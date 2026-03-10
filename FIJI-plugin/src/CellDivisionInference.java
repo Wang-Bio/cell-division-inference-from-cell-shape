@@ -31,7 +31,7 @@ import java.text.DecimalFormat;
 
 import com.google.gson.*;
 
-public class Open_Figure_Window implements PlugIn {
+public class CellDivisionInference implements PlugIn {
 
     private ImagePlus currentImp;
     private BufferedImage currentBI;
@@ -171,7 +171,7 @@ public class Open_Figure_Window implements PlugIn {
 
         SwingUtilities.invokeLater(() -> {
 
-            JFrame frame=new JFrame("Figure Window");
+            JFrame frame=new JFrame("Cell Division Inference");
             frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             frame.setSize(900,700);
 
@@ -362,7 +362,7 @@ public class Open_Figure_Window implements PlugIn {
         imagePanel.setLines(lineEdges);
         imagePanel.setPolygons(polygons);
 
-        frame.setTitle("Figure Window — "+name);
+        frame.setTitle("Cell Division Inference — "+name);
     }
 
     private void skeletonize2D(JFrame frame){
@@ -5804,10 +5804,10 @@ public class Open_Figure_Window implements PlugIn {
 
             lines=l;
             clearNeighborPairs();
-            Open_Figure_Window.this.clearNeighborPairGeometryCache();
-            Open_Figure_Window.this.clearNeighborPairEstimationCache();
-            Open_Figure_Window.this.clearRealDivisionPairCache();
-            Open_Figure_Window.this.clearComparisonPairCaches();
+            CellDivisionInference.this.clearNeighborPairGeometryCache();
+            CellDivisionInference.this.clearNeighborPairEstimationCache();
+            CellDivisionInference.this.clearRealDivisionPairCache();
+            CellDivisionInference.this.clearComparisonPairCaches();
             repaint();
         }
 
@@ -5816,10 +5816,10 @@ public class Open_Figure_Window implements PlugIn {
             polygons=p;
             polygonDisplayIds = new ArrayList<>();
             clearNeighborPairs();
-            Open_Figure_Window.this.clearNeighborPairGeometryCache();
-            Open_Figure_Window.this.clearNeighborPairEstimationCache();
-            Open_Figure_Window.this.clearRealDivisionPairCache();
-            Open_Figure_Window.this.clearComparisonPairCaches();
+            CellDivisionInference.this.clearNeighborPairGeometryCache();
+            CellDivisionInference.this.clearNeighborPairEstimationCache();
+            CellDivisionInference.this.clearRealDivisionPairCache();
+            CellDivisionInference.this.clearComparisonPairCaches();
             sortPolygonsByTopVertices();
             refreshPolygonColors();
             repaint();
@@ -5829,10 +5829,10 @@ public class Open_Figure_Window implements PlugIn {
             polygons = p;
             polygonDisplayIds = new ArrayList<>();
             clearNeighborPairs();
-            Open_Figure_Window.this.clearNeighborPairGeometryCache();
-            Open_Figure_Window.this.clearNeighborPairEstimationCache();
-            Open_Figure_Window.this.clearRealDivisionPairCache();
-            Open_Figure_Window.this.clearComparisonPairCaches();
+            CellDivisionInference.this.clearNeighborPairGeometryCache();
+            CellDivisionInference.this.clearNeighborPairEstimationCache();
+            CellDivisionInference.this.clearRealDivisionPairCache();
+            CellDivisionInference.this.clearComparisonPairCaches();
 
             // IMPORTANT:
             // Do NOT sort here.
@@ -5975,19 +5975,19 @@ public class Open_Figure_Window implements PlugIn {
         void setNeighborPairs(List<int[]> pairs){
             if(pairs == null) neighborPairs = new ArrayList<>();
             else neighborPairs = new ArrayList<>(pairs);
-            Open_Figure_Window.this.clearNeighborPairGeometryCache();
-            Open_Figure_Window.this.clearNeighborPairEstimationCache();
-            Open_Figure_Window.this.clearRealDivisionPairCache();
-            Open_Figure_Window.this.clearComparisonPairCaches();
+            CellDivisionInference.this.clearNeighborPairGeometryCache();
+            CellDivisionInference.this.clearNeighborPairEstimationCache();
+            CellDivisionInference.this.clearRealDivisionPairCache();
+            CellDivisionInference.this.clearComparisonPairCaches();
             repaint();
         }
 
         void clearNeighborPairs(){
             neighborPairs = new ArrayList<>();
-            Open_Figure_Window.this.clearNeighborPairGeometryCache();
-            Open_Figure_Window.this.clearNeighborPairEstimationCache();
-            Open_Figure_Window.this.clearRealDivisionPairCache();
-            Open_Figure_Window.this.clearComparisonPairCaches();
+            CellDivisionInference.this.clearNeighborPairGeometryCache();
+            CellDivisionInference.this.clearNeighborPairEstimationCache();
+            CellDivisionInference.this.clearRealDivisionPairCache();
+            CellDivisionInference.this.clearComparisonPairCaches();
         }
 
         boolean isShowNeighborLinks(){
@@ -6423,8 +6423,8 @@ public class Open_Figure_Window implements PlugIn {
             // ===== estimated division arrows (daughter-cell pairs) =====
             if(showDivisionArrows
                     && polygons != null && polygons.size() > 0
-                    && Open_Figure_Window.this.neighborPairEstimationCache != null
-                    && !Open_Figure_Window.this.neighborPairEstimationCache.isEmpty()){
+                    && CellDivisionInference.this.neighborPairEstimationCache != null
+                    && !CellDivisionInference.this.neighborPairEstimationCache.isEmpty()){
 
                 Stroke oldStroke = g2.getStroke();
                 Color oldColor = g2.getColor();
@@ -6440,7 +6440,7 @@ public class Open_Figure_Window implements PlugIn {
                 headLen = Math.max(3.0, Math.min(60.0, headLen));
                 headWid = Math.max(2.0, Math.min(40.0, headWid));
 
-                for(Map.Entry<Long, EstimationEntry> ent : Open_Figure_Window.this.neighborPairEstimationCache.entrySet()){
+                for(Map.Entry<Long, EstimationEntry> ent : CellDivisionInference.this.neighborPairEstimationCache.entrySet()){
                     EstimationEntry ee = ent.getValue();
                     if(ee == null || !ee.selected) continue;
 
@@ -6471,8 +6471,8 @@ public class Open_Figure_Window implements PlugIn {
             // ===== real (groud-truth) division arrows =====
             if(showRealDivisionArrows
                     && polygons != null && polygons.size() > 0
-                    && Open_Figure_Window.this.realDivisionPairCache != null
-                    && !Open_Figure_Window.this.realDivisionPairCache.isEmpty()){
+                    && CellDivisionInference.this.realDivisionPairCache != null
+                    && !CellDivisionInference.this.realDivisionPairCache.isEmpty()){
 
                 Stroke oldStroke = g2.getStroke();
                 Color oldColor = g2.getColor();
@@ -6486,7 +6486,7 @@ public class Open_Figure_Window implements PlugIn {
                 headLen = Math.max(3.0, Math.min(60.0, headLen));
                 headWid = Math.max(2.0, Math.min(40.0, headWid));
 
-                for(Map.Entry<Long, RealDivisionEntry> ent : Open_Figure_Window.this.realDivisionPairCache.entrySet()){
+                for(Map.Entry<Long, RealDivisionEntry> ent : CellDivisionInference.this.realDivisionPairCache.entrySet()){
                     long k = ent.getKey();
                     int a = (int)(k >> 32);
                     int b = (int)(k & 0xffffffffL);
@@ -6514,7 +6514,7 @@ public class Open_Figure_Window implements PlugIn {
 
             // ===== True positive arrows =====
             if(showTruePositiveDivisionArrows
-                && polygons != null && !Open_Figure_Window.this.truePositivePairCache.isEmpty()){
+                && polygons != null && !CellDivisionInference.this.truePositivePairCache.isEmpty()){
 
                 Stroke oldStroke = g2.getStroke();
                 Color oldColor = g2.getColor();
@@ -6526,7 +6526,7 @@ public class Open_Figure_Window implements PlugIn {
                 double headLen = Math.max(3.0, Math.min(60.0, truePositiveArrowHeadLength * zoom));
                 double headWid = Math.max(2.0, Math.min(40.0, truePositiveArrowHeadWidth  * zoom));
 
-                for(long k : Open_Figure_Window.this.truePositivePairCache.keySet()){
+                for(long k : CellDivisionInference.this.truePositivePairCache.keySet()){
                     int a = (int)(k >> 32);
                     int b = (int)(k & 0xffffffffL);
                     if(a < 0 || b < 0 || a >= polygons.size() || b >= polygons.size()) continue;
@@ -6548,7 +6548,7 @@ public class Open_Figure_Window implements PlugIn {
 
             // ===== False positive arrows =====
             if(showFalsePositiveDivisionArrows
-                    && polygons != null && !Open_Figure_Window.this.falsePositivePairCache.isEmpty()){
+                    && polygons != null && !CellDivisionInference.this.falsePositivePairCache.isEmpty()){
 
                 Stroke oldStroke = g2.getStroke();
                 Color oldColor = g2.getColor();
@@ -6560,7 +6560,7 @@ public class Open_Figure_Window implements PlugIn {
                 double headLen = Math.max(3.0, Math.min(60.0, falsePositiveArrowHeadLength * zoom));
                 double headWid = Math.max(2.0, Math.min(40.0, falsePositiveArrowHeadWidth  * zoom));
 
-                for(long k : Open_Figure_Window.this.falsePositivePairCache.keySet()){
+                for(long k : CellDivisionInference.this.falsePositivePairCache.keySet()){
                     int a = (int)(k >> 32);
                     int b = (int)(k & 0xffffffffL);
                     if(a < 0 || b < 0 || a >= polygons.size() || b >= polygons.size()) continue;
@@ -6582,7 +6582,7 @@ public class Open_Figure_Window implements PlugIn {
 
             // ===== false negative arrows =====
             if(showFalseNegativeDivisionArrows
-        && polygons != null && !Open_Figure_Window.this.falseNegativePairCache.isEmpty()){
+        && polygons != null && !CellDivisionInference.this.falseNegativePairCache.isEmpty()){
 
                 Stroke oldStroke = g2.getStroke();
                 Color oldColor = g2.getColor();
@@ -6594,7 +6594,7 @@ public class Open_Figure_Window implements PlugIn {
                 double headLen = Math.max(3.0, Math.min(60.0, falseNegativeArrowHeadLength * zoom));
                 double headWid = Math.max(2.0, Math.min(40.0, falseNegativeArrowHeadWidth  * zoom));
 
-                for(long k : Open_Figure_Window.this.falseNegativePairCache.keySet()){
+                for(long k : CellDivisionInference.this.falseNegativePairCache.keySet()){
                     int a = (int)(k >> 32);
                     int b = (int)(k & 0xffffffffL);
                     if(a < 0 || b < 0 || a >= polygons.size() || b >= polygons.size()) continue;
