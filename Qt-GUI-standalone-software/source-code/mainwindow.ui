@@ -1,0 +1,722 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QWidget" name="widget" native="true">
+      <layout class="QFormLayout" name="formLayout_2">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_input_file_name">
+         <property name="text">
+          <string>Input File Name</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLabel" name="label_input_file_name_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_input_directory">
+         <property name="text">
+          <string>Input Directory</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLabel" name="label_input_directory_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_canvas_size">
+         <property name="text">
+          <string>Canvas Size</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QLabel" name="label_canvas_size_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_mouse_position">
+         <property name="text">
+          <string>Mouse Position</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QLabel" name="label_mouse_position_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="label_mouse_pixel">
+         <property name="text">
+          <string>Mouse Pixel</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLabel" name="label_mouse_pixel_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="label_selected_item">
+         <property name="text">
+          <string>Selected Item</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QLabel" name="label_selected_item_name">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="label_selected_item_id">
+         <property name="text">
+          <string>Selected Item Id</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="1">
+        <widget class="QLabel" name="label_selected_item_id_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="0">
+        <widget class="QLabel" name="label_vertex_number">
+         <property name="text">
+          <string>Vertex Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="1">
+        <widget class="QLabel" name="label_vertex_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="label_selected_item_pos">
+         <property name="text">
+          <string>Selected Item Pos</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="1">
+        <widget class="QLabel" name="label_selected_item_pos_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="0">
+        <widget class="QLabel" name="label_line_number">
+         <property name="text">
+          <string>Line Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="1">
+        <widget class="QLabel" name="label_line_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="0">
+        <widget class="QLabel" name="label_polygon_number">
+         <property name="text">
+          <string>Polygon Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="1">
+        <widget class="QLabel" name="label_polygon_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="0">
+        <widget class="QLabel" name="label_neighbor_polygon_number">
+         <property name="text">
+          <string>Neighbor Polygon Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="1">
+        <widget class="QLabel" name="label_neighbor_polygon_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="0">
+        <widget class="QLabel" name="label_estimated_division_number">
+         <property name="text">
+          <string>Estimated Division Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="1">
+        <widget class="QLabel" name="label_estimated_division_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="0">
+        <widget class="QLabel" name="label_real_division_number">
+         <property name="text">
+          <string>Real Division Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="1">
+        <widget class="QLabel" name="label_real_division_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="0">
+        <widget class="QLabel" name="label_true_positive_number">
+         <property name="text">
+          <string>True Positive Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="1">
+        <widget class="QLabel" name="label_true_positive_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="0">
+        <widget class="QLabel" name="label_false_positive_number">
+         <property name="text">
+          <string>False Postivie Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="1">
+        <widget class="QLabel" name="label_false_positive_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="0">
+        <widget class="QLabel" name="label_false_negative_number">
+         <property name="text">
+          <string>False Negative Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="1">
+        <widget class="QLabel" name="label_false_negative_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="17" column="0">
+        <widget class="QLabel" name="label_true_negative_number">
+         <property name="text">
+          <string>True Negative Num</string>
+         </property>
+        </widget>
+       </item>
+       <item row="17" column="1">
+        <widget class="QLabel" name="label_true_negative_number_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="18" column="0">
+        <widget class="QLabel" name="label_precision">
+         <property name="text">
+          <string>Precision</string>
+         </property>
+        </widget>
+       </item>
+       <item row="18" column="1">
+        <widget class="QLabel" name="label_precision_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="19" column="0">
+        <widget class="QLabel" name="label_recall">
+         <property name="text">
+          <string>Recall</string>
+         </property>
+        </widget>
+       </item>
+       <item row="19" column="1">
+        <widget class="QLabel" name="label_recall_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="20" column="0">
+        <widget class="QLabel" name="label_F1_score">
+         <property name="text">
+          <string>F1 score</string>
+         </property>
+        </widget>
+       </item>
+       <item row="20" column="1">
+        <widget class="QLabel" name="label_F1_score_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="21" column="0">
+        <widget class="QLabel" name="label_specificity">
+         <property name="text">
+          <string>Specificity</string>
+         </property>
+        </widget>
+       </item>
+       <item row="21" column="1">
+        <widget class="QLabel" name="label_specificity_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="22" column="0">
+        <widget class="QLabel" name="label_accuracy">
+         <property name="text">
+          <string>Accuracy</string>
+         </property>
+        </widget>
+       </item>
+       <item row="22" column="1">
+        <widget class="QLabel" name="label_accuracy_value">
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="InteractiveGraphicsView" name="graphicsView"/>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>800</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuOpen">
+   <property name="title">
+    <string>Open</string>
+   </property>
+   <addaction name="actionOpen_Raw_Image"/>
+    <addaction name="actionOpen_Background"/>
+    <addaction name="actionCreate_Canvas"/>
+  </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="actionEdit_Setting"/>
+    <addaction name="actionDelete_Image"/>
+    <addaction name="actionAdd_Vertex"/>
+    <addaction name="actionDelete_Vertex"/>
+    <addaction name="actionDelete_All_Vertices"/>
+    <addaction name="actionAdd_Line"/>
+    <addaction name="actionDelete_Line"/>
+    <addaction name="actionDelete_All_Lines"/>
+    <addaction name="actionAdd_Polygon"/>
+    <addaction name="actionDelete_Polygon"/>
+    <addaction name="actionDelete_All_Polygons"/>
+   </widget>
+   <widget class="QMenu" name="menuDetection">
+    <property name="title">
+     <string>Detect</string>
+    </property>
+    <addaction name="actionSkeletonization"/>
+    <addaction name="actionVertex_Detection"/>
+    <addaction name="actionLine_Detection"/>
+    <addaction name="actionPolygon_Detection"/>
+    <addaction name="actionDetect_Neighbor_Pairs"/>
+   </widget>
+   <widget class="QMenu" name="menuGeometry">
+    <property name="title">
+     <string>Geometry</string>
+    </property>
+    <addaction name="actionGeometry_Calculation_Setting"/>
+    <addaction name="actionNeighbor_Pair_Geometry_Calculation"/>
+    <addaction name="actionBatch_Neighbor_Pair_Geometry_Calculation"/>
+    <addaction name="actionBatch_Single_Cell_Geometry_Calculation"/>
+   </widget>
+   <widget class="QMenu" name="menuEstimate">
+    <property name="title">
+     <string>Estimate</string>
+    </property>
+    <addaction name="actionEstimate_division_by_single_geometry"/>
+    <addaction name="actionCompare_with_real_division"/>
+    <addaction name="actionBatch_Estimate_Division_by_single_geometry"/>
+    <addaction name="actionBatch_Estimate_Division_by_designated_geometry"/>
+    <addaction name="actionPrecision_and_Recall_Curve_Over_Single_Geometry"/>
+   </widget>
+   <widget class="QMenu" name="menuDisplay">
+    <property name="title">
+     <string>Display</string>
+    </property>
+    <addaction name="actionVertex_Display_Setting"/>
+    <addaction name="actionLine_Display_Setting"/>
+    <addaction name="actionPolygon_Display_Setting"/>
+    <addaction name="actionNeighbor_Pair_Display_Setting"/>
+    <addaction name="actionDivision_Pair_Display_Setting"/>
+   </widget>
+   <widget class="QMenu" name="menuDebug">
+   <property name="title">
+     <string>Debug</string>
+    </property>
+    <addaction name="actionGenerate_Random_Network"/>
+    <addaction name="actionCheck_Geometry_Calculation_Single_Pair"/>
+    <addaction name="actionComparing_Batch_Estimation"/>
+    <addaction name="actionExport_Geometric_Feature_Names"/>
+   </widget>
+   <widget class="QMenu" name="menuFind">
+    <property name="title">
+     <string>Find</string>
+    </property>
+    <addaction name="actionFind_Vertex"/>
+    <addaction name="actionFind_Line"/>
+    <addaction name="actionFind_Polygon"/>
+   </widget>
+   <widget class="QMenu" name="menuPlot">
+    <property name="title">
+     <string>Analysis &amp;&amp; Plot</string>
+    </property>
+    <addaction name="actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot"/>
+    <addaction name="actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot"/>
+    <addaction name="actionTemporal_Analysis_Over_Single_Geometry_Box_Plot"/>
+   </widget>
+   <widget class="QMenu" name="menuImport_Export">
+   <property name="title">
+    <string>Import &amp;&amp; Export</string>
+   </property>
+    <addaction name="actionImport"/>
+    <addaction name="actionImport_All_Data"/>
+    <addaction name="actionExport"/>
+    <addaction name="actionExport_All_Data"/>
+   </widget>
+   <addaction name="menuOpen"/>
+   <addaction name="menuDetection"/>
+   <addaction name="menuGeometry"/>
+   <addaction name="menuEstimate"/>
+   <addaction name="menuDisplay"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuFind"/>
+   <addaction name="menuPlot"/>
+   <addaction name="menuImport_Export"/>
+   <addaction name="menuDebug"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionOpen_Raw_Image">
+   <property name="text">
+    <string>Open Raw Image</string>
+   </property>
+  </action>
+  <action name="actionOpen_Background">
+   <property name="text">
+    <string>Open Background</string>
+   </property>
+  </action>
+  <action name="actionCreate_Canvas">
+   <property name="text">
+    <string>Create Canvas</string>
+   </property>
+  </action>
+  <action name="actionDelete_Image">
+   <property name="text">
+    <string>Delete Image</string>
+   </property>
+  </action>
+  <action name="actionAdd_Vertex">
+   <property name="text">
+    <string>Add Vertex</string>
+   </property>
+  </action>
+  <action name="actionDelete_Vertex">
+   <property name="text">
+    <string>Delete Vertex</string>
+   </property>
+  </action>
+  <action name="actionDelete_All_Vertices">
+   <property name="text">
+    <string>Delete All Vertices</string>
+   </property>
+  </action>
+  <action name="actionVertex_Display_Setting">
+   <property name="text">
+    <string>Vertex Display Setting</string>
+   </property>
+  </action>
+  <action name="actionFind_Vertex">
+   <property name="text">
+    <string>Find Vertex</string>
+   </property>
+  </action>
+  <action name="actionAdd_Line">
+   <property name="text">
+    <string>Add Line</string>
+   </property>
+  </action>
+  <action name="actionDelete_Line">
+   <property name="text">
+    <string>Delete Line</string>
+   </property>
+  </action>
+  <action name="actionDelete_All_Lines">
+   <property name="text">
+    <string>Delete All Lines</string>
+   </property>
+  </action>
+  <action name="actionFind_Line">
+   <property name="text">
+    <string>Find Line</string>
+   </property>
+  </action>
+  <action name="actionLine_Display_Setting">
+   <property name="text">
+    <string>Line Display Setting</string>
+   </property>
+  </action>
+  <action name="actionAdd_Polygon">
+   <property name="text">
+    <string>Add Polygon</string>
+   </property>
+  </action>
+  <action name="actionDelete_Polygon">
+   <property name="text">
+    <string>Delete Polygon</string>
+   </property>
+  </action>
+  <action name="actionDelete_All_Polygons">
+   <property name="text">
+    <string>Delete All Polygons</string>
+   </property>
+  </action>
+  <action name="actionPolygon_Display_Setting">
+   <property name="text">
+    <string>Polygon Display Setting</string>
+   </property>
+  </action>
+  <action name="actionFind_Polygon">
+   <property name="text">
+    <string>Find Polygon</string>
+   </property>
+  </action>
+  <action name="actionGenerate_Random_Network">
+   <property name="text">
+    <string>Generate Random Network</string>
+   </property>
+  </action>
+  <action name="actionDetect_Neighbor_Pairs">
+   <property name="text">
+    <string>Detect Neighbor Pairs</string>
+   </property>
+  </action>
+  <action name="actionNeighbor_Pair_Display_Setting">
+   <property name="text">
+    <string>Neighbor Pair Display Setting</string>
+   </property>
+  </action>
+  <action name="actionDivision_Pair_Display_Setting">
+   <property name="text">
+    <string>Division Pair Display Setting</string>
+   </property>
+  </action>
+  <action name="actionSkeletonization">
+   <property name="text">
+    <string>Skeletonization</string>
+   </property>
+  </action>
+  <action name="actionVertex_Detection">
+   <property name="text">
+    <string>Vertex Detection</string>
+   </property>
+  </action>
+  <action name="actionLine_Detection">
+   <property name="text">
+    <string>Line Detection</string>
+   </property>
+  </action>
+  <action name="actionPolygon_Detection">
+   <property name="text">
+    <string>Polygon Detection</string>
+   </property>
+  </action>
+  <action name="actionEdit_Setting">
+   <property name="text">
+    <string>Edit Setting</string>
+   </property>
+  </action>
+  <action name="actionGeometry_Calculation_Setting">
+   <property name="text">
+    <string>Geometry Calculation Setting</string>
+   </property>
+  </action>
+  <action name="actionNeighbor_Pair_Geometry_Calculation">
+   <property name="text">
+    <string>Neighbor Pair Geometry Calculation</string>
+   </property>
+  </action>
+  <action name="actionEstimate_division_by_single_geometry">
+   <property name="text">
+    <string>Estimate division by single geometry</string>
+   </property>
+  </action>
+  <action name="actionCompare_with_real_division">
+   <property name="text">
+    <string>Compare with real division</string>
+   </property>
+  </action>
+  <action name="actionExport_Setting">
+   <property name="text">
+    <string>Export Setting</string>
+   </property>
+  </action>
+  <action name="actionImport">
+   <property name="text">
+    <string>Import</string>
+   </property>
+  </action>
+  <action name="actionImport_All_Data">
+   <property name="text">
+    <string>Import All Data (JSON)</string>
+   </property>
+  </action>
+  <action name="actionExport">
+   <property name="text">
+    <string>Export</string>
+   </property>
+  </action>
+  <action name="actionExport_All_Data">
+   <property name="text">
+    <string>Export All Data (JSON)</string>
+   </property>
+  </action>
+  <action name="actionBatch_Neighbor_Pair_Geometry_Calculation">
+    <property name="text">
+     <string>Batch Neighbor Pair Geometry Calculation</string>
+    </property>
+  </action>
+  <action name="actionBatch_Single_Cell_Geometry_Calculation">
+   <property name="text">
+    <string>Batch Single Cell Geometry Calculation</string>
+   </property>
+  </action>
+  <action name="actionBatch_Estimate_Division_by_single_geometry">
+   <property name="text">
+    <string>Batch Estimate Division by single geometry</string>
+   </property>
+  </action>
+  <action name="actionBatch_Estimate_Division_by_designated_geometry">
+   <property name="text">
+    <string>Batch Estimate Division by designated geometry</string>
+   </property>
+  </action>
+  <action name="actionCheck_Geometry_Calculation_Single_Pair">
+   <property name="text">
+    <string>Check Geometry Calculation (Single Pair)</string>
+   </property>
+  </action>
+  <action name="actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot">
+   <property name="text">
+    <string>Comparing Daughter and Non-Daughter Group &amp;&amp; Box Plot</string>
+   </property>
+  </action>
+  <action name="actionPrecision_and_Recall_Curve_Over_Single_Geometry">
+   <property name="text">
+    <string>Batch Estimate Division by ranging single geometry</string>
+   </property>
+  </action>
+  <action name="actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot">
+   <property name="text">
+    <string>Comparing Daughter and Non-Daughter Group &amp;&amp; Histogram Plot</string>
+   </property>
+  </action>
+  <action name="actionTemporal_Analysis_Over_Single_Geometry_Box_Plot">
+   <property name="text">
+    <string>Temporal Analysis Over Single Geometry &amp;&amp; Box Plot</string>
+   </property>
+  </action>
+  <action name="actionComparing_Batch_Estimation">
+   <property name="text">
+    <string>Comparing Batch Estimation</string>
+   </property>
+  </action>
+  <action name="actionExport_Geometric_Feature_Names">
+   <property name="text">
+    <string>Export Geometric Feature Names</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>InteractiveGraphicsView</class>
+   <extends>QGraphicsView</extends>
+   <header>interactivegraphicsview.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

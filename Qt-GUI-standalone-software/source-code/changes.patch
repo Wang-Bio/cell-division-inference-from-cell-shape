@@ -1,0 +1,142 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/mainwindow.ui b/mainwindow.ui
+index 133ea1c9534aa0f999aec350bdce0a1d1597b6a1..59c87b8e2d562d92f401ba761298e99daddb4bdc 100644
+--- a/mainwindow.ui
++++ b/mainwindow.ui
+@@ -1119,58 +1119,58 @@
+   <action name="actionSnapShot_All">
+    <property name="text">
+     <string>Snapshot (All)</string>
+    </property>
+   </action>
+   <action name="actionSnapShot_View">
+    <property name="text">
+     <string>Snapshot (View)</string>
+    </property>
+   </action>
+   <action name="actionCreate_Test_Polygon_Network">
+    <property name="text">
+     <string>Create Test Polygon Network</string>
+    </property>
+   </action>
+   <action name="actionDebug_Geometric_Property_Calculation">
+    <property name="text">
+     <string>Debug-Geometric Property Calculation</string>
+    </property>
+   </action>
+   <action name="actionExport_Vertex_Only">
+    <property name="text">
+     <string>Export Vertices (JSON)</string>
+    </property>
+   </action>
+-  <action name="actionExport_Real_Division">
+-   <property name="text">
+-    <string>Real Division</string>
+-   </property>
+-   <property name="toolTip">
+-    <string>Export real division pairs to a CSV file</string>
+-   </property>
+-  </action>
++  <action name="actionExport_Real_Division">
++   <property name="text">
++    <string>Export Real Division Pairs</string>
++   </property>
++   <property name="toolTip">
++    <string>Export real division pairs to a CSV file</string>
++   </property>
++  </action>
+   <action name="actionExport_Estimated_Division">
+    <property name="text">
+     <string>Estimated Division</string>
+    </property>
+    <property name="toolTip">
+     <string>Export estimated division pairs to a CSV file</string>
+    </property>
+   </action>
+   <action name="actionPlot_Angle_Distribution_Histogram">
+    <property name="text">
+     <string>Plot angle distribution histogram from estimated cell division</string>
+    </property>
+   </action>
+   <action name="actionPlot_Two_Angle_Distributions">
+    <property name="text">
+     <string>Plot two angle distribution histograms from estimated cell division</string>
+    </property>
+   </action>
+   <action name="actionExport_Vertex_Line">
+    <property name="text">
+     <string>Export Vertices, Lines, and Polygons (.json)</string>
+    </property>
+   </action>
+   <action name="actionExport_Estimation_Metrics">
+    <property name="text">
+@@ -1200,58 +1200,58 @@
+    <property name="text">
+     <string>Export Division Comparison Graph Figure</string>
+    </property>
+    <property name="toolTip">
+     <string>Export a neighbor graph highlighting matching (red), real-only (green), and estimated-only (blue) division pairs</string>
+    </property>
+   </action>
+   <action name="actionExport_All_Information">
+    <property name="text">
+     <string>Export All Information</string>
+    </property>
+    <property name="toolTip">
+     <string>Export comparison graphics, metrics, and neighbor pair features</string>
+    </property>
+   </action>
+   <action name="actionImport_Vertex_Only">
+    <property name="text">
+     <string>Import Vertices (JSON)</string>
+    </property>
+   </action>
+   <action name="actionImport_Vertex_Line">
+    <property name="text">
+     <string>Import Vertices, Lines, and Polygons (.json)</string>
+    </property>
+   </action>
+-  <action name="actionImport_Real_Division">
+-   <property name="text">
+-    <string>Real Division</string>
+-   </property>
+-   <property name="toolTip">
+-    <string>Import real division pairs from a CSV file</string>
+-   </property>
+-  </action>
++  <action name="actionImport_Real_Division">
++   <property name="text">
++    <string>Import Real Division Pairs</string>
++   </property>
++   <property name="toolTip">
++    <string>Import real division pairs from a CSV file</string>
++   </property>
++  </action>
+   <action name="actionDelete_All_Polygons">
+    <property name="text">
+     <string>Delete All Polygons</string>
+    </property>
+   </action>
+   <action name="actionCell_Contour_Image">
+    <property name="text">
+     <string>Cell Contour Image</string>
+    </property>
+   </action>
+   <action name="actionCustom_Canvas">
+    <property name="text">
+     <string>Custom Canvas</string>
+    </property>
+   </action>
+   <action name="actionTemporal_Analysis">
+    <property name="text">
+     <string>Temporal Analysis</string>
+    </property>
+   </action>
+   <action name="actionSemi_auto_tracking_based_on_topology">
+    <property name="text">
+     <string>Semi-auto tracking (based on topology)</string>
+    </property>
+    <property name="shortcut">
+ 
+EOF
+)
