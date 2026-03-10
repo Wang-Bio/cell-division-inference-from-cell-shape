@@ -83,9 +83,9 @@ If you are reviewing methodology transfer to another species/system, we recommen
 ## Contact
 
 For correspondence regarding materials, method usage, or reproducibility:
-First author:
+- First author:
 - Zining Wang: `wangzining2020@g.ecc.u-tokyo.ac.jp`
-Correspondence authors:
+- Correspondence authors:
 - Hirokazu Tsukaya: `tsukaya3946@g.ecc.u-tokyo.ac.jp`
 - Yasuhiro Inoue: `inoue.yasuhiro.4n@kyoto-u.ac.jp`
 - Atsushi Mochizuki: `mochi@infront.kyoto-u.ac.jp`
