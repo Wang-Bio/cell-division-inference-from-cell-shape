@@ -33,11 +33,35 @@ import com.google.gson.*;
 
 public class CellDivisionInference implements PlugIn {
 
+    private static class CenteredViewPanel extends JPanel {
+        private final JComponent content;
+
+        CenteredViewPanel(JComponent content){
+            super(new GridBagLayout());
+            this.content = content;
+            setOpaque(true);
+            add(content, new GridBagConstraints());
+        }
+
+        @Override
+        public Dimension getPreferredSize(){
+            Dimension pref = content.getPreferredSize();
+            Container parent = getParent();
+            if(parent instanceof JViewport){
+                Dimension extent = ((JViewport)parent).getExtentSize();
+                return new Dimension(Math.max(pref.width, extent.width), Math.max(pref.height, extent.height));
+            }
+            return pref;
+        }
+    }
+
+
     private ImagePlus currentImp;
     private BufferedImage currentBI;
     private String currentGeometrySourceFileName = "unknown.json";
 
     private ImagePanel imagePanel;
+    private JPanel centeredImageContainer;
     private JScrollPane scrollPane;
     private JFrame mainFrame;
     private JPanel infoPanel;
@@ -58,19 +82,25 @@ public class CellDivisionInference implements PlugIn {
     private JLabel infoTruePositiveCountValue;
     private JLabel infoFalsePositiveCountValue;
     private JLabel infoFalseNegativeCountValue;
+    private JLabel infoTrueNegativeCountValue;
+    private JLabel infoPrecisionValue;
+    private JLabel infoRecallValue;
+    private JLabel infoF1Value;
+    private JLabel infoAccuracyValue;
+    private JLabel infoSpecificityValue;
 
     // ===== Vertex display =====
-    private Color vertexColor = Color.GRAY;
+    private Color vertexColor = new Color(0xAA, 0xFF, 0xFF);
     private int vertexRadius = 8;
 
     // ===== Line display =====
-    private Color lineColor = Color.GREEN;   
+    private Color lineColor = Color.GRAY;   
     private float lineWidth = 2.0f;          
 
     // ===== Polygon display =====
     private boolean polygonRandomColors = false;               // uniform vs random
-    private Color polygonUniformColor = new Color(0, 200, 255);
-    private int polygonFillAlpha = 60;                         // 0..255
+    private Color polygonUniformColor = new Color(128, 128, 128);
+    private int polygonFillAlpha = 64;
 
     // ===== Cell ID label display =====
     private boolean showCellId = true;
@@ -79,19 +109,19 @@ public class CellDivisionInference implements PlugIn {
 
     // ===== Neighbor link display style =====
     private boolean showNeighborLinks = true;
-    private Color neighborLinkColor = new Color(255,0,255);
+    private Color neighborLinkColor = new Color(255,85,0);
     private float neighborLinkWidth = 1.5f;
 
     // ===== Estimated division arrow display style =====
     private boolean showDivisionArrows = true;
-    private Color divisionArrowColor = new Color(255, 140, 0, 220);
+    private Color divisionArrowColor = new Color(255, 140, 0);
     private float divisionArrowWidth = 2.0f;                    
     private double divisionArrowHeadLength = 5.0;                 
     private double divisionArrowHeadWidth  = 3.0;  
     
     // ===== Real division arrow display style =====
     private boolean showRealDivisionArrows = true;
-    private Color realDivisionArrowColor = new Color(255,153,153,220);
+    private Color realDivisionArrowColor = new Color(255,153,153);
     private float realDivisionArrowWidth = 2.0f;
     private double realDivisionArrowHeadLength = 5.0;
     private double realDivisionArrowHeadWidth = 3.0;
@@ -101,21 +131,21 @@ public class CellDivisionInference implements PlugIn {
     // Qt colors from divisionestimator.cpp:
     // TP "#AA1E1E", FP "#50AA78", FN "#3C78C8"
     private boolean showTruePositiveDivisionArrows = true;
-    private Color truePositiveArrowColor = new Color(170, 30, 30, 220);
+    private Color truePositiveArrowColor = new Color(170, 30, 30);
     private float truePositiveArrowWidth = 2.0f;
     private double truePositiveArrowHeadLength = 5.0;
     private double truePositiveArrowHeadWidth  = 3.0;
     private DivisionArrowType truePositiveArrowType = DivisionArrowType.DoubleHeaded;
 
     private boolean showFalsePositiveDivisionArrows = true;
-    private Color falsePositiveArrowColor = new Color(80, 170, 120, 220);
+    private Color falsePositiveArrowColor = new Color(80, 170, 120);
     private float falsePositiveArrowWidth = 2.0f;
     private double falsePositiveArrowHeadLength = 5.0;
     private double falsePositiveArrowHeadWidth  = 3.0;
     private DivisionArrowType falsePositiveArrowType = DivisionArrowType.DoubleHeaded;
 
     private boolean showFalseNegativeDivisionArrows = true;
-    private Color falseNegativeArrowColor = new Color(60, 120, 200, 220);
+    private Color falseNegativeArrowColor = new Color(60, 120, 200);
     private float falseNegativeArrowWidth = 2.0f;
     private double falseNegativeArrowHeadLength = 5.0;
     private double falseNegativeArrowHeadWidth  = 3.0;
@@ -195,7 +225,9 @@ public class CellDivisionInference implements PlugIn {
             frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 
             imagePanel=new ImagePanel();
-            scrollPane=new JScrollPane(imagePanel);
+            centeredImageContainer = new CenteredViewPanel(imagePanel);
+            centeredImageContainer.setBackground(Color.BLACK);
+            scrollPane=new JScrollPane(centeredImageContainer);
             infoPanel = createInfoPanel();
 
             scrollPane.getVerticalScrollBar().setUnitIncrement(16);
@@ -224,7 +256,13 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
-            JMenu processMenu=new JMenu("Process");
+            fileMenu.add(new JMenuItem(new AbstractAction("Open Background..."){
+                public void actionPerformed(ActionEvent e){
+                    openBackground(frame);
+                }
+            }));
+
+            JMenu processMenu=new JMenu("Detect");
 
             processMenu.add(new JMenuItem(new AbstractAction("Skeletonize"){
                 public void actionPerformed(ActionEvent e){
@@ -263,21 +301,23 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
             */
-            processMenu.addSeparator();
+            JMenu geometryMenu=new JMenu("Geometry");
 
-            processMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Geometrical Calculation...") {
+            geometryMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Geometrical Calculation...") {
                 @Override public void actionPerformed(ActionEvent e){
                     calculateAllNeighborPairGeometries(frame);
                 }                
             }));
 
-            processMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Estimation...") {
+            JMenu estimateMenu=new JMenu("Estimate");
+
+            estimateMenu.add(new JMenuItem(new AbstractAction("divided pair estimation...") {
                 @Override public void actionPerformed(ActionEvent e){
                     showNeighborPairEstimationDialog(frame);
                 }
             }));
 
-            processMenu.add(new JMenuItem(new AbstractAction("Compare Estimated and Real Division...") {
+            estimateMenu.add(new JMenuItem(new AbstractAction("Compare Estimated and Real Division...") {
                 @Override public void actionPerformed(ActionEvent e){
                     compareEstimatedAndRealDivision(frame);
                 }
@@ -300,6 +340,26 @@ public class CellDivisionInference implements PlugIn {
             editMenu.add(new JMenuItem(new AbstractAction("Add polygon...") {
                 @Override public void actionPerformed(ActionEvent e){
                     showAddPolygonDialog(frame);
+                }
+            }));
+
+            editMenu.addSeparator();
+
+            editMenu.add(new JMenuItem(new AbstractAction("Delete vertex...") {
+                @Override public void actionPerformed(ActionEvent e){
+                    showDeleteVertexDialog(frame);
+                }
+            }));
+
+            editMenu.add(new JMenuItem(new AbstractAction("Delete line...") {
+                @Override public void actionPerformed(ActionEvent e){
+                    showDeleteLineDialog(frame);
+                }
+            }));
+
+            editMenu.add(new JMenuItem(new AbstractAction("Delete polygon...") {
+                @Override public void actionPerformed(ActionEvent e){
+                    showDeletePolygonDialog(frame);
                 }
             }));
 
@@ -366,9 +426,30 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
+            JMenu findMenu = new JMenu("Find");
+
+            findMenu.add(new JMenuItem(new AbstractAction("Find vertex...") {
+                @Override public void actionPerformed(ActionEvent e){
+                    showFindVertexDialog(frame);
+                }
+            }));
+
+            findMenu.add(new JMenuItem(new AbstractAction("Find line...") {
+                @Override public void actionPerformed(ActionEvent e){
+                    showFindLineDialog(frame);
+                }
+            }));
+
+            findMenu.add(new JMenuItem(new AbstractAction("Find polygon...") {
+                @Override public void actionPerformed(ActionEvent e){
+                    showFindPolygonDialog(frame);
+                }
+            }));
+
+
             JMenu ioMenu = new JMenu("Import & Export");
 
-            ioMenu.add(new JMenuItem(new AbstractAction("Import Data...") {
+            ioMenu.add(new JMenuItem(new AbstractAction("Import Polygonal Cell Networks...") {
                 @Override public void actionPerformed(ActionEvent e){
                     importData(frame);
                 }                
@@ -380,7 +461,7 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
-            ioMenu.add(new JMenuItem(new AbstractAction("Export Data..."){
+            ioMenu.add(new JMenuItem(new AbstractAction("Export Polygonal Cell Networks..."){
                 @Override public void actionPerformed(ActionEvent e){
                     exportData(frame);
                 }
@@ -394,12 +475,17 @@ public class CellDivisionInference implements PlugIn {
 
             bar.add(fileMenu);
             bar.add(processMenu);
-            bar.add(editMenu);
+            bar.add(geometryMenu);
+            bar.add(estimateMenu);
             bar.add(displayMenu);
+            bar.add(editMenu);
+            bar.add(findMenu);
             bar.add(ioMenu);
 
             frame.setJMenuBar(bar);
             updateInfoPanel();
+            frame.setSize(1200, 800);
+            frame.setLocationRelativeTo(null);
             adjustWindowToContent();
             frame.setVisible(true);
         });
@@ -415,15 +501,21 @@ public class CellDivisionInference implements PlugIn {
         infoSelectedItemValue = new JLabel("-");
         infoSelectedItemIdValue = new JLabel("-");
         infoSelectedItemPosValue = new JLabel("-");
-        infoVertexCountValue = new JLabel("0");
-        infoLineCountValue = new JLabel("0");
-        infoPolygonCountValue = new JLabel("0");
-        infoNeighborCountValue = new JLabel("0");
-        infoEstimatedCountValue = new JLabel("0");
-        infoRealCountValue = new JLabel("0");
-        infoTruePositiveCountValue = new JLabel("0");
-        infoFalsePositiveCountValue = new JLabel("0");
-        infoFalseNegativeCountValue = new JLabel("0");
+        infoVertexCountValue = new JLabel("-");
+        infoLineCountValue = new JLabel("-");
+        infoPolygonCountValue = new JLabel("-");
+        infoNeighborCountValue = new JLabel("-");
+        infoEstimatedCountValue = new JLabel("-");
+        infoRealCountValue = new JLabel("-");
+        infoTruePositiveCountValue = new JLabel("-");
+        infoFalsePositiveCountValue = new JLabel("-");
+        infoFalseNegativeCountValue = new JLabel("-");
+        infoTrueNegativeCountValue = new JLabel("-");
+        infoPrecisionValue = new JLabel("-");
+        infoRecallValue = new JLabel("-");
+        infoF1Value = new JLabel("-");
+        infoAccuracyValue = new JLabel("-");
+        infoSpecificityValue = new JLabel("-");
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(3, 6, 3, 6);
@@ -447,6 +539,12 @@ public class CellDivisionInference implements PlugIn {
         addInfoRow(panel, gbc, row++, "True Positive Num", infoTruePositiveCountValue);
         addInfoRow(panel, gbc, row++, "False Positive Num", infoFalsePositiveCountValue);
         addInfoRow(panel, gbc, row++, "False Negative Num", infoFalseNegativeCountValue);
+        addInfoRow(panel, gbc, row++, "True Negative Num", infoTrueNegativeCountValue);
+        addInfoRow(panel, gbc, row++, "Precision", infoPrecisionValue);
+        addInfoRow(panel, gbc, row++, "Recall", infoRecallValue);
+        addInfoRow(panel, gbc, row++, "F1", infoF1Value);
+        addInfoRow(panel, gbc, row++, "Accuracy", infoAccuracyValue);
+        addInfoRow(panel, gbc, row++, "Specificity", infoSpecificityValue);
 
         gbc.gridx = 0;
         gbc.gridy = row;
@@ -473,55 +571,75 @@ public class CellDivisionInference implements PlugIn {
     }
 
     private void adjustWindowToContent(){
-        if(mainFrame == null || scrollPane == null || imagePanel == null) return;
+        if(scrollPane == null || imagePanel == null || centeredImageContainer == null) return;
 
-        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-        int maxWindowW = Math.max(700, screen.width - 120);
-        int maxWindowH = Math.max(500, screen.height - 140);
-
-        int leftW = (infoPanel == null) ? 0 : infoPanel.getPreferredSize().width;
-        int maxViewportW = Math.max(320, maxWindowW - leftW - 64);
-        int maxViewportH = Math.max(240, maxWindowH - 120);
-
-        Dimension content = imagePanel.getPreferredSize();
-        int viewportW = Math.min(content.width, maxViewportW);
-        int viewportH = Math.min(content.height, maxViewportH);
-
-        scrollPane.setPreferredSize(new Dimension(viewportW, viewportH));
-        mainFrame.pack();
-        mainFrame.setSize(Math.min(mainFrame.getWidth(), maxWindowW), Math.min(mainFrame.getHeight(), maxWindowH));
-        mainFrame.validate();
+        centeredImageContainer.revalidate();
+        scrollPane.revalidate();
     }
 
     private void updateInfoPanel(){
         if(infoSourceValue == null) return;
 
+        boolean hasCanvas = currentBI != null;
+        boolean hasDivisionData = !neighborPairEstimationCache.isEmpty()
+                || !realDivisionPairCache.isEmpty()
+                || !truePositivePairCache.isEmpty()
+                || !falsePositivePairCache.isEmpty()
+                || !falseNegativePairCache.isEmpty();
+
         infoSourceValue.setText(currentGeometrySourceFileName == null ? "-" : currentGeometrySourceFileName);
 
-        if(currentBI != null){
+        Dimension backgroundSize = (imagePanel == null) ? null : imagePanel.getBackgroundImageSize();
+        if(backgroundSize != null){
+            infoCanvasSizeValue.setText(backgroundSize.width + " x " + backgroundSize.height);
+        }else if(currentBI != null){
             infoCanvasSizeValue.setText(currentBI.getWidth() + " x " + currentBI.getHeight());
         }else{
             infoCanvasSizeValue.setText("-");
         }
 
-        infoVertexCountValue.setText(Integer.toString(vertexPoints == null ? 0 : vertexPoints.size()));
-        infoLineCountValue.setText(Integer.toString(lineEdges == null ? 0 : lineEdges.size()));
-        infoPolygonCountValue.setText(Integer.toString(polygons == null ? 0 : polygons.size()));
-        infoNeighborCountValue.setText(Integer.toString((imagePanel == null || imagePanel.getNeighborPairs() == null) ? 0 : imagePanel.getNeighborPairs().size()));
+        infoVertexCountValue.setText(formatCount(hasCanvas, vertexPoints == null ? 0 : vertexPoints.size()));
+        infoLineCountValue.setText(formatCount(hasCanvas, lineEdges == null ? 0 : lineEdges.size()));
+        infoPolygonCountValue.setText(formatCount(hasCanvas, polygons == null ? 0 : polygons.size()));
+        infoNeighborCountValue.setText(formatCount(hasCanvas, (imagePanel == null || imagePanel.getNeighborPairs() == null) ? 0 : imagePanel.getNeighborPairs().size()));
 
         int estimatedCount = 0;
         for(EstimationEntry e : neighborPairEstimationCache.values()){
             if(e != null && e.selected) estimatedCount++;
         }
-        infoEstimatedCountValue.setText(Integer.toString(estimatedCount));
-        infoRealCountValue.setText(Integer.toString(realDivisionPairCache.size()));
-        infoTruePositiveCountValue.setText(Integer.toString(truePositivePairCache.size()));
-        infoFalsePositiveCountValue.setText(Integer.toString(falsePositivePairCache.size()));
-        infoFalseNegativeCountValue.setText(Integer.toString(falseNegativePairCache.size()));
+        infoEstimatedCountValue.setText(formatCount(hasDivisionData, estimatedCount));
+        infoRealCountValue.setText(formatCount(hasDivisionData, realDivisionPairCache.size()));
+        infoTruePositiveCountValue.setText(formatCount(hasDivisionData, truePositivePairCache.size()));
+        infoFalsePositiveCountValue.setText(formatCount(hasDivisionData, falsePositivePairCache.size()));
+        infoFalseNegativeCountValue.setText(formatCount(hasDivisionData, falseNegativePairCache.size()));
+
+        if(lastDivisionMetrics != null){
+            infoTrueNegativeCountValue.setText(Integer.toString(lastDivisionMetrics.trueNegatives));
+            infoPrecisionValue.setText(formatMetric(lastDivisionMetrics.precision));
+            infoRecallValue.setText(formatMetric(lastDivisionMetrics.recall));
+            infoF1Value.setText(formatMetric(lastDivisionMetrics.f1));
+            infoAccuracyValue.setText(formatMetric(lastDivisionMetrics.accuracy));
+            infoSpecificityValue.setText(formatMetric(lastDivisionMetrics.specificity));
+        }else{
+            infoTrueNegativeCountValue.setText("-");
+            infoPrecisionValue.setText("-");
+            infoRecallValue.setText("-");
+            infoF1Value.setText("-");
+            infoAccuracyValue.setText("-");
+            infoSpecificityValue.setText("-");
+        }
 
         if(imagePanel != null){
             imagePanel.updateSelectionInfoLabels();
         }
+    }
+
+    private static String formatMetric(double value){
+        if(!Double.isFinite(value) || value < 0.0) return "-";
+        return String.format(Locale.ROOT, "%.4f", value);
+    }
+    private static String formatCount(boolean available, int value){
+        return available ? Integer.toString(value) : "-";
     }
 
     private void showAddVertexDialog(JFrame frame){
@@ -598,7 +716,7 @@ public class CellDivisionInference implements PlugIn {
         p.add(vertexRefsField);
         p.add(new JLabel("Line count:"));
         p.add(lineCountField);
-        p.add(new JLabel("Line indices (0-based, separated by comma/semicolon)."));
+        p.add(new JLabel("Line indices (separated by comma/semicolon)."));
         p.add(lineRefsField);
 
         int ret = JOptionPane.showConfirmDialog(frame, p, "Add Polygon", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
@@ -644,6 +762,348 @@ public class CellDivisionInference implements PlugIn {
         }else{
             JOptionPane.showMessageDialog(frame, "This polygon already exists.", "Add Polygon", JOptionPane.INFORMATION_MESSAGE);
         }
+    }
+
+    private void showDeleteVertexDialog(JFrame frame){
+        JTextField indexField = new JTextField(8);
+        JTextField xField = new JTextField(8);
+        JTextField yField = new JTextField(8);
+
+        JPanel p = new JPanel(new GridLayout(0, 2, 8, 8));
+        p.add(new JLabel("Vertex index:"));
+        p.add(indexField);
+        p.add(new JLabel("OR vertex X:"));
+        p.add(xField);
+        p.add(new JLabel("vertex Y:"));
+        p.add(yField);
+
+        int ret = JOptionPane.showConfirmDialog(frame, p, "Delete Vertex", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if(ret != JOptionPane.OK_OPTION) return;
+
+        Integer idx = null;
+        Integer zeroBased = parseIntegerField(indexField.getText());
+        if(zeroBased != null){
+            int candidate = zeroBased;
+            if(candidate < 0 || candidate >= vertexPoints.size()){
+                JOptionPane.showMessageDialog(frame, "Vertex index is out of range.", "Delete Vertex", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            idx = candidate;
+        }else{
+            Integer x = parseIntegerField(xField.getText());
+            Integer y = parseIntegerField(yField.getText());
+            if(x == null || y == null){
+                JOptionPane.showMessageDialog(frame, "Please provide either a valid index, or both X and Y coordinates.", "Delete Vertex", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            for(int i = 0; i < vertexPoints.size(); i++){
+                Point vp = vertexPoints.get(i);
+                if(vp.x == x && vp.y == y){
+                    idx = i;
+                    break;
+                }
+            }
+            if(idx == null){
+                JOptionPane.showMessageDialog(frame, "No vertex found at the specified coordinates.", "Delete Vertex", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+        }
+
+        deleteVertexAndUpdateTopology(idx);
+        imagePanel.setOverlayPoints(vertexPoints);
+        imagePanel.setLines(lineEdges);
+        imagePanel.setPolygons(polygons);
+        updateInfoPanel();
+    }
+
+    private void showDeleteLineDialog(JFrame frame){
+        JTextField aField = new JTextField(20);
+        JTextField bField = new JTextField(20);
+
+        JPanel p = new JPanel(new GridLayout(0, 1, 8, 8));
+        p.add(new JLabel("Vertex A (index or position x:y or x,y):"));
+        p.add(aField);
+        p.add(new JLabel("Vertex B (index or position x:y or x,y):"));
+        p.add(bField);
+
+        int ret = JOptionPane.showConfirmDialog(frame, p, "Delete Line", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if(ret != JOptionPane.OK_OPTION) return;
+
+        Integer aIdx = resolveVertexReference(aField.getText(), false);
+        Integer bIdx = resolveVertexReference(bField.getText(), false);
+        if(aIdx == null || bIdx == null){
+            JOptionPane.showMessageDialog(frame, "Invalid vertex reference. Use an existing index (0-based) or existing coordinates (x:y / x,y).", "Delete Line", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if(aIdx.equals(bIdx)){
+            JOptionPane.showMessageDialog(frame, "A line requires two different vertices.", "Delete Line", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        LineEdge target = new LineEdge(aIdx, bIdx);
+        int removeIdx = -1;
+        for(int i = 0; i < lineEdges.size(); i++){
+            if(target.equals(lineEdges.get(i))){
+                removeIdx = i;
+                break;
+            }
+        }
+        if(removeIdx < 0){
+            JOptionPane.showMessageDialog(frame, "The specified line was not found.", "Delete Line", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        LineEdge removed = lineEdges.remove(removeIdx);
+        deletePolygonsContainingEdge(removed.v1, removed.v2);
+        imagePanel.setLines(lineEdges);
+        imagePanel.setPolygons(polygons);
+        updateInfoPanel();
+    }
+
+    private void showDeletePolygonDialog(JFrame frame){
+        JTextField polygonIndexField = new JTextField(8);
+        JTextField vertexCountField = new JTextField(8);
+        JTextField vertexRefsField = new JTextField(40);
+        JTextField lineCountField = new JTextField(8);
+        JTextField lineRefsField = new JTextField(40);
+
+        JPanel p = new JPanel(new GridLayout(0, 1, 8, 8));
+        p.add(new JLabel("Delete polygon by index OR by the same references used to create it."));
+        p.add(new JLabel("Polygon index:"));
+        p.add(polygonIndexField);
+        p.add(new JLabel("Vertex count:"));
+        p.add(vertexCountField);
+        p.add(new JLabel("Vertices (indices or coordinates; separate by semicolon)."));
+        p.add(new JLabel("Example: 0; 3; 10:20; 35,40"));
+        p.add(vertexRefsField);
+        p.add(new JLabel("Line count:"));
+        p.add(lineCountField);
+        p.add(new JLabel("Line indices (separated by comma/semicolon)."));
+        p.add(lineRefsField);
+
+        int ret = JOptionPane.showConfirmDialog(frame, p, "Delete Polygon", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if(ret != JOptionPane.OK_OPTION) return;
+
+        Integer polygonZeroBased = parseIntegerField(polygonIndexField.getText());
+        if(polygonZeroBased != null){
+            int polygonIdx = polygonZeroBased;
+            if(polygonIdx < 0 || polygonIdx >= polygons.size()){
+                JOptionPane.showMessageDialog(frame, "Polygon index is out of range.", "Delete Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            polygons.remove(polygonIdx);
+            imagePanel.setPolygons(polygons);
+            updateInfoPanel();
+            return;
+        }
+
+        List<Integer> polygonVertices;
+        if(!vertexRefsField.getText().trim().isEmpty()){
+            Integer expected = parseIntegerField(vertexCountField.getText());
+            polygonVertices = parseVertexReferenceList(vertexRefsField.getText(), false);
+            if(polygonVertices == null || polygonVertices.size() < 3){
+                JOptionPane.showMessageDialog(frame, "Please provide at least 3 valid existing vertex references.", "Delete Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if(expected != null && expected != polygonVertices.size()){
+                JOptionPane.showMessageDialog(frame, "Vertex count does not match number of parsed vertex references.", "Delete Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }else if(!lineRefsField.getText().trim().isEmpty()){
+            Integer expected = parseIntegerField(lineCountField.getText());
+            List<Integer> lineIndices = parseIndexList(lineRefsField.getText());
+            if(lineIndices == null || lineIndices.size() < 3){
+                JOptionPane.showMessageDialog(frame, "Please provide at least 3 valid line indices.", "Delete Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if(expected != null && expected != lineIndices.size()){
+                JOptionPane.showMessageDialog(frame, "Line count does not match number of parsed line indices.", "Delete Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            polygonVertices = buildPolygonFromLines(lineIndices);
+            if(polygonVertices == null || polygonVertices.size() < 3){
+                JOptionPane.showMessageDialog(frame, "The specified lines must form one closed polygonal cycle.", "Delete Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }else{
+            JOptionPane.showMessageDialog(frame, "Provide a polygon index, vertex references, or line indices.", "Delete Polygon", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        int polygonIdx = findPolygonIndexByCycle(polygonVertices);
+        if(polygonIdx < 0){
+            JOptionPane.showMessageDialog(frame, "No matching polygon was found.", "Delete Polygon", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        polygons.remove(polygonIdx);
+        imagePanel.setPolygons(polygons);
+        updateInfoPanel();
+    }
+
+    private void showFindVertexDialog(JFrame frame){
+        JTextField indexField = new JTextField(8);
+        JTextField xField = new JTextField(8);
+        JTextField yField = new JTextField(8);
+
+        JPanel p = new JPanel(new GridLayout(0, 2, 8, 8));
+        p.add(new JLabel("Vertex index:"));
+        p.add(indexField);
+        p.add(new JLabel("OR vertex X:"));
+        p.add(xField);
+        p.add(new JLabel("vertex Y:"));
+        p.add(yField);
+
+        int ret = JOptionPane.showConfirmDialog(frame, p, "Find Vertex", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if(ret != JOptionPane.OK_OPTION) return;
+
+        Integer idx = null;
+        Integer zeroBased = parseIntegerField(indexField.getText());
+        if(zeroBased != null){
+            int candidate = zeroBased;
+            if(candidate < 0 || candidate >= vertexPoints.size()){
+                JOptionPane.showMessageDialog(frame, "Vertex index is out of range.", "Find Vertex", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            idx = candidate;
+        }else{
+            Integer x = parseIntegerField(xField.getText());
+            Integer y = parseIntegerField(yField.getText());
+            if(x == null || y == null){
+                JOptionPane.showMessageDialog(frame, "Please provide either a valid index, or both X and Y coordinates.", "Find Vertex", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            for(int i = 0; i < vertexPoints.size(); i++){
+                Point vp = vertexPoints.get(i);
+                if(vp.x == x && vp.y == y){
+                    idx = i;
+                    break;
+                }
+            }
+            if(idx == null){
+                JOptionPane.showMessageDialog(frame, "No vertex found at the specified coordinates.", "Find Vertex", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+        }
+
+        imagePanel.selectVertex(idx);
+    }
+
+    private void showFindLineDialog(JFrame frame){
+        JTextField aField = new JTextField(20);
+        JTextField bField = new JTextField(20);
+
+        JPanel p = new JPanel(new GridLayout(0, 1, 8, 8));
+        p.add(new JLabel("Vertex A (index or position x:y or x,y):"));
+        p.add(aField);
+        p.add(new JLabel("Vertex B (index or position x:y or x,y):"));
+        p.add(bField);
+
+        int ret = JOptionPane.showConfirmDialog(frame, p, "Find Line", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if(ret != JOptionPane.OK_OPTION) return;
+
+        Integer aIdx = resolveVertexReference(aField.getText(), false);
+        Integer bIdx = resolveVertexReference(bField.getText(), false);
+        if(aIdx == null || bIdx == null){
+            JOptionPane.showMessageDialog(frame, "Invalid vertex reference. Use an existing index or existing coordinates (x:y / x,y).", "Find Line", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if(aIdx.equals(bIdx)){
+            JOptionPane.showMessageDialog(frame, "A line requires two different vertices.", "Find Line", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        LineEdge target = new LineEdge(aIdx, bIdx);
+        int lineIdx = -1;
+        for(int i = 0; i < lineEdges.size(); i++){
+            if(target.equals(lineEdges.get(i))){
+                lineIdx = i;
+                break;
+            }
+        }
+        if(lineIdx < 0){
+            JOptionPane.showMessageDialog(frame, "The specified line was not found.", "Find Line", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        imagePanel.selectLine(lineIdx);
+    }
+
+    private void showFindPolygonDialog(JFrame frame){
+        JTextField polygonIndexField = new JTextField(8);
+        JTextField vertexCountField = new JTextField(8);
+        JTextField vertexRefsField = new JTextField(40);
+        JTextField lineCountField = new JTextField(8);
+        JTextField lineRefsField = new JTextField(40);
+
+        JPanel p = new JPanel(new GridLayout(0, 1, 8, 8));
+        p.add(new JLabel("Find polygon by index OR by the same references used to create it."));
+        p.add(new JLabel("Polygon index:"));
+        p.add(polygonIndexField);
+        p.add(new JLabel("Vertex count:"));
+        p.add(vertexCountField);
+        p.add(new JLabel("Vertices (indices or coordinates; separate by semicolon)."));
+        p.add(new JLabel("Example: 0; 3; 10:20; 35,40"));
+        p.add(vertexRefsField);
+        p.add(new JLabel("Line count:"));
+        p.add(lineCountField);
+        p.add(new JLabel("Line indices (separated by comma/semicolon)."));
+        p.add(lineRefsField);
+
+        int ret = JOptionPane.showConfirmDialog(frame, p, "Find Polygon", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if(ret != JOptionPane.OK_OPTION) return;
+
+        Integer polygonZeroBased = parseIntegerField(polygonIndexField.getText());
+        if(polygonZeroBased != null){
+            int polygonIdx = polygonZeroBased;
+            if(polygonIdx < 0 || polygonIdx >= polygons.size()){
+                JOptionPane.showMessageDialog(frame, "Polygon index is out of range.", "Find Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            imagePanel.selectPolygon(polygonIdx);
+            return;
+        }
+
+        List<Integer> polygonVertices;
+        if(!vertexRefsField.getText().trim().isEmpty()){
+            Integer expected = parseIntegerField(vertexCountField.getText());
+            polygonVertices = parseVertexReferenceList(vertexRefsField.getText(), false);
+            if(polygonVertices == null || polygonVertices.size() < 3){
+                JOptionPane.showMessageDialog(frame, "Please provide at least 3 valid existing vertex references.", "Find Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if(expected != null && expected != polygonVertices.size()){
+                JOptionPane.showMessageDialog(frame, "Vertex count does not match number of parsed vertex references.", "Find Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }else if(!lineRefsField.getText().trim().isEmpty()){
+            Integer expected = parseIntegerField(lineCountField.getText());
+            List<Integer> lineIndices = parseIndexList(lineRefsField.getText());
+            if(lineIndices == null || lineIndices.size() < 3){
+                JOptionPane.showMessageDialog(frame, "Please provide at least 3 valid line indices.", "Find Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if(expected != null && expected != lineIndices.size()){
+                JOptionPane.showMessageDialog(frame, "Line count does not match number of parsed line indices.", "Find Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            polygonVertices = buildPolygonFromLines(lineIndices);
+            if(polygonVertices == null || polygonVertices.size() < 3){
+                JOptionPane.showMessageDialog(frame, "The specified lines must form one closed polygonal cycle.", "Find Polygon", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }else{
+            JOptionPane.showMessageDialog(frame, "Provide a polygon index, vertex references, or line indices.", "Find Polygon", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        int polygonIdx = findPolygonIndexByCycle(polygonVertices);
+        if(polygonIdx < 0){
+            JOptionPane.showMessageDialog(frame, "No matching polygon was found.", "Find Polygon", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        imagePanel.selectPolygon(polygonIdx);
     }
 
     private Integer parseIntegerField(String text){
@@ -802,6 +1262,104 @@ public class CellDivisionInference implements PlugIn {
         updateInfoPanel();
     }
 
+    private void deleteVertexAndUpdateTopology(int delIdx){
+        if(delIdx < 0 || delIdx >= vertexPoints.size()) return;
+
+        vertexPoints.remove(delIdx);
+
+        ArrayList<LineEdge> newLines = new ArrayList<>();
+        LinkedHashSet<LineEdge> unique = new LinkedHashSet<>();
+        for(LineEdge e : lineEdges){
+            int a = e.v1;
+            int b = e.v2;
+            if(a == delIdx || b == delIdx) continue;
+            if(a > delIdx) a--;
+            if(b > delIdx) b--;
+            if(a == b) continue;
+            unique.add(new LineEdge(a, b));
+        }
+        newLines.addAll(unique);
+        lineEdges = newLines;
+
+        ArrayList<List<Integer>> keptPolygons = new ArrayList<>();
+        for(List<Integer> poly : polygons){
+            if(poly == null || poly.isEmpty()) continue;
+            boolean containsDeleted = false;
+            ArrayList<Integer> mapped = new ArrayList<>(poly.size());
+            for(int v : poly){
+                if(v == delIdx){
+                    containsDeleted = true;
+                    break;
+                }
+                if(v < 0 || v >= vertexPoints.size() + 1){
+                    containsDeleted = true;
+                    break;
+                }
+                mapped.add(v > delIdx ? v - 1 : v);
+            }
+            if(containsDeleted) continue;
+            if(mapped.size() < 3) continue;
+            if(new HashSet<>(mapped).size() < 3) continue;
+            keptPolygons.add(mapped);
+        }
+        polygons = keptPolygons;
+    }
+
+    private void deletePolygonsContainingEdge(int a, int b){
+        long target = edgeKey(a, b);
+        for(int i = polygons.size() - 1; i >= 0; i--){
+            List<Integer> poly = polygons.get(i);
+            if(poly == null || poly.size() < 2) continue;
+            int m = poly.size();
+            for(int k = 0; k < m; k++){
+                int u = poly.get(k);
+                int v = poly.get((k + 1) % m);
+                if(edgeKey(u, v) == target){
+                    polygons.remove(i);
+                    break;
+                }
+            }
+        }
+    }
+
+    private int findPolygonIndexByCycle(List<Integer> targetPolygon){
+        String targetKey = normalizedPolygonCycleKey(targetPolygon);
+        if(targetKey.isEmpty()) return -1;
+        for(int i = 0; i < polygons.size(); i++){
+            if(targetKey.equals(normalizedPolygonCycleKey(polygons.get(i)))) return i;
+        }
+        return -1;
+    }
+
+    private String normalizedPolygonCycleKey(List<Integer> ids){
+        if(ids == null || ids.size() < 3) return "";
+        ArrayList<Integer> base = new ArrayList<>(ids);
+        if(base.size() > 1 && base.get(0).equals(base.get(base.size() - 1))){
+            base.remove(base.size() - 1);
+        }
+        if(base.size() < 3) return "";
+
+        ArrayList<Integer> reversed = new ArrayList<>(base);
+        Collections.reverse(reversed);
+        String forward = minimalRotationKey(base);
+        String backward = minimalRotationKey(reversed);
+        return (forward.compareTo(backward) <= 0) ? forward : backward;
+    }
+
+    private String minimalRotationKey(List<Integer> ids){
+        int m = ids.size();
+        String best = null;
+        for(int start = 0; start < m; start++){
+            StringBuilder sb = new StringBuilder(m * 4);
+            for(int k = 0; k < m; k++){
+                sb.append(ids.get((start + k) % m)).append(':');
+            }
+            String key = sb.toString();
+            if(best == null || key.compareTo(best) < 0) best = key;
+        }
+        return best == null ? "" : best;
+    }
+
     private void openImage(JFrame frame){
 
         OpenDialog od=new OpenDialog("Open image",null);
@@ -922,6 +1480,30 @@ public class CellDivisionInference implements PlugIn {
         adjustWindowToContent();
     }
 
+    private void openBackground(JFrame frame){
+
+        OpenDialog od = new OpenDialog("Open background image", null);
+
+        String dir = od.getDirectory();
+        String name = od.getFileName();
+        if(name == null) return;
+
+        ImagePlus imp = IJ.openImage(dir + name);
+        if(imp == null || imp.getProcessor() == null){
+            IJ.error("Cannot open background image");
+            return;
+        }
+
+        BufferedImage bg = imp.getProcessor().getBufferedImage();
+        if(bg == null){
+            IJ.error("Cannot decode background image");
+            return;
+        }
+
+        imagePanel.setBackgroundImage(bg);
+        updateInfoPanel();
+        adjustWindowToContent();
+    }
 
     private void skeletonize2D(JFrame frame){
 
@@ -984,8 +1566,8 @@ public class CellDivisionInference implements PlugIn {
             return;
         }
 
-        // If no image loaded, create a blank canvas so paintComponent can draw something
-        if(currentBI == null){
+        // If no image/background loaded, create a blank canvas so paintComponent can draw something
+        if(currentBI == null && !imagePanel.hasBackgroundImage()){
             int w = Math.max(64, result.maxX + 50);
             int h = Math.max(64, result.maxY + 50);
 
@@ -999,8 +1581,8 @@ public class CellDivisionInference implements PlugIn {
             updateInfoPanel();
             adjustWindowToContent();
         }else{
-            int w = currentBI.getWidth();
-            int h = currentBI.getHeight();
+            int w = (currentBI != null) ? currentBI.getWidth() : imagePanel.getCanvasWidth();
+            int h = (currentBI != null) ? currentBI.getHeight() : imagePanel.getCanvasHeight();
             if(result.maxX >= w || result.maxY >= h){
                 IJ.log("[Import] Warning: Imported vertices exceed current image size ("+w+"x"+h+").");
             }
@@ -1088,7 +1670,10 @@ public class CellDivisionInference implements PlugIn {
             return;
         }
 
-        JFileChooser chooser = new JFileChooser();
+        String defaultDirectory = OpenDialog.getDefaultDirectory();
+        JFileChooser chooser = (defaultDirectory != null && !defaultDirectory.trim().isEmpty())
+                ? new JFileChooser(defaultDirectory)
+                : new JFileChooser();
         chooser.setDialogTitle("Select real division pairs CSV");
 
         int ret = chooser.showOpenDialog(frame);
@@ -1098,6 +1683,11 @@ public class CellDivisionInference implements PlugIn {
         if(file == null || !file.exists()){
             JOptionPane.showMessageDialog(frame, "File not found.", "Import Real Division Pairs", JOptionPane.ERROR_MESSAGE);
             return;
+        }
+        
+        File parentDir = file.getParentFile();
+        if(parentDir != null){
+            OpenDialog.setDefaultDirectory(parentDir.getAbsolutePath() + File.separator);
         }
 
         int polyN = polygons.size();
@@ -1277,6 +1867,7 @@ public class CellDivisionInference implements PlugIn {
             }
 
             if(imagePanel != null) imagePanel.repaint();
+            updateInfoPanel();
 
             JOptionPane.showMessageDialog(frame,
                     "Imported real division pairs: " + imported +
@@ -1622,7 +2213,7 @@ public class CellDivisionInference implements PlugIn {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonObject root = new JsonObject();
 
-        // vertices (Qt uses 1-based ids)
+        // vertices 
         JsonArray vArr = new JsonArray();
         for(int i=0; i<vertexPoints.size(); i++){
             Point p = vertexPoints.get(i);
@@ -2615,9 +3206,14 @@ public class CellDivisionInference implements PlugIn {
         truePositivePairCache.clear();
         falsePositivePairCache.clear();
         falseNegativePairCache.clear();
+        clearDivisionMetricsCache();
     }
 
-    // ===== Neighbor pair estimation cache (threshold + matching results) =====
+    private void clearDivisionMetricsCache(){
+        lastDivisionMetrics = null;
+    }
+
+    // ===== divided pair estimation cache (threshold + matching results) =====
     private final HashMap<Long, EstimationEntry> neighborPairEstimationCache = new HashMap<>();
     private Criterion lastEstimationCriterion = null;
     private void clearNeighborPairEstimationCache(){
@@ -4033,6 +4629,11 @@ public class CellDivisionInference implements PlugIn {
             return Integer.compare(p1[1], p2[1]);
         });
 
+        if(imagePanel != null){
+            imagePanel.setNeighborPairs(new ArrayList<>(sortedPairs));
+        }
+        updateInfoPanel();
+
         // progress dialog
         final JDialog prog = new JDialog(frame, "Computing neighbor pair geometries...", true);
         prog.setLayout(new BorderLayout());
@@ -4085,6 +4686,7 @@ public class CellDivisionInference implements PlugIn {
                 neighborPairGeometryCache.putAll(computed);
 
                 IJ.showStatus("Neighbor pair geometries computed: " + computed.size());
+                updateInfoPanel();
 
                 // show preview again; it will now include geometry columns
                 showNeighborPairPreviewDialog(frame);
@@ -4100,14 +4702,14 @@ public class CellDivisionInference implements PlugIn {
     }
 
     // =========================
-    // Neighbor Pair Estimation (threshold + matching)
+    // divided pair estimation (threshold + matching)
     // =========================
 
     private void showNeighborPairEstimationDialog(JFrame frame){
 
         // Need geometry already computed (same requirement as Qt estimation stage)
         if(polygons == null || polygons.size() < 2){
-            JOptionPane.showMessageDialog(frame, "Need at least 2 polygons.", "Neighbor Pair Estimation",
+            JOptionPane.showMessageDialog(frame, "Need at least 2 polygons.", "divided pair estimation",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -4121,7 +4723,7 @@ public class CellDivisionInference implements PlugIn {
         criterion.threshold = lastEstimationCriterion.threshold;
         criterion.matchingMode = lastEstimationCriterion.matchingMode;
 
-        JDialog dialog = new JDialog(frame, "Neighbor Pair Estimation (Single Feature)", true);
+        JDialog dialog = new JDialog(frame, "divided pair estimation (Single Feature)", true);
         dialog.setLayout(new BorderLayout());
 
         JPanel form = new JPanel(new GridBagLayout());
@@ -4210,7 +4812,7 @@ public class CellDivisionInference implements PlugIn {
         if(pairs == null || pairs.isEmpty()){
             JOptionPane.showMessageDialog(frame,
                     "No neighboring polygon pairs found.\n(Need pairs sharing >=2 vertices.)",
-                    "Neighbor Pair Estimation",
+                    "divided pair estimation",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
@@ -4218,7 +4820,7 @@ public class CellDivisionInference implements PlugIn {
         if(!hasGeometryForPairs(pairs)){
             JOptionPane.showMessageDialog(frame,
                     "Neighbor-pair geometries are not available.\nRun: Process → Neighbor Pair Geometrical Calculation... first.",
-                    "Neighbor Pair Estimation",
+                    "divided pair estimation",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -4227,7 +4829,7 @@ public class CellDivisionInference implements PlugIn {
         if(featIdx < 0){
             JOptionPane.showMessageDialog(frame,
                     "Unknown geometry feature key: " + criterion.featureKey,
-                    "Neighbor Pair Estimation",
+                    "divided pair estimation",
                     JOptionPane.ERROR_MESSAGE);
             return;
         }
@@ -4298,7 +4900,7 @@ public class CellDivisionInference implements PlugIn {
         if(imagePanel != null) imagePanel.repaint();
         updateInfoPanel();
 
-        IJ.showStatus("Neighbor pair estimation done. Selected pairs: " + selectedCount);
+        IJ.showStatus("divided pair estimation done. Selected pairs: " + selectedCount);
 
         // refresh preview to show estimation columns
         showNeighborPairPreviewDialog(frame);
@@ -4662,6 +5264,8 @@ public class CellDivisionInference implements PlugIn {
     // =========================
     // Compare estimated vs real division (Qt-like metrics)
     // =========================
+    private DivisionMetrics lastDivisionMetrics = null;
+
     private static class DivisionMetrics {
         int estimatedPairs = 0;
         int realPairs = 0;
@@ -4747,7 +5351,7 @@ public class CellDivisionInference implements PlugIn {
         HashSet<Long> estSetAll = selectedEstimatedSet(neighborPairEstimationCache);
         if(estSetAll.isEmpty()){
             JOptionPane.showMessageDialog(frame,
-                    "No estimated division pairs selected.\nRun: Process → Neighbor Pair Estimation... first.",
+                    "No estimated division pairs selected.\nRun: Process → divided pair estimation... first.",
                     "Compare Estimated and Real Division",
                     JOptionPane.WARNING_MESSAGE);
             return;
@@ -4831,6 +5435,8 @@ public class CellDivisionInference implements PlugIn {
             falseNegativePairCache.put(k, dst);
         }
 
+        lastDivisionMetrics = m;
+        updateInfoPanel();
         if(imagePanel != null) imagePanel.repaint();
 
         // Report
@@ -5648,6 +6254,7 @@ public class CellDivisionInference implements PlugIn {
     class ImagePanel extends JComponent{
 
         private BufferedImage image;
+        private BufferedImage backgroundImage;
         private double zoom=1.0;
 
         private List<Point> overlayPoints=new ArrayList<>();
@@ -5677,6 +6284,7 @@ public class CellDivisionInference implements PlugIn {
         private final JPopupMenu popup;
 
         private int clickX,clickY;
+        private int mouseX, mouseY;
 
         // helper for manually adding line and polygon
         private boolean isPicked(int idx){
@@ -5695,6 +6303,95 @@ public class CellDivisionInference implements PlugIn {
 
         private void clearPickedVertices(){
             pickedVertices.clear();
+        }
+
+        private void addVertexAtScreen(int sx, int sy){
+            Point p = toImagePixel(sx, sy);
+            overlayPoints.add(p);
+            repaint();
+            updateInfoPanel();
+        }
+
+        private void addLineFromPickedVertices(){
+            if(pickedVertices.size() != 2) return;
+
+            int a = pickedVertices.get(0);
+            int b = pickedVertices.get(1);
+            LineEdge ne = new LineEdge(a, b);
+            if(!lines.contains(ne)){
+                lines.add(ne);
+            }
+
+            refreshPolygonColors();
+            clearPickedVertices();
+            repaint();
+            updateInfoPanel();
+        }
+
+        private void addPolygonFromPickedVertices(){
+            if(pickedVertices.size() < 3) return;
+
+            ArrayList<Integer> poly = buildPolygonOrderFromPicked();
+            if(poly.size() >= 3){
+                String key = polygonKey(poly);
+                boolean exists = false;
+                for(List<Integer> p : polygons){
+                    if(p != null && p.size() >= 3 && polygonKey(p).equals(key)){
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if(!exists){
+                    polygons.add(poly);
+                    sortPolygonsByTopVertices();
+                    refreshPolygonColors();
+                }
+            }
+
+            clearPickedVertices();
+            repaint();
+            updateInfoPanel();
+        }
+
+        private void deleteAllSelectedItems(){
+            TreeSet<Integer> verticesToDelete = new TreeSet<>(Collections.reverseOrder());
+
+            if(selectedVertex >= 0 && selectedVertex < overlayPoints.size()){
+                verticesToDelete.add(selectedVertex);
+            }
+            for(int v : pickedVertices){
+                if(v >= 0 && v < overlayPoints.size()){
+                    verticesToDelete.add(v);
+                }
+            }
+
+            for(int v : verticesToDelete){
+                deleteVertexAndUpdateTopology(v);
+            }
+
+            if(verticesToDelete.isEmpty()){
+                if(selectedLine >= 0 && selectedLine < lines.size()){
+                    LineEdge removed = lines.remove(selectedLine);
+                    selectedLine = -1;
+                    if(removed != null){
+                        deletePolygonsContainingEdge(removed.v1, removed.v2);
+                    }
+                }
+
+                if(selectedPolygon >= 0 && selectedPolygon < polygons.size()){
+                    polygons.remove(selectedPolygon);
+                }
+            }
+
+            selectedVertex = -1;
+            selectedLine = -1;
+            selectedPolygon = -1;
+            clearPickedVertices();
+            sortPolygonsByTopVertices();
+            refreshPolygonColors();
+            repaint();
+            updateInfoPanel();
         }
 
         // Keep picks consistent if a vertex is deleted
@@ -6120,6 +6817,8 @@ public class CellDivisionInference implements PlugIn {
                 updateInfoPanel();
             });
 
+            addV.addActionListener(e -> addVertexAtScreen(clickX, clickY));
+
             addL.addActionListener(e->{
                 if(pickedVertices.size() ==2){
                     int a = pickedVertices.get(0);
@@ -6135,6 +6834,8 @@ public class CellDivisionInference implements PlugIn {
                     updateInfoPanel();
                 }
             });
+
+            addL.addActionListener(e -> addLineFromPickedVertices());
 
             addP.addActionListener(e->{
                 if(pickedVertices.size() >=3){
@@ -6161,6 +6862,8 @@ public class CellDivisionInference implements PlugIn {
                 repaint();
                 updateInfoPanel();
             });
+
+            addP.addActionListener(e -> addPolygonFromPickedVertices());
 
             clearPicked.addActionListener(e -> {
                 clearPickedVertices();
@@ -6216,9 +6919,45 @@ public class CellDivisionInference implements PlugIn {
                 }
             });
 
+            InputMap inputMap = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+            ActionMap actionMap = getActionMap();
+
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_DOWN_MASK), "addVertexShortcut");
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK), "addLineShortcut");
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK), "addPolygonShortcut");
+            inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "deleteSelectedShortcut");
+
+            actionMap.put("addVertexShortcut", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    addVertexAtScreen(mouseX, mouseY);
+                }
+            });
+            actionMap.put("addLineShortcut", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    addLineFromPickedVertices();
+                }
+            });
+            actionMap.put("addPolygonShortcut", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    addPolygonFromPickedVertices();
+                }
+            });
+            actionMap.put("deleteSelectedShortcut", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    deleteAllSelectedItems();
+                }
+            });
+
             MouseAdapter ma=new MouseAdapter(){
 
                 public void mousePressed(MouseEvent e){
+
+                    mouseX = e.getX();
+                    mouseY = e.getY();
 
                     if(SwingUtilities.isLeftMouseButton(e)){
 
@@ -6248,6 +6987,9 @@ public class CellDivisionInference implements PlugIn {
                 }
 
                 public void mouseDragged(MouseEvent e){
+
+                    mouseX = e.getX();
+                    mouseY = e.getY();
                     
                     updateMousePositionLabel(e.getX(), e.getY());
 
@@ -6293,6 +7035,9 @@ public class CellDivisionInference implements PlugIn {
 
                 public void mouseReleased(MouseEvent e){
 
+                    mouseX = e.getX();
+                    mouseY = e.getY();
+
                     // click on vertex without drag => toggle pick
                     if(SwingUtilities.isLeftMouseButton(e)){
                         if(pressedVertex >= 0 && !draggingVertex){
@@ -6323,6 +7068,9 @@ public class CellDivisionInference implements PlugIn {
                 }
 
                 public void mouseClicked(MouseEvent e){
+
+                    mouseX = e.getX();
+                    mouseY = e.getY();
 
                     clickX=e.getX();
                     clickY=e.getY();
@@ -6359,6 +7107,8 @@ public class CellDivisionInference implements PlugIn {
             addMouseMotionListener(new MouseMotionAdapter() {
                 @Override
                 public void mouseMoved(MouseEvent e) {
+                    mouseX = e.getX();
+                    mouseY = e.getY();
                     updateMousePositionLabel(e.getX(), e.getY());
                 }
             });
@@ -6383,6 +7133,23 @@ public class CellDivisionInference implements PlugIn {
             repaint();
             adjustWindowToContent();
         }
+
+        void setBackgroundImage(BufferedImage img){
+            backgroundImage = img;
+            revalidate();
+            repaint();
+            adjustWindowToContent();
+        }
+
+        boolean hasBackgroundImage(){
+            return backgroundImage != null;
+        }
+
+        Dimension getBackgroundImageSize(){
+            if(backgroundImage == null) return null;
+            return new Dimension(backgroundImage.getWidth(), backgroundImage.getHeight());
+        }
+
 
         void setOverlayPoints(List<Point> pts){
             overlayPoints=pts;
@@ -6443,6 +7210,36 @@ public class CellDivisionInference implements PlugIn {
             else polygonDisplayIds = new ArrayList<>(ids);
             repaint();
             updateInfoPanel();
+        }
+
+        void selectVertex(int vertexIdx){
+            if(vertexIdx < 0 || vertexIdx >= overlayPoints.size()) return;
+            selectedVertex = vertexIdx;
+            selectedLine = -1;
+            selectedPolygon = -1;
+            clearPickedVertices();
+            repaint();
+            updateSelectionInfoLabels();
+        }
+
+        void selectLine(int lineIdx){
+            if(lineIdx < 0 || lineIdx >= lines.size()) return;
+            selectedVertex = -1;
+            selectedLine = lineIdx;
+            selectedPolygon = -1;
+            clearPickedVertices();
+            repaint();
+            updateSelectionInfoLabels();
+        }
+
+        void selectPolygon(int polygonIdx){
+            if(polygonIdx < 0 || polygonIdx >= polygons.size()) return;
+            selectedVertex = -1;
+            selectedLine = -1;
+            selectedPolygon = polygonIdx;
+            clearPickedVertices();
+            repaint();
+            updateSelectionInfoLabels();
         }
 
         void resetSelectionsAndPicks(){
@@ -6888,13 +7685,30 @@ public class CellDivisionInference implements PlugIn {
         }
 
         public Dimension getPreferredSize(){
+            int canvasW = getCanvasWidth();
+            int canvasH = getCanvasHeight();
 
             if(image==null)
+            if(canvasW <= 0 || canvasH <= 0)
                 return new Dimension(800,600);
 
             return new Dimension(
-                    (int)(image.getWidth()*zoom),
-                    (int)(image.getHeight()*zoom));
+                    (int)(canvasW*zoom),
+                    (int)(canvasH*zoom));
+        }
+
+        private int getCanvasWidth(){
+            int w = 0;
+            if(backgroundImage != null) w = Math.max(w, backgroundImage.getWidth());
+            if(image != null) w = Math.max(w, image.getWidth());
+            return w;
+        }
+
+        private int getCanvasHeight(){
+            int h = 0;
+            if(backgroundImage != null) h = Math.max(h, backgroundImage.getHeight());
+            if(image != null) h = Math.max(h, image.getHeight());
+            return h;
         }
 
         private void drawDivisionArrow(Graphics2D g2, double x1, double y1, double x2, double y2,
@@ -6949,14 +7763,21 @@ public class CellDivisionInference implements PlugIn {
 
             super.paintComponent(g);
 
-            if(image==null) return;
+            if(image==null && backgroundImage == null) return;
 
             Graphics2D g2=(Graphics2D)g;
 
-            int w=(int)(image.getWidth()*zoom);
-            int h=(int)(image.getHeight()*zoom);
+            if(backgroundImage != null){
+                int bgW = (int)(backgroundImage.getWidth() * zoom);
+                int bgH = (int)(backgroundImage.getHeight() * zoom);
+                g2.drawImage(backgroundImage, 0, 0, bgW, bgH, null);
+            }
 
-            g2.drawImage(image,0,0,w,h,null);
+            if(image != null){
+                int w=(int)(image.getWidth()*zoom);
+                int h=(int)(image.getHeight()*zoom);
+                g2.drawImage(image,0,0,w,h,null);
+            }
 
             // polygons
             if(polygons != null && !polygons.isEmpty()){
