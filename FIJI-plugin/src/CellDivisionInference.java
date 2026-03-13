@@ -383,11 +383,19 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
+            editMenu.addSeparator();
+
             editMenu.add(new JMenuItem(new AbstractAction("Delete whole polygonal cell network"){
                 @Override public void actionPerformed(ActionEvent e){
                     deleteAllPolygons();
                     deleteAllLines();
                     deleteAllVertices();
+                }
+            }));
+
+            editMenu.add(new JMenuItem(new AbstractAction("Delete all and reset") {
+                @Override public void actionPerformed(ActionEvent e){
+                    resetWholeWindow(frame);
                 }
             }));
 
@@ -446,6 +454,14 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
+            JMenu debugMenu = new JMenu("Debug");
+
+            debugMenu.add(new JMenuItem(new AbstractAction("Check unconnected vertices and lines") {
+                @Override public void actionPerformed(ActionEvent e){
+                    checkUnconnectedVerticesAndLines(frame);
+                }
+            }));
+
 
             JMenu ioMenu = new JMenu("Import & Export");
 
@@ -473,6 +489,12 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
+            ioMenu.add(new JMenuItem(new AbstractAction("Export Estimated Division Pairs..."){
+                @Override public void actionPerformed(ActionEvent e){
+                    exportEstimatedDivisionPairs(frame);
+                }
+            }));
+
             bar.add(fileMenu);
             bar.add(processMenu);
             bar.add(geometryMenu);
@@ -480,6 +502,7 @@ public class CellDivisionInference implements PlugIn {
             bar.add(displayMenu);
             bar.add(editMenu);
             bar.add(findMenu);
+            bar.add(debugMenu);
             bar.add(ioMenu);
 
             frame.setJMenuBar(bar);
@@ -490,6 +513,88 @@ public class CellDivisionInference implements PlugIn {
             frame.setVisible(true);
         });
     }
+
+    private void checkUnconnectedVerticesAndLines(JFrame frame){
+        if(imagePanel == null) return;
+
+        List<Point> verts = imagePanel.getOverlayPoints();
+        int vertexCount = (verts == null) ? 0 : verts.size();
+        int lineCount = lineEdges.size();
+
+        int[] vertexLineDegree = new int[Math.max(0, vertexCount)];
+        boolean[] vertexInPolygon = new boolean[Math.max(0, vertexCount)];
+        boolean[] lineInPolygon = new boolean[Math.max(0, lineCount)];
+
+        HashMap<Long, ArrayList<Integer>> lineIndexByEdge = new HashMap<>();
+
+        for(int i = 0; i < lineEdges.size(); i++){
+            LineEdge e = lineEdges.get(i);
+            if(e == null) continue;
+
+            if(e.v1 >= 0 && e.v1 < vertexCount) vertexLineDegree[e.v1]++;
+            if(e.v2 >= 0 && e.v2 < vertexCount) vertexLineDegree[e.v2]++;
+
+            if(e.v1 >= 0 && e.v1 < vertexCount && e.v2 >= 0 && e.v2 < vertexCount){
+                long key = edgeKey(e.v1, e.v2);
+                lineIndexByEdge.computeIfAbsent(key, k -> new ArrayList<>()).add(i);
+            }
+        }
+
+        for(List<Integer> poly : polygons){
+            if(poly == null || poly.isEmpty()) continue;
+
+            for(int v : poly){
+                if(v >= 0 && v < vertexCount){
+                    vertexInPolygon[v] = true;
+                }
+            }
+
+            if(poly.size() < 2) continue;
+
+            int m = poly.size();
+            for(int k = 0; k < m; k++){
+                int a = poly.get(k);
+                int b = poly.get((k + 1) % m);
+                if(a < 0 || a >= vertexCount || b < 0 || b >= vertexCount) continue;
+
+                ArrayList<Integer> lineIndices = lineIndexByEdge.get(edgeKey(a, b));
+                if(lineIndices == null) continue;
+                for(int lineIdx : lineIndices){
+                    if(lineIdx >= 0 && lineIdx < lineInPolygon.length){
+                        lineInPolygon[lineIdx] = true;
+                    }
+                }
+            }
+        }
+
+        ArrayList<Integer> unconnectedVertices = new ArrayList<>();
+        for(int i = 0; i < vertexCount; i++){
+            if(vertexLineDegree[i] <= 1 || !vertexInPolygon[i]){
+                unconnectedVertices.add(i);
+            }
+        }
+
+        ArrayList<Integer> unconnectedLines = new ArrayList<>();
+        for(int i = 0; i < lineCount; i++){
+            if(!lineInPolygon[i]){
+                unconnectedLines.add(i);
+            }
+        }
+
+        imagePanel.setDebugHighlights(unconnectedVertices, unconnectedLines);
+
+        IJ.log("[Debug] Unconnected vertices and lines check");
+        IJ.log("[Debug] Unconnected vertices: " + unconnectedVertices.size());
+        IJ.log("[Debug] Vertex indices: " + (unconnectedVertices.isEmpty() ? "(none)" : unconnectedVertices.toString()));
+        IJ.log("[Debug] Unconnected lines: " + unconnectedLines.size());
+        IJ.log("[Debug] Line indices: " + (unconnectedLines.isEmpty() ? "(none)" : unconnectedLines.toString()));
+
+        IJ.showStatus("Debug check done: " + unconnectedVertices.size() + " unconnected vertices, " + unconnectedLines.size() + " unconnected lines.");
+        if(frame != null){
+            frame.toFront();
+        }
+    }
+
 
     private JPanel createInfoPanel(){
         JPanel panel = new JPanel(new GridBagLayout());
@@ -580,7 +685,7 @@ public class CellDivisionInference implements PlugIn {
     private void updateInfoPanel(){
         if(infoSourceValue == null) return;
 
-        boolean hasCanvas = currentBI != null;
+        boolean hasCanvas = currentBI != null || (imagePanel != null && imagePanel.hasBackgroundImage());
         boolean hasDivisionData = !neighborPairEstimationCache.isEmpty()
                 || !realDivisionPairCache.isEmpty()
                 || !truePositivePairCache.isEmpty()
@@ -1261,6 +1366,48 @@ public class CellDivisionInference implements PlugIn {
         imagePanel.setPolygons(polygons);
         updateInfoPanel();
     }
+
+    private void resetWholeWindow(JFrame frame){
+        int ans = JOptionPane.showConfirmDialog(
+                frame,
+                "Delete all data and reset this window to a fresh state?",
+                "Delete all and reset",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+        if(ans != JOptionPane.OK_OPTION) return;
+
+        currentImp = null;
+        currentBI = null;
+        currentGeometrySourceFileName = "unknown.json";
+
+        vertexPoints = new ArrayList<>();
+        lineEdges = new ArrayList<>();
+        polygons = new ArrayList<>();
+
+        neighborPreviewCache.clear();
+        clearNeighborPairGeometryCache();
+        clearNeighborPairEstimationCache();
+        clearRealDivisionPairCache();
+        clearComparisonPairCaches();
+
+        imagePanel.resetSelectionsAndPicks();
+        imagePanel.setImage(null);
+        imagePanel.setBackgroundImage(null);
+        imagePanel.setOverlayPoints(vertexPoints);
+        imagePanel.setLines(lineEdges);
+        imagePanel.setPolygons(polygons);
+        imagePanel.updateSelectionInfoLabels();
+
+        if(infoMousePositionValue != null){
+            infoMousePositionValue.setText("-");
+        }
+
+        scrollPane.getViewport().setViewPosition(new Point(0, 0));
+
+        updateInfoPanel();
+    }
+
 
     private void deleteVertexAndUpdateTopology(int delIdx){
         if(delIdx < 0 || delIdx >= vertexPoints.size()) return;
@@ -2300,6 +2447,20 @@ public class CellDivisionInference implements PlugIn {
             "junctionAngleAverageDegrees","junctionAngleMaxDegrees","junctionAngleMinDegrees","junctionAngleDifferenceDegrees","junctionAngleRatio"
     };
 
+    private static final String[] ESTIMATED_DIVISION_PAIR_CSV_HEADERS = new String[]{
+            "fileName",
+            "firstCellId",
+            "secondCellId",
+            "firstCentroidX",
+            "firstCentroidY",
+            "secondCentroidX",
+            "secondCentroidY",
+            "divisionAngle0to90",
+            "divisionAngle0to180",
+            "averageCentroidX",
+            "averageCentroidY"
+    };
+
     private void exportNeighborPairGeometrics(JFrame frame){
 
         if(polygons == null || polygons.size() < 2){
@@ -2367,6 +2528,131 @@ public class CellDivisionInference implements PlugIn {
                 "Exported " + sortedPairs.size() + " neighbor pairs to:\n" + file.getAbsolutePath(),
                 "Export Neighbor Pair Geometrics",
                 JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void exportEstimatedDivisionPairs(JFrame frame){
+
+        if(polygons == null || polygons.size() < 2){
+            JOptionPane.showMessageDialog(frame,
+                    "Need at least 2 polygons.",
+                    "Export Estimated Division Pairs",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        ArrayList<int[]> selectedPairs = new ArrayList<>();
+        for(Map.Entry<Long, EstimationEntry> e : neighborPairEstimationCache.entrySet()){
+            if(e.getValue() == null || !e.getValue().selected) continue;
+            long key = e.getKey();
+            int a = (int)(key >> 32);
+            int b = (int)(key & 0xffffffffL);
+            if(a < 0 || b < 0 || a >= polygons.size() || b >= polygons.size()) continue;
+            if(a == b) continue;
+            selectedPairs.add(new int[]{Math.min(a, b), Math.max(a, b)});
+        }
+
+        ArrayList<int[]> sortedPairs = normalizeAndSortPairs(selectedPairs);
+        if(sortedPairs.isEmpty()){
+            JOptionPane.showMessageDialog(frame,
+                    "No estimated division pairs selected.\nRun: Process → divided pair estimation... first.",
+                    "Export Estimated Division Pairs",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        String base = baseNameWithoutExtension(currentGeometrySourceFileName);
+        if(base == null || base.trim().isEmpty()){
+            base = "estimated_division_pairs";
+        }
+
+        SaveDialog sd = new SaveDialog(
+                "Export Estimated Division Pairs CSV",
+                base + "_estimated_division_pairs",
+                ".csv"
+        );
+
+        String dir = sd.getDirectory();
+        String name = sd.getFileName();
+        if(name == null) return;
+
+        if(!name.toLowerCase(Locale.ROOT).endsWith(".csv")){
+            name += ".csv";
+        }
+
+        File file = new File(dir, name);
+
+        try{
+            writeEstimatedDivisionPairsCsv(file, sortedPairs);
+        }catch(Exception ex){
+            IJ.error("Export Estimated Division Pairs failed", ex.getMessage());
+            return;
+        }
+
+        JOptionPane.showMessageDialog(frame,
+                "Exported " + sortedPairs.size() + " estimated division pairs to:\n" + file.getAbsolutePath(),
+                "Export Estimated Division Pairs",
+                JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void writeEstimatedDivisionPairsCsv(File file, List<int[]> sortedPairs) throws IOException{
+
+        try(BufferedWriter bw = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))){
+
+            for(int i=0; i<ESTIMATED_DIVISION_PAIR_CSV_HEADERS.length; i++){
+                if(i > 0) bw.write(",");
+                bw.write(escapeCsvField(ESTIMATED_DIVISION_PAIR_CSV_HEADERS[i]));
+            }
+            bw.write("\n");
+
+            String fileNameForCsv = currentGeometrySourceFileName;
+            if(fileNameForCsv == null || fileNameForCsv.trim().isEmpty()){
+                fileNameForCsv = "unknown.json";
+            }
+
+            for(int[] pr : sortedPairs){
+                int firstCellId = pr[0];
+                int secondCellId = pr[1];
+
+                Point2D.Double c1 = polygonCentroid_PolygonItemLike(polygons.get(firstCellId));
+                Point2D.Double c2 = polygonCentroid_PolygonItemLike(polygons.get(secondCellId));
+
+                double dx = c2.x - c1.x;
+                double dy = c2.y - c1.y;
+
+                double divisionAngle0to90 = Math.toDegrees(Math.atan2(Math.abs(dy), Math.abs(dx)));
+
+                double divisionAngle0to180 = Math.toDegrees(Math.atan2(dy, dx));
+                if(divisionAngle0to180 < 0.0){
+                    divisionAngle0to180 += 360.0;
+                }
+                if(divisionAngle0to180 > 180.0){
+                    divisionAngle0to180 = 360.0 - divisionAngle0to180;
+                }
+
+                double avgX = (c1.x + c2.x) * 0.5;
+                double avgY = (c1.y + c2.y) * 0.5;
+
+                ArrayList<String> row = new ArrayList<>(ESTIMATED_DIVISION_PAIR_CSV_HEADERS.length);
+                row.add(fileNameForCsv);
+                row.add(String.valueOf(firstCellId));
+                row.add(String.valueOf(secondCellId));
+                row.add(formatQtCsvDouble(c1.x));
+                row.add(formatQtCsvDouble(c1.y));
+                row.add(formatQtCsvDouble(c2.x));
+                row.add(formatQtCsvDouble(c2.y));
+                row.add(formatQtCsvDouble(divisionAngle0to90));
+                row.add(formatQtCsvDouble(divisionAngle0to180));
+                row.add(formatQtCsvDouble(avgX));
+                row.add(formatQtCsvDouble(avgY));
+
+                for(int i=0; i<row.size(); i++){
+                    if(i > 0) bw.write(",");
+                    bw.write(escapeCsvField(row.get(i)));
+                }
+                bw.write("\n");
+            }
+        }
     }
 
     private static ArrayList<int[]> normalizeAndSortPairs(List<int[]> pairs){
@@ -4962,7 +5248,7 @@ public class CellDivisionInference implements PlugIn {
 
         // Qt: supports up to 63 polygons using a 64-bit mask; fallback to greedy otherwise
         if(polygonCount >= 64){
-            IJ.log("Global maximum weight matching supports up to 63 polygons. Falling back to greedy matching.");
+            //IJ.log("Global maximum weight matching supports up to 63 polygons. Falling back to greedy matching.");
             return greedyMatching(polygonCount, candidates);
         }
 
@@ -6272,6 +6558,8 @@ public class CellDivisionInference implements PlugIn {
 
         // --- multi-vertex picking for manual line/polygon creation
         private final ArrayList<Integer> pickedVertices = new ArrayList<>();
+        private final LinkedHashSet<Integer> debugHighlightedVertices = new LinkedHashSet<>();
+        private final LinkedHashSet<Integer> debugHighlightedLines = new LinkedHashSet<>();
 
         // --- to distinguish click (select) vs drag (move) on a vertex ---
         private int pressedVertex = -1;
@@ -6303,6 +6591,34 @@ public class CellDivisionInference implements PlugIn {
 
         private void clearPickedVertices(){
             pickedVertices.clear();
+        }
+
+        private void clearDebugHighlights(){
+            debugHighlightedVertices.clear();
+            debugHighlightedLines.clear();
+        }
+
+        void setDebugHighlights(Collection<Integer> vertexIndices, Collection<Integer> lineIndices){
+            clearDebugHighlights();
+
+            if(vertexIndices != null){
+                for(Integer idx : vertexIndices){
+                    if(idx != null && idx >= 0 && idx < overlayPoints.size()){
+                        debugHighlightedVertices.add(idx);
+                    }
+                }
+            }
+
+            if(lineIndices != null){
+                for(Integer idx : lineIndices){
+                    if(idx != null && idx >= 0 && idx < lines.size()){
+                        debugHighlightedLines.add(idx);
+                    }
+                }
+            }
+
+            repaint();
+            updateSelectionInfoLabels();
         }
 
         private void addVertexAtScreen(int sx, int sy){
@@ -7153,6 +7469,7 @@ public class CellDivisionInference implements PlugIn {
 
         void setOverlayPoints(List<Point> pts){
             overlayPoints=pts;
+            clearDebugHighlights();
             repaint();
             updateInfoPanel();
         }
@@ -7164,6 +7481,7 @@ public class CellDivisionInference implements PlugIn {
         void setLines(List<LineEdge> l){
 
             lines=l;
+            clearDebugHighlights();
             clearNeighborPairs();
             CellDivisionInference.this.clearNeighborPairGeometryCache();
             CellDivisionInference.this.clearNeighborPairEstimationCache();
@@ -7176,6 +7494,7 @@ public class CellDivisionInference implements PlugIn {
         void setPolygons(List<List<Integer>> p){
 
             polygons=p;
+            clearDebugHighlights();
             polygonDisplayIds = new ArrayList<>();
             clearNeighborPairs();
             CellDivisionInference.this.clearNeighborPairGeometryCache();
@@ -7190,6 +7509,7 @@ public class CellDivisionInference implements PlugIn {
 
         void setPolygonsKeepOrder(List<List<Integer>> p){
             polygons = p;
+            clearDebugHighlights();
             polygonDisplayIds = new ArrayList<>();
             clearNeighborPairs();
             CellDivisionInference.this.clearNeighborPairGeometryCache();
@@ -7892,6 +8212,36 @@ public class CellDivisionInference implements PlugIn {
                 g2.setColor(oldColor);
             }
 
+            // lines
+            g2.setColor(lineColor);
+            g2.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+            for(int i=0; i<lines.size(); i++){
+
+                LineEdge e = lines.get(i);
+                if(e.v1 >= overlayPoints.size() || e.v2 >= overlayPoints.size()) continue;
+
+                Point p1 = overlayPoints.get(e.v1);
+                Point p2 = overlayPoints.get(e.v2);
+
+                if(i == selectedLine){
+                    g2.setColor(Color.YELLOW);
+                    g2.setStroke(new BasicStroke(lineWidth + 2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                }else if(debugHighlightedLines.contains(i)){
+                    g2.setColor(new Color(255, 0, 255));
+                    g2.setStroke(new BasicStroke(lineWidth + 2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                }else{
+                    g2.setColor(lineColor);
+                    g2.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                }
+
+                g2.drawLine(
+                        (int)((p1.x+0.5)*zoom),
+                        (int)((p1.y+0.5)*zoom),
+                        (int)((p2.x+0.5)*zoom),
+                        (int)((p2.y+0.5)*zoom));
+            }
+
             // ===== estimated division arrows (daughter-cell pairs) =====
             if(showDivisionArrows
                     && polygons != null && polygons.size() > 0
@@ -8086,32 +8436,7 @@ public class CellDivisionInference implements PlugIn {
                 g2.setColor(oldColor);
             }
 
-            // lines
-            g2.setColor(lineColor);
-            g2.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-
-            for(int i=0; i<lines.size(); i++){
-
-                LineEdge e = lines.get(i);
-                if(e.v1 >= overlayPoints.size() || e.v2 >= overlayPoints.size()) continue;
-
-                Point p1 = overlayPoints.get(e.v1);
-                Point p2 = overlayPoints.get(e.v2);
-
-                if(i == selectedLine){
-                    g2.setColor(Color.YELLOW);
-                    g2.setStroke(new BasicStroke(lineWidth + 2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                }else{
-                    g2.setColor(lineColor);
-                    g2.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                }
-
-                g2.drawLine(
-                        (int)((p1.x+0.5)*zoom),
-                        (int)((p1.y+0.5)*zoom),
-                        (int)((p2.x+0.5)*zoom),
-                        (int)((p2.y+0.5)*zoom));
-            }
+            
 
             // vertices
             for(int i=0;i<overlayPoints.size();i++){
@@ -8125,6 +8450,8 @@ public class CellDivisionInference implements PlugIn {
 
                 if(isPicked(i)){
                     g2.setColor(Color.ORANGE);
+                }else if(debugHighlightedVertices.contains(i)){
+                    g2.setColor(new Color(255, 0, 255));
                 }else{
                     g2.setColor(i==selectedVertex ? Color.YELLOW : vertexColor);
                 }
