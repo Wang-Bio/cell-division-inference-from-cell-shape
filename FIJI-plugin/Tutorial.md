@@ -70,12 +70,12 @@ Open:
 
 `Estimate` → `Divided Pair Estimation`
 
-Use the following settings:
+Use the following settings (by default):
 
-- **Geometry feature:** `junctionAngleAverageDegrees` (default)
+- **Geometry feature:** `junctionAngleAverageDegrees`
 - **Comparison:** `Above or equal to threshold (>=)`
 - **Threshold:** `145`
-- **Matching:** `GlobalMaximumWeight` (default)
+- **Matching:** `GlobalMaximumWeight`
 
 Select **OK**. Estimated divisions are displayed as orange arrows.
 
@@ -194,4 +194,4 @@ Open:
 
 `Import&Export` → `Export Polygonal Cell Networks`
 
-This exports all vertex, line, and polygon information.
+This exports all vertex, line, and polygon information, which could be imported and analyzed by Trial 1 similarly (but notice that the cell index could be different and cause mistakes in the real division pairs import).
