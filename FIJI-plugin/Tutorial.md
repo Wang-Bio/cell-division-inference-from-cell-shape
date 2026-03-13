@@ -1,46 +1,197 @@
-1. Install "Cell Division Inference" FIJI plugin into your FIJI
+# Cell Division Inference FIJI Plugin Tutorial
 
-For windows users, please copy and paste the "FIJI-plugin/plugin/Cell-Division-Inference-FIJI-plugin.jar" into your "FIJI_main_directory/plugins/". 
-(Under this /plugins/, usually there are many other plugins' .jar file by default)
-(For example, the directory is C:/tool/Fiji-win.app/plugins in Wang's windows pc)
+## 1. Installation
 
-For mac users, please copy and paste the "FIJI-plugin/plugin/Cell-Division-Inference-FIJI-plugin.jar" into your ... (ChatGPT, please help me fix this).
+Install the **Cell Division Inference** plugin by copying the plugin JAR file into the FIJI plugins directory.
 
-2. Open this plugin by opening FIJI-menu-Plugins-"Cell Division Inference", then the window will open
+- **Plugin file:** `FIJI-plugin/plugin/Cell-Division-Inference-FIJI-plugin.jar`
+- **Destination:** `<FIJI_main_directory>/plugins/`
 
-3. Please find the example data set in "example-data/"
+### Platform notes
 
---- Trial 1: with identified polygonal cell network
+- **Windows example:** `C:/tool/Fiji-win.app/plugins`
+- **macOS example:** `/Applications/Fiji.app/plugins`
 
-4. In the "Cell Division Inference" plugin main window, please select menu-"Open-Open Background", and open the "example-data/exampled_raw_image.jpg". Then the background image will be shown.
+After copying the JAR file, restart FIJI if it is already running.
 
-5. Select menu-Import&export-Import Polygonal Cell Networks, and import the "example-data/exampled_polygonal_cell_networks.json". Then the detected polygonal cell network will be displayed as an overlay on the background image. 
+## 2. Launch the Plugin
 
-6. Select the menu-Geometry-Neighbor Pair Geometrical Calculation. Then a preview of neighbor pair cells and calculation results will be shown. 
+In FIJI, open:
 
-7. Select the menu-Estimate-divided pair estimation, and keep Geometry feature: "junctionAngleAverageDegrees" by default, also keep Comparison: "Above or equal to threshold (>=)", and threshold: 145, and matching: GlobalMaximumWeight by default, and then select "OK". Then the estimated divisions will be displayed by orange arrows. 
+`Plugins` → `Cell Division Inference`
 
-8. Select the menu-Import&Export-Import Real Division Pairs, and import the "example-data/exampled_real_division_paris.csv". Then the real divisions will be displayed by pink arrows. 
+The plugin main window will appear.
 
-9. Select the menu-Estimate-Compare Estimated and Real Divisions. Then the true positive, false positive, and false negative of division estimation will be displayed by arrows. (true positives by dark red arrows, false positives by green arrows, false negatives by blue arrows)
+## 3. Example Dataset
 
-10. Select the menu-Import&Export-Export Neighbor Pair Geometrics, which will export all the geometrical results and also the real divisions for further analysis. 
+Sample files are provided in:
 
-11. Select the menu-Import&Export-Export Estimated Division Pairs, which will export the position informaiton of all estimated divided pairs, for further analysis. 
+`example-data/`
 
+---
 
------ Trial 2: Extract polygonal cell networks from binary image -----
+## Trial 1: Use an Existing Polygonal Cell Network
 
-12. Open a new window of plugin "Cell Division Inference" or select the menu-Edit-Delete All and Reset
+### Step 1: Load a background image
 
-13. Select menu-Open-Binary Image, and open the "exampled-data/exampled_binary_image". Then binary image of polygonal cell networks will be displayed.
+From the plugin main window, open:
 
-14. Select menu-Detect-Skeletonize, which will make the binary image to be a one-pixel width skeletonized image.
+`Open` → `Open Background`
 
-15. Select menu-Detect-Detect Vertices, which will detect the vertices if any pixel has three connected pixels, then users have to manually add some vertices in the outermost part (put mouse onto the desired place and then press ctrl+V, will create a vertex; to delete a miss labeled vertex, just select the vertex and press ctrl+D). 
+Then select:
 
-16. Select menu-Detect-Detect Lines, which will detect the lines based on the skeletonized image. Some lines might be misconnected, you manually delete (by select the misconnected line and press ctrl+D) and reconnect (by select the two vertices and press ctrl+L). 
+`example-data/exampled_raw_image.jpg`
 
-17. Select menu-Detect-Detect Polygons, which will detect the polygons based on the vertices nad lines. Basically all polygons should be correct, but still you can manuaally delete (by selecting the misconnected polygon and press ctrl+D) and reconnect (by selecting the vertices and press ctrl+P).
+The background image will be displayed.
 
-18. Select menu-Import&Export-Export Polygonal Cell Networks, which will export all information about the vertices, lines, and polygons. 
+### Step 2: Import polygonal cell networks
+
+Open:
+
+`Import&Export` → `Import Polygonal Cell Networks`
+
+Then select:
+
+`example-data/exampled_polygonal_cell_networks.json`
+
+The polygonal cell network is displayed as an overlay.
+
+### Step 3: Compute neighbor-pair geometry
+
+Open:
+
+`Geometry` → `Neighbor Pair Geometrical Calculation`
+
+A preview of neighboring cell pairs and calculated geometric values will be shown.
+
+### Step 4: Estimate division pairs
+
+Open:
+
+`Estimate` → `Divided Pair Estimation`
+
+Use the following settings:
+
+- **Geometry feature:** `junctionAngleAverageDegrees` (default)
+- **Comparison:** `Above or equal to threshold (>=)`
+- **Threshold:** `145`
+- **Matching:** `GlobalMaximumWeight` (default)
+
+Select **OK**. Estimated divisions are displayed as orange arrows.
+
+### Step 5: Import real division pairs
+
+Open:
+
+`Import&Export` → `Import Real Division Pairs`
+
+Then select:
+
+`example-data/exampled_real_division_paris.csv`
+
+Real divisions are displayed as pink arrows.
+
+### Step 6: Compare estimated vs. real divisions
+
+Open:
+
+`Estimate` → `Compare Estimated and Real Divisions`
+
+Results are shown as arrows:
+
+- **True positives:** dark red  
+- **False positives:** green  
+- **False negatives:** blue
+
+### Step 7: Export geometry results
+
+Open:
+
+`Import&Export` → `Export Neighbor Pair Geometrics`
+
+This exports geometric measurements and real division labels for downstream analysis.
+
+### Step 8: Export estimated division pairs
+
+Open:
+
+`Import&Export` → `Export Estimated Division Pairs`
+
+This exports position information for all estimated division pairs.
+
+---
+
+## Trial 2: Extract a Polygonal Cell Network from a Binary Image
+
+### Step 1: Reset the workspace
+
+Either open a new plugin window, or use:
+
+`Edit` → `Delete All and Reset`
+
+### Step 2: Load a binary image
+
+Open:
+
+`Open` → `Binary Image`
+
+Then select:
+
+`example-data/exampled_binary_image`
+
+The binary polygonal network image will be displayed.
+
+### Step 3: Skeletonize
+
+Open:
+
+`Detect` → `Skeletonize`
+
+This converts the binary image to a one-pixel-wide skeleton.
+
+### Step 4: Detect vertices
+
+Open:
+
+`Detect` → `Detect Vertices`
+
+Vertices are detected where a pixel has three connected neighbors.
+
+Manual editing shortcuts:
+
+- **Add vertex:** place the cursor at the desired location and press `Ctrl+V`
+- **Delete vertex:** select the mislabeled vertex and press `Ctrl+D`
+
+### Step 5: Detect lines
+
+Open:
+
+`Detect` → `Detect Lines`
+
+Lines are detected from the skeletonized image.
+
+Manual editing shortcuts:
+
+- **Delete misconnected line:** select the line and press `Ctrl+D`
+- **Connect two vertices:** select both vertices and press `Ctrl+L`
+
+### Step 6: Detect polygons
+
+Open:
+
+`Detect` → `Detect Polygons`
+
+Polygons are detected from vertices and lines.
+
+Manual editing shortcuts:
+
+- **Delete misdetected polygon:** select the polygon and press `Ctrl+D`
+- **Create polygon from selected vertices:** press `Ctrl+P`
+
+### Step 7: Export polygonal cell networks
+
+Open:
+
+`Import&Export` → `Export Polygonal Cell Networks`
+
+This exports all vertex, line, and polygon information.
