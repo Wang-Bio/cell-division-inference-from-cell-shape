@@ -149,6 +149,31 @@ QString formatValue(double value)
     return QString::number(value, 'f', 6);
 }
 
+
+QVector<BatchDivisionEstimator::GeometryEntry> sortedNormalizedGeometryEntries(const QVector<BatchDivisionEstimator::GeometryEntry> &entries)
+{
+    QVector<BatchDivisionEstimator::GeometryEntry> sorted = entries;
+
+    for (auto &entry : sorted) {
+        if (entry.firstId > entry.secondId)
+            std::swap(entry.firstId, entry.secondId);
+    }
+
+    std::stable_sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b) {
+        if (a.firstId != b.firstId)
+            return a.firstId < b.firstId;
+        if (a.secondId != b.secondId)
+            return a.secondId < b.secondId;
+        return a.fileName < b.fileName;
+    });
+
+    int pairIndex = 0;
+    for (auto &entry : sorted)
+        entry.pairIndex = ++pairIndex;
+
+    return sorted;
+}
+
 QStringList buildRow(const BatchDivisionEstimator::GeometryEntry &entry,
                      const NeighborPairGeometrySettings &settings)
 {
@@ -855,7 +880,8 @@ bool BatchDivisionEstimator::exportNeighborGeometryToCsv(const QString &filePath
     const QStringList headers = buildHeaders(settings);
     stream << headers.join(',') << '\n';
 
-    for (const GeometryEntry &entry : entries) {
+    const QVector<GeometryEntry> sortedEntries = sortedNormalizedGeometryEntries(entries);
+    for (const GeometryEntry &entry : sortedEntries) {
         QStringList row = buildRow(entry, settings);
         for (QString &field : row)
             field = escapeForCsv(field);

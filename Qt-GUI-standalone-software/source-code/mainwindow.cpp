@@ -449,10 +449,10 @@ void MainWindow::onExportAllData()
     if (defaultDir.isEmpty() || defaultDir == "-")
         defaultDir = QDir::homePath();
 
-    QString baseName = ui->label_input_file_name_value->text();
-    if (baseName.isEmpty() || baseName == "-")
-        baseName = "export";
-    baseName = QFileInfo(baseName).completeBaseName();
+    QString inputFileName = ui->label_input_file_name_value->text();
+    if (inputFileName.isEmpty() || inputFileName == "-")
+        inputFileName = "export";
+    const QString baseName = QFileInfo(inputFileName).completeBaseName();
 
     const QString defaultPath = QDir(defaultDir).filePath(baseName + "_all_data.json");
     const QString savePath = QFileDialog::getSaveFileName(this,
@@ -526,10 +526,10 @@ void MainWindow::onExportAllData()
                 geometryDisabledWarningAdded = true;
             }
         }
-        entry.fileName = baseName;
+        entry.fileName = inputFileName;
         entry.pairIndex = ++pairIndex;
-        entry.firstId = pair.first;
-        entry.secondId = pair.second;
+        entry.firstId = std::min(pair.first, pair.second);
+        entry.secondId = std::max(pair.first, pair.second);
         geometryEntries.append(entry);
     }
 
@@ -2122,8 +2122,6 @@ void MainWindow::onNeighborPairGeometryCalculation()
     QString geometryFileName = ui->label_input_file_name_value->text();
     if (geometryFileName.isEmpty() || geometryFileName == "-")
         geometryFileName = QStringLiteral("current_scene");
-    else
-        geometryFileName = QFileInfo(geometryFileName).completeBaseName();
 
     QVector<NeighborPairGeometryCalculator::Result> results;
     int neighborCount = 0;
@@ -2146,8 +2144,8 @@ void MainWindow::onNeighborPairGeometryCalculation()
             BatchDivisionEstimator::GeometryEntry entry;
             entry.fileName = geometryFileName;
             entry.pairIndex = ++pairIndexForExport;
-            entry.firstId = polygons[i]->id();
-            entry.secondId = polygons[j]->id();
+            entry.firstId = std::min(polygons[i]->id(), polygons[j]->id());
+            entry.secondId = std::max(polygons[i]->id(), polygons[j]->id());
             entry.geometry = storedResult;
             m_lastGeometryEntries.append(entry);
         }
