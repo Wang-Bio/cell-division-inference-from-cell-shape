@@ -1,0 +1,1503 @@
+{
+    "lines": [
+        {
+            "endVertexId": 92,
+            "id": 5,
+            "startVertexId": 96
+        },
+        {
+            "endVertexId": 89,
+            "id": 6,
+            "startVertexId": 96
+        },
+        {
+            "endVertexId": 85,
+            "id": 12,
+            "startVertexId": 90
+        },
+        {
+            "endVertexId": 98,
+            "id": 13,
+            "startVertexId": 90
+        },
+        {
+            "endVertexId": 89,
+            "id": 14,
+            "startVertexId": 90
+        },
+        {
+            "endVertexId": 86,
+            "id": 15,
+            "startVertexId": 89
+        },
+        {
+            "endVertexId": 84,
+            "id": 17,
+            "startVertexId": 86
+        },
+        {
+            "endVertexId": 81,
+            "id": 18,
+            "startVertexId": 86
+        },
+        {
+            "endVertexId": 82,
+            "id": 19,
+            "startVertexId": 85
+        },
+        {
+            "endVertexId": 88,
+            "id": 20,
+            "startVertexId": 85
+        },
+        {
+            "endVertexId": 78,
+            "id": 21,
+            "startVertexId": 84
+        },
+        {
+            "endVertexId": 92,
+            "id": 22,
+            "startVertexId": 84
+        },
+        {
+            "endVertexId": 75,
+            "id": 23,
+            "startVertexId": 81
+        },
+        {
+            "endVertexId": 82,
+            "id": 24,
+            "startVertexId": 81
+        },
+        {
+            "endVertexId": 72,
+            "id": 25,
+            "startVertexId": 80
+        },
+        {
+            "endVertexId": 88,
+            "id": 26,
+            "startVertexId": 80
+        },
+        {
+            "endVertexId": 73,
+            "id": 27,
+            "startVertexId": 78
+        },
+        {
+            "endVertexId": 77,
+            "id": 28,
+            "startVertexId": 78
+        },
+        {
+            "endVertexId": 69,
+            "id": 29,
+            "startVertexId": 77
+        },
+        {
+            "endVertexId": 83,
+            "id": 30,
+            "startVertexId": 77
+        },
+        {
+            "endVertexId": 70,
+            "id": 31,
+            "startVertexId": 76
+        },
+        {
+            "endVertexId": 83,
+            "id": 32,
+            "startVertexId": 76
+        },
+        {
+            "endVertexId": 66,
+            "id": 34,
+            "startVertexId": 71
+        },
+        {
+            "endVertexId": 68,
+            "id": 35,
+            "startVertexId": 71
+        },
+        {
+            "endVertexId": 82,
+            "id": 36,
+            "startVertexId": 71
+        },
+        {
+            "endVertexId": 60,
+            "id": 37,
+            "startVertexId": 70
+        },
+        {
+            "endVertexId": 69,
+            "id": 38,
+            "startVertexId": 70
+        },
+        {
+            "endVertexId": 63,
+            "id": 39,
+            "startVertexId": 62
+        },
+        {
+            "endVertexId": 56,
+            "id": 40,
+            "startVertexId": 62
+        },
+        {
+            "endVertexId": 65,
+            "id": 41,
+            "startVertexId": 62
+        },
+        {
+            "endVertexId": 50,
+            "id": 43,
+            "startVertexId": 61
+        },
+        {
+            "endVertexId": 57,
+            "id": 44,
+            "startVertexId": 61
+        },
+        {
+            "endVertexId": 66,
+            "id": 45,
+            "startVertexId": 61
+        },
+        {
+            "endVertexId": 48,
+            "id": 46,
+            "startVertexId": 58
+        },
+        {
+            "endVertexId": 64,
+            "id": 48,
+            "startVertexId": 58
+        },
+        {
+            "endVertexId": 49,
+            "id": 49,
+            "startVertexId": 57
+        },
+        {
+            "endVertexId": 64,
+            "id": 50,
+            "startVertexId": 57
+        },
+        {
+            "endVertexId": 46,
+            "id": 51,
+            "startVertexId": 56
+        },
+        {
+            "endVertexId": 37,
+            "id": 52,
+            "startVertexId": 55
+        },
+        {
+            "endVertexId": 60,
+            "id": 53,
+            "startVertexId": 55
+        },
+        {
+            "endVertexId": 64,
+            "id": 57,
+            "startVertexId": 68
+        },
+        {
+            "endVertexId": 72,
+            "id": 58,
+            "startVertexId": 68
+        },
+        {
+            "endVertexId": 38,
+            "id": 59,
+            "startVertexId": 53
+        },
+        {
+            "endVertexId": 52,
+            "id": 60,
+            "startVertexId": 53
+        },
+        {
+            "endVertexId": 60,
+            "id": 61,
+            "startVertexId": 53
+        },
+        {
+            "endVertexId": 91,
+            "id": 62,
+            "startVertexId": 98
+        },
+        {
+            "endVertexId": 46,
+            "id": 64,
+            "startVertexId": 52
+        },
+        {
+            "endVertexId": 63,
+            "id": 65,
+            "startVertexId": 52
+        },
+        {
+            "endVertexId": 41,
+            "id": 66,
+            "startVertexId": 51
+        },
+        {
+            "endVertexId": 50,
+            "id": 67,
+            "startVertexId": 51
+        },
+        {
+            "endVertexId": 56,
+            "id": 68,
+            "startVertexId": 51
+        },
+        {
+            "endVertexId": 65,
+            "id": 69,
+            "startVertexId": 67
+        },
+        {
+            "endVertexId": 66,
+            "id": 70,
+            "startVertexId": 67
+        },
+        {
+            "endVertexId": 75,
+            "id": 71,
+            "startVertexId": 67
+        },
+        {
+            "endVertexId": 43,
+            "id": 72,
+            "startVertexId": 49
+        },
+        {
+            "endVertexId": 48,
+            "id": 73,
+            "startVertexId": 49
+        },
+        {
+            "endVertexId": 45,
+            "id": 74,
+            "startVertexId": 48
+        },
+        {
+            "endVertexId": 88,
+            "id": 75,
+            "startVertexId": 91
+        },
+        {
+            "endVertexId": 44,
+            "id": 79,
+            "startVertexId": 46
+        },
+        {
+            "endVertexId": 39,
+            "id": 80,
+            "startVertexId": 45
+        },
+        {
+            "endVertexId": 42,
+            "id": 81,
+            "startVertexId": 43
+        },
+        {
+            "endVertexId": 32,
+            "id": 82,
+            "startVertexId": 43
+        },
+        {
+            "endVertexId": 36,
+            "id": 83,
+            "startVertexId": 42
+        },
+        {
+            "endVertexId": 50,
+            "id": 84,
+            "startVertexId": 42
+        },
+        {
+            "endVertexId": 44,
+            "id": 85,
+            "startVertexId": 41
+        },
+        {
+            "endVertexId": 34,
+            "id": 86,
+            "startVertexId": 41
+        },
+        {
+            "endVertexId": 31,
+            "id": 88,
+            "startVertexId": 39
+        },
+        {
+            "endVertexId": 29,
+            "id": 89,
+            "startVertexId": 38
+        },
+        {
+            "endVertexId": 37,
+            "id": 90,
+            "startVertexId": 38
+        },
+        {
+            "endVertexId": 28,
+            "id": 91,
+            "startVertexId": 36
+        },
+        {
+            "endVertexId": 34,
+            "id": 92,
+            "startVertexId": 36
+        },
+        {
+            "endVertexId": 30,
+            "id": 95,
+            "startVertexId": 34
+        },
+        {
+            "endVertexId": 24,
+            "id": 96,
+            "startVertexId": 33
+        },
+        {
+            "endVertexId": 44,
+            "id": 97,
+            "startVertexId": 33
+        },
+        {
+            "endVertexId": 29,
+            "id": 98,
+            "startVertexId": 33
+        },
+        {
+            "endVertexId": 26,
+            "id": 99,
+            "startVertexId": 32
+        },
+        {
+            "endVertexId": 31,
+            "id": 100,
+            "startVertexId": 32
+        },
+        {
+            "endVertexId": 24,
+            "id": 102,
+            "startVertexId": 30
+        },
+        {
+            "endVertexId": 25,
+            "id": 103,
+            "startVertexId": 30
+        },
+        {
+            "endVertexId": 25,
+            "id": 104,
+            "startVertexId": 28
+        },
+        {
+            "endVertexId": 27,
+            "id": 105,
+            "startVertexId": 28
+        },
+        {
+            "endVertexId": 16,
+            "id": 106,
+            "startVertexId": 27
+        },
+        {
+            "endVertexId": 26,
+            "id": 107,
+            "startVertexId": 27
+        },
+        {
+            "endVertexId": 15,
+            "id": 108,
+            "startVertexId": 26
+        },
+        {
+            "endVertexId": 22,
+            "id": 109,
+            "startVertexId": 25
+        },
+        {
+            "endVertexId": 63,
+            "id": 110,
+            "startVertexId": 69
+        },
+        {
+            "endVertexId": 23,
+            "id": 111,
+            "startVertexId": 24
+        },
+        {
+            "endVertexId": 19,
+            "id": 113,
+            "startVertexId": 23
+        },
+        {
+            "endVertexId": 22,
+            "id": 114,
+            "startVertexId": 23
+        },
+        {
+            "endVertexId": 17,
+            "id": 115,
+            "startVertexId": 22
+        },
+        {
+            "endVertexId": 19,
+            "id": 118,
+            "startVertexId": 20
+        },
+        {
+            "endVertexId": 14,
+            "id": 119,
+            "startVertexId": 20
+        },
+        {
+            "endVertexId": 29,
+            "id": 120,
+            "startVertexId": 20
+        },
+        {
+            "endVertexId": 13,
+            "id": 121,
+            "startVertexId": 19
+        },
+        {
+            "endVertexId": 11,
+            "id": 124,
+            "startVertexId": 17
+        },
+        {
+            "endVertexId": 16,
+            "id": 125,
+            "startVertexId": 17
+        },
+        {
+            "endVertexId": 10,
+            "id": 126,
+            "startVertexId": 16
+        },
+        {
+            "endVertexId": 10,
+            "id": 127,
+            "startVertexId": 15
+        },
+        {
+            "endVertexId": 73,
+            "id": 129,
+            "startVertexId": 75
+        },
+        {
+            "endVertexId": 8,
+            "id": 130,
+            "startVertexId": 14
+        },
+        {
+            "endVertexId": 5,
+            "id": 131,
+            "startVertexId": 13
+        },
+        {
+            "endVertexId": 9,
+            "id": 132,
+            "startVertexId": 13
+        },
+        {
+            "endVertexId": 9,
+            "id": 134,
+            "startVertexId": 11
+        },
+        {
+            "endVertexId": 5,
+            "id": 137,
+            "startVertexId": 8
+        },
+        {
+            "endVertexId": 65,
+            "id": 139,
+            "startVertexId": 73
+        },
+        {
+            "endVertexId": 2,
+            "id": 143,
+            "startVertexId": 5
+        },
+        {
+            "endVertexId": 2,
+            "id": 144,
+            "startVertexId": 4
+        },
+        {
+            "endVertexId": 9,
+            "id": 146,
+            "startVertexId": 4
+        }
+    ],
+    "polygons": [
+        {
+            "id": 28,
+            "lineIds": [
+                5,
+                22,
+                17,
+                15,
+                6
+            ],
+            "vertexIds": [
+                96,
+                92,
+                84,
+                86,
+                89
+            ]
+        },
+        {
+            "id": 29,
+            "lineIds": [
+                12,
+                20,
+                75,
+                62,
+                13
+            ],
+            "vertexIds": [
+                90,
+                85,
+                88,
+                91,
+                98
+            ]
+        },
+        {
+            "id": 27,
+            "lineIds": [
+                14,
+                15,
+                18,
+                24,
+                19,
+                12
+            ],
+            "vertexIds": [
+                90,
+                89,
+                86,
+                81,
+                82,
+                85
+            ]
+        },
+        {
+            "id": 26,
+            "lineIds": [
+                17,
+                21,
+                27,
+                129,
+                23,
+                18
+            ],
+            "vertexIds": [
+                86,
+                84,
+                78,
+                73,
+                75,
+                81
+            ]
+        },
+        {
+            "id": 24,
+            "lineIds": [
+                19,
+                36,
+                35,
+                58,
+                25,
+                26,
+                20
+            ],
+            "vertexIds": [
+                85,
+                82,
+                71,
+                68,
+                72,
+                80,
+                88
+            ]
+        },
+        {
+            "id": 23,
+            "lineIds": [
+                23,
+                71,
+                70,
+                34,
+                36,
+                24
+            ],
+            "vertexIds": [
+                81,
+                75,
+                67,
+                66,
+                71,
+                82
+            ]
+        },
+        {
+            "id": 21,
+            "lineIds": [
+                28,
+                29,
+                110,
+                39,
+                41,
+                139,
+                27
+            ],
+            "vertexIds": [
+                78,
+                77,
+                69,
+                63,
+                62,
+                65,
+                73
+            ]
+        },
+        {
+            "id": 25,
+            "lineIds": [
+                30,
+                32,
+                31,
+                38,
+                29
+            ],
+            "vertexIds": [
+                77,
+                83,
+                76,
+                70,
+                69
+            ]
+        },
+        {
+            "id": 20,
+            "lineIds": [
+                34,
+                45,
+                44,
+                50,
+                57,
+                35
+            ],
+            "vertexIds": [
+                71,
+                66,
+                61,
+                57,
+                64,
+                68
+            ]
+        },
+        {
+            "id": 19,
+            "lineIds": [
+                37,
+                61,
+                60,
+                65,
+                110,
+                38
+            ],
+            "vertexIds": [
+                70,
+                60,
+                53,
+                52,
+                63,
+                69
+            ]
+        },
+        {
+            "id": 16,
+            "lineIds": [
+                39,
+                65,
+                64,
+                51,
+                40
+            ],
+            "vertexIds": [
+                62,
+                63,
+                52,
+                46,
+                56
+            ]
+        },
+        {
+            "id": 18,
+            "lineIds": [
+                40,
+                68,
+                67,
+                43,
+                45,
+                70,
+                69,
+                41
+            ],
+            "vertexIds": [
+                62,
+                56,
+                51,
+                50,
+                61,
+                66,
+                67,
+                65
+            ]
+        },
+        {
+            "id": 15,
+            "lineIds": [
+                43,
+                84,
+                81,
+                72,
+                49,
+                44
+            ],
+            "vertexIds": [
+                61,
+                50,
+                42,
+                43,
+                49,
+                57
+            ]
+        },
+        {
+            "id": 17,
+            "lineIds": [
+                48,
+                50,
+                49,
+                73,
+                46
+            ],
+            "vertexIds": [
+                58,
+                64,
+                57,
+                49,
+                48
+            ]
+        },
+        {
+            "id": 14,
+            "lineIds": [
+                51,
+                79,
+                85,
+                66,
+                68
+            ],
+            "vertexIds": [
+                56,
+                46,
+                44,
+                41,
+                51
+            ]
+        },
+        {
+            "id": 13,
+            "lineIds": [
+                52,
+                90,
+                59,
+                61,
+                53
+            ],
+            "vertexIds": [
+                55,
+                37,
+                38,
+                53,
+                60
+            ]
+        },
+        {
+            "id": 10,
+            "lineIds": [
+                59,
+                89,
+                98,
+                97,
+                79,
+                64,
+                60
+            ],
+            "vertexIds": [
+                53,
+                38,
+                29,
+                33,
+                44,
+                46,
+                52
+            ]
+        },
+        {
+            "id": 12,
+            "lineIds": [
+                66,
+                86,
+                92,
+                83,
+                84,
+                67
+            ],
+            "vertexIds": [
+                51,
+                41,
+                34,
+                36,
+                42,
+                50
+            ]
+        },
+        {
+            "id": 22,
+            "lineIds": [
+                71,
+                129,
+                139,
+                69
+            ],
+            "vertexIds": [
+                67,
+                75,
+                73,
+                65
+            ]
+        },
+        {
+            "id": 11,
+            "lineIds": [
+                72,
+                82,
+                100,
+                88,
+                80,
+                74,
+                73
+            ],
+            "vertexIds": [
+                49,
+                43,
+                32,
+                31,
+                39,
+                45,
+                48
+            ]
+        },
+        {
+            "id": 9,
+            "lineIds": [
+                81,
+                83,
+                91,
+                105,
+                107,
+                99,
+                82
+            ],
+            "vertexIds": [
+                43,
+                42,
+                36,
+                28,
+                27,
+                26,
+                32
+            ]
+        },
+        {
+            "id": 7,
+            "lineIds": [
+                85,
+                97,
+                96,
+                102,
+                95,
+                86
+            ],
+            "vertexIds": [
+                41,
+                44,
+                33,
+                24,
+                30,
+                34
+            ]
+        },
+        {
+            "id": 8,
+            "lineIds": [
+                92,
+                95,
+                103,
+                104,
+                91
+            ],
+            "vertexIds": [
+                36,
+                34,
+                30,
+                25,
+                28
+            ]
+        },
+        {
+            "id": 5,
+            "lineIds": [
+                98,
+                120,
+                118,
+                113,
+                111,
+                96
+            ],
+            "vertexIds": [
+                33,
+                29,
+                20,
+                19,
+                23,
+                24
+            ]
+        },
+        {
+            "id": 6,
+            "lineIds": [
+                102,
+                111,
+                114,
+                109,
+                103
+            ],
+            "vertexIds": [
+                30,
+                24,
+                23,
+                22,
+                25
+            ]
+        },
+        {
+            "id": 4,
+            "lineIds": [
+                104,
+                109,
+                115,
+                125,
+                106,
+                105
+            ],
+            "vertexIds": [
+                28,
+                25,
+                22,
+                17,
+                16,
+                27
+            ]
+        },
+        {
+            "id": 3,
+            "lineIds": [
+                106,
+                126,
+                127,
+                108,
+                107
+            ],
+            "vertexIds": [
+                27,
+                16,
+                10,
+                15,
+                26
+            ]
+        },
+        {
+            "id": 2,
+            "lineIds": [
+                113,
+                121,
+                132,
+                134,
+                124,
+                115,
+                114
+            ],
+            "vertexIds": [
+                23,
+                19,
+                13,
+                9,
+                11,
+                17,
+                22
+            ]
+        },
+        {
+            "id": 1,
+            "lineIds": [
+                119,
+                130,
+                137,
+                131,
+                121,
+                118
+            ],
+            "vertexIds": [
+                20,
+                14,
+                8,
+                5,
+                13,
+                19
+            ]
+        },
+        {
+            "id": 0,
+            "lineIds": [
+                131,
+                143,
+                144,
+                146,
+                132
+            ],
+            "vertexIds": [
+                13,
+                5,
+                2,
+                4,
+                9
+            ]
+        }
+    ],
+    "vertices": [
+        {
+            "id": 2,
+            "x": 341.8333333333333,
+            "y": 284.16666666666663
+        },
+        {
+            "id": 4,
+            "x": 371.5,
+            "y": 288.5
+        },
+        {
+            "id": 5,
+            "x": 311.5,
+            "y": 302.5
+        },
+        {
+            "id": 8,
+            "x": 281.8333333333333,
+            "y": 316.16666666666663
+        },
+        {
+            "id": 9,
+            "x": 374.8333333333333,
+            "y": 335.16666666666663
+        },
+        {
+            "id": 10,
+            "x": 483.5,
+            "y": 341.5
+        },
+        {
+            "id": 11,
+            "x": 403.5,
+            "y": 343.5
+        },
+        {
+            "id": 13,
+            "x": 348.5,
+            "y": 352.5
+        },
+        {
+            "id": 14,
+            "x": 268.5,
+            "y": 357.5
+        },
+        {
+            "id": 15,
+            "x": 503.8333333333333,
+            "y": 359.8333333333333
+        },
+        {
+            "id": 16,
+            "x": 451.16666666666663,
+            "y": 367.8333333333333
+        },
+        {
+            "id": 17,
+            "x": 422.5,
+            "y": 374.5
+        },
+        {
+            "id": 19,
+            "x": 336.5,
+            "y": 377.5
+        },
+        {
+            "id": 20,
+            "x": 289.8333333333333,
+            "y": 381.16666666666663
+        },
+        {
+            "id": 22,
+            "x": 415.5,
+            "y": 394.5
+        },
+        {
+            "id": 23,
+            "x": 346.5,
+            "y": 399.5
+        },
+        {
+            "id": 24,
+            "x": 342.5,
+            "y": 425.5
+        },
+        {
+            "id": 25,
+            "x": 419.5,
+            "y": 426.5
+        },
+        {
+            "id": 26,
+            "x": 484.5,
+            "y": 427.5
+        },
+        {
+            "id": 27,
+            "x": 462.5,
+            "y": 428.5
+        },
+        {
+            "id": 28,
+            "x": 421.5,
+            "y": 429.5
+        },
+        {
+            "id": 29,
+            "x": 263.16666666666663,
+            "y": 434.16666666666663
+        },
+        {
+            "id": 30,
+            "x": 356.5,
+            "y": 440.5
+        },
+        {
+            "id": 31,
+            "x": 514.5,
+            "y": 452.5
+        },
+        {
+            "id": 32,
+            "x": 489.5,
+            "y": 455.5
+        },
+        {
+            "id": 33,
+            "x": 287.16666666666663,
+            "y": 457.8333333333333
+        },
+        {
+            "id": 34,
+            "x": 354.5,
+            "y": 468.5
+        },
+        {
+            "id": 36,
+            "x": 419.5,
+            "y": 472.5
+        },
+        {
+            "id": 37,
+            "x": 202.5,
+            "y": 473.5
+        },
+        {
+            "id": 38,
+            "x": 229.16666666666666,
+            "y": 473.8333333333333
+        },
+        {
+            "id": 39,
+            "x": 533.8333333333333,
+            "y": 479.8333333333333
+        },
+        {
+            "id": 41,
+            "x": 350.16666666666663,
+            "y": 491.16666666666663
+        },
+        {
+            "id": 42,
+            "x": 428.5,
+            "y": 495.5
+        },
+        {
+            "id": 43,
+            "x": 462.5,
+            "y": 499.5
+        },
+        {
+            "id": 44,
+            "x": 321.5,
+            "y": 505.5
+        },
+        {
+            "id": 45,
+            "x": 523.5,
+            "y": 506.5
+        },
+        {
+            "id": 46,
+            "x": 315.16666666666663,
+            "y": 513.8333333333333
+        },
+        {
+            "id": 48,
+            "x": 518.5,
+            "y": 518.5
+        },
+        {
+            "id": 49,
+            "x": 472.5,
+            "y": 520.5
+        },
+        {
+            "id": 50,
+            "x": 402.5,
+            "y": 524.5
+        },
+        {
+            "id": 51,
+            "x": 389.5,
+            "y": 527.5
+        },
+        {
+            "id": 52,
+            "x": 298.5,
+            "y": 540.5
+        },
+        {
+            "id": 53,
+            "x": 241.5,
+            "y": 546.5
+        },
+        {
+            "id": 55,
+            "x": 192.5,
+            "y": 554.5
+        },
+        {
+            "id": 56,
+            "x": 369.8333333333333,
+            "y": 555.8333333333333
+        },
+        {
+            "id": 57,
+            "x": 463.5,
+            "y": 558.5
+        },
+        {
+            "id": 58,
+            "x": 519.5,
+            "y": 559.5
+        },
+        {
+            "id": 60,
+            "x": 229.5,
+            "y": 569.5
+        },
+        {
+            "id": 61,
+            "x": 442.5,
+            "y": 569.5
+        },
+        {
+            "id": 62,
+            "x": 360.5,
+            "y": 570.5
+        },
+        {
+            "id": 63,
+            "x": 308.5,
+            "y": 572.5
+        },
+        {
+            "id": 64,
+            "x": 492.8333333333333,
+            "y": 577.8333333333333
+        },
+        {
+            "id": 65,
+            "x": 361.5,
+            "y": 589.5
+        },
+        {
+            "id": 66,
+            "x": 431.16666666666663,
+            "y": 595.1666666666666
+        },
+        {
+            "id": 67,
+            "x": 423.5,
+            "y": 603.5
+        },
+        {
+            "id": 68,
+            "x": 487.5,
+            "y": 610.5
+        },
+        {
+            "id": 69,
+            "x": 292.16666666666663,
+            "y": 613.8333333333333
+        },
+        {
+            "id": 70,
+            "x": 236.5,
+            "y": 621.5
+        },
+        {
+            "id": 71,
+            "x": 460.5,
+            "y": 623.5
+        },
+        {
+            "id": 72,
+            "x": 504.5,
+            "y": 635.5
+        },
+        {
+            "id": 73,
+            "x": 345.8333333333333,
+            "y": 640.1666666666666
+        },
+        {
+            "id": 75,
+            "x": 397.16666666666663,
+            "y": 650.8333333333333
+        },
+        {
+            "id": 76,
+            "x": 230.5,
+            "y": 660.5
+        },
+        {
+            "id": 77,
+            "x": 304.8333333333333,
+            "y": 663.8333333333333
+        },
+        {
+            "id": 78,
+            "x": 328.75,
+            "y": 664.5
+        },
+        {
+            "id": 80,
+            "x": 485.5,
+            "y": 676.5
+        },
+        {
+            "id": 81,
+            "x": 400.5,
+            "y": 678.5
+        },
+        {
+            "id": 82,
+            "x": 426.16666666666663,
+            "y": 679.8333333333333
+        },
+        {
+            "id": 83,
+            "x": 272.5,
+            "y": 691.5
+        },
+        {
+            "id": 84,
+            "x": 330.8333333333333,
+            "y": 700.8333333333333
+        },
+        {
+            "id": 85,
+            "x": 430.5,
+            "y": 701.5
+        },
+        {
+            "id": 86,
+            "x": 363.5,
+            "y": 706.5
+        },
+        {
+            "id": 88,
+            "x": 448.8333333333333,
+            "y": 713.8333333333333
+        },
+        {
+            "id": 89,
+            "x": 367.5,
+            "y": 738.5
+        },
+        {
+            "id": 90,
+            "x": 393.16666666666663,
+            "y": 748.8333333333333
+        },
+        {
+            "id": 91,
+            "x": 455.5,
+            "y": 750.5
+        },
+        {
+            "id": 92,
+            "x": 309.5,
+            "y": 756.5
+        },
+        {
+            "id": 96,
+            "x": 343.5,
+            "y": 768.5
+        },
+        {
+            "id": 98,
+            "x": 418.5,
+            "y": 781.5
+        }
+    ]
+}
