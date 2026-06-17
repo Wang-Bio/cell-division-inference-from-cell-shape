@@ -4297,12 +4297,13 @@ public class CellDivisionInference implements PlugIn {
             res.unionCircularity = (4.0 * Math.PI * unionArea) / (unionPerimeter * unionPerimeter);
         }
 
-        // unionConvexDeficiency: (hullArea - unionArea)/unionArea
-        if(unionArea > 0.0 && !unionPoints.isEmpty()){
+        // unionConvexDeficiency: (hullArea - unionArea)/meanAreaOfTwoCells
+        double meanAreaOfTwoCells = 0.5 * (areaA + areaB);
+        if(meanAreaOfTwoCells > 0.0 && !unionPoints.isEmpty()){
             List<Point2D.Double> hull = convexHull(unionPoints); // Qt monotonic chain w/ cross<=0
             double hullArea = polygonAreaAbsPts(hull);
             if(hullArea > 0.0){
-                res.unionConvexDeficiency = (hullArea - unionArea) / unionArea;
+                res.unionConvexDeficiency = (hullArea - unionArea) / meanAreaOfTwoCells;
             }
         }
 

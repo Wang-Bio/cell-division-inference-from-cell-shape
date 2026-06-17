@@ -652,10 +652,11 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
         for (const QPolygonF &p : polygons)
             combined << p;
 
-        if (!combined.isEmpty() && unionArea > 0.0) {
+        const double meanAreaOfTwoCells = 0.5 * (areaA + areaB);
+        if (!combined.isEmpty() && meanAreaOfTwoCells > 0.0) {
             const double hullArea = polygonArea(convexHull(combined));
             if (hullArea > 0.0)
-                result.unionConvexDeficiency = (hullArea - unionArea) / unionArea;
+                result.unionConvexDeficiency = (hullArea - unionArea) / meanAreaOfTwoCells;
         }
     }
 
