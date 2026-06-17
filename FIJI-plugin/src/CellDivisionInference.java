@@ -4306,10 +4306,6 @@ public class CellDivisionInference implements PlugIn {
             }
         }
 
-        // union principal axis (Qt PCA on unionPoints)
-        Point2D.Double unionAxis = principalAxisForPoints(unionPoints);
-        boolean hasUnionAxis = (unionAxis != null && (Math.abs(unionAxis.x) > 1e-12 || Math.abs(unionAxis.y) > 1e-12));
-
         // --- NeighborPair shared relationships (Qt NeighborPair) ---
         // shared vertices = intersection
         HashSet<Integer> setA = new HashSet<>(idsA);
@@ -4439,18 +4435,27 @@ public class CellDivisionInference implements PlugIn {
             }
         }
 
-        // sharedEdgeUnionAxisAngleDegrees (Qt: acos(abs(dot)) in degrees)
-        if(hasSharedEdge && longestLen > 0.0 && hasUnionAxis){
+        // sharedEdgeUnionAxisAngleDegrees definition shared with Qt:
+        // - shared edge vector: longest shared edge (ties keep polygon-A order);
+        // - union axis vector: PCA major axis of unique outer-boundary vertices from A∪B
+        //   (all polygon edges except shared/internal edges), not toolkit-specific fill output;
+        // - angle: undirected abs(angle_between) normalized to [0, 90] degrees.
+        // Unique, unordered PCA inputs make duplicated closing points and reversed vertex order irrelevant.
+        Point2D.Double unionAxisForAngle = principalAxisForPoints(uniqueUnionBoundaryPoints(idsA, idsB, edgeKeysB));
+        boolean hasUnionAxisForAngle = (Math.abs(unionAxisForAngle.x) > 1e-12 || Math.abs(unionAxisForAngle.y) > 1e-12);
+        if(hasSharedEdge && longestLen > 0.0 && hasUnionAxisForAngle){
             double ex = (longestP2.x - longestP1.x);
             double ey = (longestP2.y - longestP1.y);
             double edgeMag = Math.hypot(ex, ey);
-            double axisMag = Math.hypot(unionAxis.x, unionAxis.y);
+            double axisMag = Math.hypot(unionAxisForAngle.x, unionAxisForAngle.y);
 
             if(edgeMag > 0.0 && axisMag > 0.0){
-                double dot = (ex * unionAxis.x + ey * unionAxis.y) / (edgeMag * axisMag);
+                double dot = (ex * unionAxisForAngle.x + ey * unionAxisForAngle.y) / (edgeMag * axisMag);
                 dot = clamp(dot, -1.0, 1.0);
-                double angle = Math.acos(Math.abs(dot));
-                res.sharedEdgeUnionAxisAngleDegrees = Math.toDegrees(angle);
+                double angleDeg = Math.toDegrees(Math.acos(dot));
+                angleDeg = Math.abs(angleDeg);
+                if(angleDeg > 90.0) angleDeg = 180.0 - angleDeg;
+                res.sharedEdgeUnionAxisAngleDegrees = angleDeg;
             }
         }
 
@@ -4813,6 +4818,35 @@ public class CellDivisionInference implements PlugIn {
                 pts.remove(pts.size()-1);
             }
         }
+    }
+
+    private List<Point2D.Double> uniqueUnionBoundaryPoints(List<Integer> idsA, List<Integer> idsB, Set<Long> edgeKeysB){
+        ArrayList<Point2D.Double> points = new ArrayList<>();
+        addUniqueUnionBoundaryPoints(points, idsA, edgeKeysB);
+
+        HashSet<Long> edgeKeysA = new HashSet<>();
+        for(int i=0; i<idsA.size(); i++){
+            edgeKeysA.add(edgeKey(idsA.get(i), idsA.get((i+1) % idsA.size())));
+        }
+        addUniqueUnionBoundaryPoints(points, idsB, edgeKeysA);
+        return points;
+    }
+
+    private void addUniqueUnionBoundaryPoints(List<Point2D.Double> out, List<Integer> ids, Set<Long> otherEdgeKeys){
+        for(int i=0; i<ids.size(); i++){
+            int v1 = ids.get(i);
+            int v2 = ids.get((i+1) % ids.size());
+            if(otherEdgeKeys.contains(edgeKey(v1, v2))) continue;
+            addUniquePoint(out, vertexGeometryPoint(v1));
+            addUniquePoint(out, vertexGeometryPoint(v2));
+        }
+    }
+
+    private static void addUniquePoint(List<Point2D.Double> out, Point2D.Double p){
+        for(Point2D.Double q : out){
+            if(Double.compare(q.x, p.x) == 0 && Double.compare(q.y, p.y) == 0) return;
+        }
+        out.add(new Point2D.Double(p.x, p.y));
     }
 
     // ---- PCA principal axis (Qt principalAxisForPoints) ----

@@ -452,11 +452,7 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
                 hasUnionCentroid = true;
             }
 
-            const QPointF axis = principalAxisForPoints(unionPoints);
-            if (!qFuzzyIsNull(axis.x()) || !qFuzzyIsNull(axis.y())) {
-                unionPrincipalAxis = axis;
-                hasUnionPrincipalAxis = true;
-            }
+            Q_UNUSED(unionPoints);
         }
     }
 
@@ -677,15 +673,57 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
     if (settings.computeSharedEdgeUnionCentroidDistanceNormalized && std::isfinite(sharedEdgeUnionCentroidDistance) && avgSqrtArea > 0.0)
         result.sharedEdgeUnionCentroidDistanceNormalized = sharedEdgeUnionCentroidDistance / avgSqrtArea;
 
-    if (settings.computeSharedEdgeUnionAxisAngle && hasSharedEdge && hasUnionPrincipalAxis && longestSharedEdge.length() > 0.0) {
+    // sharedEdgeUnionAxisAngleDegrees definition shared with FIJI:
+    // - shared edge vector: longest shared edge (ties keep NeighborPair order);
+    // - union axis vector: PCA major axis of unique outer-boundary vertices from A∪B
+    //   (all polygon edges except shared/internal edges), not toolkit-specific fill output;
+    // - angle: undirected abs(angle_between) normalized to [0, 90] degrees.
+    // Unique, unordered PCA inputs make duplicated closing points and reversed vertex order irrelevant.
+    if (settings.computeSharedEdgeUnionAxisAngle && hasSharedEdge && longestSharedEdge.length() > 0.0) {
+        QVector<QPointF> unionBoundaryPoints;
+        const auto addUniquePoint = [&unionBoundaryPoints](const QPointF &p) {
+            for (const QPointF &existing : std::as_const(unionBoundaryPoints)) {
+                if (existing.x() == p.x() && existing.y() == p.y())
+                    return;
+            }
+            unionBoundaryPoints.append(p);
+        };
+        const auto isSharedEdge = [](VertexItem *a, VertexItem *b, const QVector<NeighborPair::EdgeInfo> &sharedEdges) {
+            for (const NeighborPair::EdgeInfo &edge : sharedEdges) {
+                if ((edge.v1 == a && edge.v2 == b) || (edge.v1 == b && edge.v2 == a))
+                    return true;
+            }
+            return false;
+        };
+        const auto addBoundaryPoints = [&](const PolygonItem *poly, const QVector<NeighborPair::EdgeInfo> &sharedEdges) {
+            if (!poly)
+                return;
+            const auto vertices = poly->vertices();
+            for (int i = 0; i < vertices.size(); ++i) {
+                VertexItem *v1 = vertices[i];
+                VertexItem *v2 = vertices[(i + 1) % vertices.size()];
+                if (!v1 || !v2 || isSharedEdge(v1, v2, sharedEdges))
+                    continue;
+                addUniquePoint(v1->scenePos());
+                addUniquePoint(v2->scenePos());
+            }
+        };
+        const QVector<NeighborPair::EdgeInfo> sharedEdges = pair ? pair->sharedEdges() : QVector<NeighborPair::EdgeInfo>();
+        addBoundaryPoints(first, sharedEdges);
+        addBoundaryPoints(second, sharedEdges);
+
+        unionPrincipalAxis = principalAxisForPoints(unionBoundaryPoints);
+        hasUnionPrincipalAxis = !qFuzzyIsNull(unionPrincipalAxis.x()) || !qFuzzyIsNull(unionPrincipalAxis.y());
         const QPointF edgeVec = longestSharedEdge.p2() - longestSharedEdge.p1();
         const double edgeMag = std::hypot(edgeVec.x(), edgeVec.y());
         const double axisMag = std::hypot(unionPrincipalAxis.x(), unionPrincipalAxis.y());
-        if (edgeMag > 0.0 && axisMag > 0.0) {
+        if (hasUnionPrincipalAxis && edgeMag > 0.0 && axisMag > 0.0) {
             double dot = (edgeVec.x() * unionPrincipalAxis.x() + edgeVec.y() * unionPrincipalAxis.y()) / (edgeMag * axisMag);
             dot = std::clamp(dot, -1.0, 1.0);
-            const double angle = std::acos(std::abs(dot));
-            result.sharedEdgeUnionAxisAngleDegrees = qRadiansToDegrees(angle);
+            double angleDegrees = std::abs(qRadiansToDegrees(std::acos(dot)));
+            if (angleDegrees > 90.0)
+                angleDegrees = 180.0 - angleDegrees;
+            result.sharedEdgeUnionAxisAngleDegrees = angleDegrees;
         }
     }
 
