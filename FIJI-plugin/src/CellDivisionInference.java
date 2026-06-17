@@ -156,6 +156,7 @@ public class CellDivisionInference implements PlugIn {
 
     // ===== Vertex ====
     private List<Point> vertexPoints = new ArrayList<>();
+    private List<Point2D.Double> vertexGeometryPoints = new ArrayList<>();
 
     // ===== Lines =====
     static class LineEdge {
@@ -1345,6 +1346,7 @@ public class CellDivisionInference implements PlugIn {
 
     private void deleteAllVertices(){
         vertexPoints = new ArrayList<>();
+        vertexGeometryPoints = new ArrayList<>();
         lineEdges = new ArrayList<>();
         polygons = new ArrayList<>();
         imagePanel.setOverlayPoints(vertexPoints);
@@ -1382,6 +1384,7 @@ public class CellDivisionInference implements PlugIn {
         currentGeometrySourceFileName = "unknown.json";
 
         vertexPoints = new ArrayList<>();
+        vertexGeometryPoints = new ArrayList<>();
         lineEdges = new ArrayList<>();
         polygons = new ArrayList<>();
 
@@ -1528,6 +1531,7 @@ public class CellDivisionInference implements PlugIn {
         currentGeometrySourceFileName = name;
 
         vertexPoints.clear();
+        vertexGeometryPoints.clear();
         lineEdges.clear();
         polygons.clear();
 
@@ -1613,6 +1617,7 @@ public class CellDivisionInference implements PlugIn {
         currentGeometrySourceFileName = "canvas";
 
         vertexPoints.clear();
+        vertexGeometryPoints.clear();
         lineEdges.clear();
         polygons.clear();
 
@@ -1681,6 +1686,7 @@ public class CellDivisionInference implements PlugIn {
 
     private static class ImportResult{
         ArrayList<Point> vertices = new ArrayList<>();
+        ArrayList<Point2D.Double> geometryVertices = new ArrayList<>();
         ArrayList<LineEdge> lines = new ArrayList<>();
         ArrayList<List<Integer>> polygons = new ArrayList<>();
         ArrayList<Integer> polygonIds = new ArrayList<>();
@@ -1737,6 +1743,7 @@ public class CellDivisionInference implements PlugIn {
 
         // Replace current topology
         vertexPoints = result.vertices;
+        vertexGeometryPoints = result.geometryVertices;
         lineEdges = result.lines;
         polygons = result.polygons;
 
@@ -2144,9 +2151,9 @@ public class CellDivisionInference implements PlugIn {
 
         class VRec{
             final int id;
-            final int x;
-            final int y;
-            VRec(int id, int x, int y){ this.id=id; this.x=x; this.y=y; }
+            final double x;
+            final double y;
+            VRec(int id, double x, double y){ this.id=id; this.x=x; this.y=y; }
         }
 
         ArrayList<VRec> vlist = new ArrayList<>();
@@ -2166,12 +2173,12 @@ public class CellDivisionInference implements PlugIn {
                 continue;
             }
 
-            int x = (int)Math.round(xD);
-            int y = (int)Math.round(yD);
+            double x = xD;
+            double y = yD;
 
             vlist.add(new VRec(id, x, y));
-            result.maxX = Math.max(result.maxX, x);
-            result.maxY = Math.max(result.maxY, y);
+            result.maxX = Math.max(result.maxX, (int)Math.ceil(x));
+            result.maxY = Math.max(result.maxY, (int)Math.ceil(y));
         }
 
         if(vlist.isEmpty()){
@@ -2183,7 +2190,8 @@ public class CellDivisionInference implements PlugIn {
             if(vIdToIndex.containsKey(vr.id)){
                 result.warnings.add("Duplicate vertex id " + vr.id + " (using the last one for references).");
             }
-            result.vertices.add(new Point(vr.x, vr.y));
+            result.vertices.add(new Point((int)Math.round(vr.x), (int)Math.round(vr.y)));
+            result.geometryVertices.add(new Point2D.Double(vr.x, vr.y));
             vIdToIndex.put(vr.id, result.vertices.size() - 1);
         }
 
@@ -2363,7 +2371,7 @@ public class CellDivisionInference implements PlugIn {
         // vertices 
         JsonArray vArr = new JsonArray();
         for(int i=0; i<vertexPoints.size(); i++){
-            Point p = vertexPoints.get(i);
+            Point2D.Double p = vertexGeometryPoint(i);
             JsonObject o = new JsonObject();
             o.addProperty("id", i+1);
             o.addProperty("x", p.x);
@@ -3778,16 +3786,25 @@ public class CellDivisionInference implements PlugIn {
 
     // ---- Geometry helpers ----
 
+    private Point2D.Double vertexGeometryPoint(int vid){
+        if(vertexGeometryPoints != null && vid >= 0 && vid < vertexGeometryPoints.size()){
+            Point2D.Double p = vertexGeometryPoints.get(vid);
+            if(p != null) return p;
+        }
+        Point p = vertexPoints.get(vid);
+        return new Point2D.Double(p.x, p.y);
+    }
+
     private Path2D.Double polygonPath(int polygonId){
         if(polygons == null || polygonId < 0 || polygonId >= polygons.size()) return null;
         List<Integer> ids = polygons.get(polygonId);
         if(ids == null || ids.size() < 3) return null;
 
         Path2D.Double path = new Path2D.Double();
-        Point p0 = vertexPoints.get(ids.get(0));
+        Point2D.Double p0 = vertexGeometryPoint(ids.get(0));
         path.moveTo(p0.x, p0.y);
         for(int i=1; i<ids.size(); i++){
-            Point p = vertexPoints.get(ids.get(i));
+            Point2D.Double p = vertexGeometryPoint(ids.get(i));
             path.lineTo(p.x, p.y);
         }
         path.closePath();
@@ -4027,9 +4044,9 @@ public class CellDivisionInference implements PlugIn {
             long ek = edgeKey(v1, v2);
             if(otherEdges != null && otherEdges.contains(ek)) continue;
 
-            Point p1 = vertexPoints.get(v1);
-            Point p2 = vertexPoints.get(v2);
-            g.drawLine(p1.x, p1.y, p2.x, p2.y);
+            Point2D.Double p1 = vertexGeometryPoint(v1);
+            Point2D.Double p2 = vertexGeometryPoint(v2);
+            g.draw(new java.awt.geom.Line2D.Double(p1.x, p1.y, p2.x, p2.y));
         }
     }
 
@@ -4082,9 +4099,9 @@ public class CellDivisionInference implements PlugIn {
         for(long[] e : edges){
             int v1 = (int)e[0];
             int v2 = (int)e[1];
-            Point p1 = vertexPoints.get(v1);
-            Point p2 = vertexPoints.get(v2);
-            g.drawLine(p1.x, p1.y, p2.x, p2.y);
+            Point2D.Double p1 = vertexGeometryPoint(v1);
+            Point2D.Double p2 = vertexGeometryPoint(v2);
+            g.draw(new java.awt.geom.Line2D.Double(p1.x, p1.y, p2.x, p2.y));
         }
     }
 
@@ -4092,16 +4109,16 @@ public class CellDivisionInference implements PlugIn {
         for(long ek : edgeKeys){
             int v1 = (int)(ek >> 32);
             int v2 = (int)(ek & 0xffffffffL);
-            Point p1 = vertexPoints.get(v1);
-            Point p2 = vertexPoints.get(v2);
-            g.drawLine(p1.x, p1.y, p2.x, p2.y);
+            Point2D.Double p1 = vertexGeometryPoint(v1);
+            Point2D.Double p2 = vertexGeometryPoint(v2);
+            g.draw(new java.awt.geom.Line2D.Double(p1.x, p1.y, p2.x, p2.y));
         }
     }
 
     private void drawVertexDots(Graphics2D g, Collection<Integer> vids, double rWorld){
         for(Integer vid : vids){
             if(vid == null) continue;
-            Point p = vertexPoints.get(vid);
+            Point2D.Double p = vertexGeometryPoint(vid);
             double x = p.x - rWorld;
             double y = p.y - rWorld;
             g.fill(new java.awt.geom.Ellipse2D.Double(x, y, 2*rWorld, 2*rWorld));
@@ -4329,8 +4346,8 @@ public class CellDivisionInference implements PlugIn {
             if(!edgeKeysB.contains(ek)) continue;
 
             // this is a shared edge
-            Point p1 = vertexPoints.get(v1);
-            Point p2 = vertexPoints.get(v2);
+            Point2D.Double p1 = vertexGeometryPoint(v1);
+            Point2D.Double p2 = vertexGeometryPoint(v2);
             double len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
 
             sharedEdgeTotalLength += len;
@@ -4357,13 +4374,13 @@ public class CellDivisionInference implements PlugIn {
             // accumulateDistances(poly): all vertices except the 2 endpoints of longest shared edge
             for(int vid : idsA){
                 if(vid == longestV1 || vid == longestV2) continue;
-                Point p = vertexPoints.get(vid);
+                Point2D.Double p = vertexGeometryPoint(vid);
                 double d = pointToSegmentDistance(new Point2D.Double(p.x, p.y), longestP1, longestP2);
                 if(Double.isFinite(d)) dists.add(d);
             }
             for(int vid : idsB){
                 if(vid == longestV1 || vid == longestV2) continue;
-                Point p = vertexPoints.get(vid);
+                Point2D.Double p = vertexGeometryPoint(vid);
                 double d = pointToSegmentDistance(new Point2D.Double(p.x, p.y), longestP1, longestP2);
                 if(Double.isFinite(d)) dists.add(d);
             }
@@ -4446,9 +4463,9 @@ public class CellDivisionInference implements PlugIn {
                 int connB = connectingVertexFor(idsB, shared, sharedVerts);
                 if(connA < 0 || connB < 0) continue;
 
-                Point ps = vertexPoints.get(shared);
-                Point pa = vertexPoints.get(connA);
-                Point pb = vertexPoints.get(connB);
+                Point2D.Double ps = vertexGeometryPoint(shared);
+                Point2D.Double pa = vertexGeometryPoint(connA);
+                Point2D.Double pb = vertexGeometryPoint(connB);
 
                 double ax = pa.x - ps.x;
                 double ay = pa.y - ps.y;
@@ -4529,8 +4546,8 @@ public class CellDivisionInference implements PlugIn {
         if(n < 3) return 0.0;
         double s = 0.0;
         for(int i=0; i<n; i++){
-            Point p = vertexPoints.get(ids.get(i));
-            Point q = vertexPoints.get(ids.get((i+1)%n));
+            Point2D.Double p = vertexGeometryPoint(ids.get(i));
+            Point2D.Double q = vertexGeometryPoint(ids.get((i+1)%n));
             s += p.x * (double)q.y - q.x * (double)p.y;
         }
         return 0.5 * s;
@@ -4541,8 +4558,8 @@ public class CellDivisionInference implements PlugIn {
         if(n < 2) return 0.0;
         double per = 0.0;
         for(int i=0; i<n; i++){
-            Point p = vertexPoints.get(ids.get(i));
-            Point q = vertexPoints.get(ids.get((i+1)%n));
+            Point2D.Double p = vertexGeometryPoint(ids.get(i));
+            Point2D.Double q = vertexGeometryPoint(ids.get((i+1)%n));
             per += Math.hypot(q.x - p.x, q.y - p.y);
         }
         return per;
@@ -4557,7 +4574,7 @@ public class CellDivisionInference implements PlugIn {
         if(Math.abs(A) < 1e-12){
             double sx = 0.0, sy = 0.0;
             for(int vid : ids){
-                Point p = vertexPoints.get(vid);
+                Point2D.Double p = vertexGeometryPoint(vid);
                 sx += p.x;
                 sy += p.y;
             }
@@ -4566,8 +4583,8 @@ public class CellDivisionInference implements PlugIn {
 
         double cx = 0.0, cy = 0.0;
         for(int i=0; i<n; i++){
-            Point p = vertexPoints.get(ids.get(i));
-            Point q = vertexPoints.get(ids.get((i+1)%n));
+            Point2D.Double p = vertexGeometryPoint(ids.get(i));
+            Point2D.Double q = vertexGeometryPoint(ids.get((i+1)%n));
             double cross = p.x * (double)q.y - q.x * (double)p.y;
             cx += (p.x + q.x) * cross;
             cy += (p.y + q.y) * cross;
@@ -4634,7 +4651,7 @@ public class CellDivisionInference implements PlugIn {
         double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY;
 
         for(int vid : ids){
-            Point p = vertexPoints.get(vid);
+            Point2D.Double p = vertexGeometryPoint(vid);
             minX = Math.min(minX, p.x);
             minY = Math.min(minY, p.y);
             maxX = Math.max(maxX, p.x);
@@ -4659,7 +4676,7 @@ public class CellDivisionInference implements PlugIn {
 
         ArrayList<Point2D.Double> pts = new ArrayList<>(ids.size());
         for(int vid : ids){
-            Point p = vertexPoints.get(vid);
+            Point2D.Double p = vertexGeometryPoint(vid);
             pts.add(new Point2D.Double(p.x, p.y));
         }
 
