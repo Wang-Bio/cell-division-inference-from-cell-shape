@@ -318,6 +318,7 @@ void MainWindow::onExport()
     QString baseName = options.baseFileName;
     if (baseName.isEmpty() || baseName == "-")
         baseName = "export";
+    const QString exportFileName = QFileInfo(baseName).fileName();
     baseName = QFileInfo(baseName).completeBaseName();
 
     QStringList successMessages;
@@ -338,7 +339,7 @@ void MainWindow::onExport()
             warningMessages << "No real division pairs available to export.";
         } else {
             const QString realPath = exportDir.filePath(baseName + "_real_division_pairs.csv");
-            if (GeometryIO::exportDivisionPairs(realPath, baseName, m_realDivisionPairs, &errorMessage)) {
+            if (GeometryIO::exportDivisionPairs(realPath, exportFileName, m_realDivisionPairs, &errorMessage)) {
                 successMessages << QString("Real division pairs: %1").arg(realPath);
             } else {
                 warningMessages << errorMessage;
@@ -351,7 +352,7 @@ void MainWindow::onExport()
             warningMessages << "No estimated division pairs available to export.";
         } else {
             const QString estPath = exportDir.filePath(baseName + "_estimated_division_pairs.csv");
-            if (GeometryIO::exportDivisionPairs(estPath, baseName, m_estimatedDivisionPairs, &errorMessage)) {
+            if (GeometryIO::exportDivisionPairs(estPath, exportFileName, m_estimatedDivisionPairs, &errorMessage)) {
                 successMessages << QString("Estimated division pairs: %1").arg(estPath);
             } else {
                 warningMessages << errorMessage;
@@ -364,7 +365,8 @@ void MainWindow::onExport()
             warningMessages << "No neighbor pair geometry calculations available to export.";
         } else {
             const QString geometryCsvPath = exportDir.filePath(baseName + "_neighbor_geometry.csv");
-            const QVector<BatchDivisionEstimator::GeometryEntry> entries = GeometryIO::updateGeometryEntryFileNames(m_lastGeometryEntries, baseName);
+            const QVector<BatchDivisionEstimator::GeometryEntry> entries = geometryEntriesWithDivisionLabels(
+                    GeometryIO::updateGeometryEntryFileNames(m_lastGeometryEntries, exportFileName));
             if (BatchDivisionEstimator::exportNeighborGeometryToCsv(geometryCsvPath, entries, m_lastGeometrySettings, &errorMessage)) {
                 successMessages << QString("Neighbor pair geometry: %1").arg(geometryCsvPath);
             } else {
@@ -606,6 +608,7 @@ bool MainWindow::openRawImageInternal(const QString &filePath)
     resetStoredGeometryResults();
     m_estimatedDivisionPairs.clear();
     m_realDivisionRecords.clear();
+    m_realDivisionTimingByPairKey.clear();
     resetVertexNumberLabel();
     resetLineNumberLabel();
     resetPolygonNumberLabel();
@@ -654,6 +657,7 @@ bool MainWindow::importJsonFile(const QString &filePath)
     resetStoredGeometryResults();
     m_estimatedDivisionPairs.clear();
     m_realDivisionRecords.clear();
+    m_realDivisionTimingByPairKey.clear();
     resetVertexNumberLabel();
     resetLineNumberLabel();
     resetPolygonNumberLabel();
@@ -752,6 +756,7 @@ bool MainWindow::importJsonFile(const QString &filePath)
             realRecord.time = record.time;
             m_realDivisionRecords.append(realRecord);
             m_realDivisionPairs.append(QPair<int, int>(record.firstId, record.secondId));
+            m_realDivisionTimingByPairKey.insert(key, record.time);
         }
         createArrowsForPairs(m_realDivisionPairs, DivisionDisplay::ArrowCategory::Real, m_realDivisionArrows);
         ui->label_real_division_number_value->setText(QString::number(m_realDivisionPairs.size()));
@@ -2298,7 +2303,42 @@ void MainWindow::clearRealDivisionArrows()
 {
     clearDivisionArrowVector(m_realDivisionArrows);
     m_realDivisionPairs.clear();
+    m_realDivisionRecords.clear();
+    m_realDivisionTimingByPairKey.clear();
     clearDivisionComparisonArrows();
+}
+
+QVector<BatchDivisionEstimator::GeometryEntry> MainWindow::geometryEntriesWithDivisionLabels(const QVector<BatchDivisionEstimator::GeometryEntry> &entries) const
+{
+    QVector<BatchDivisionEstimator::GeometryEntry> labeled = entries;
+
+    const auto pairKey = [](int a, int b) {
+        const int first = std::min(a, b);
+        const int second = std::max(a, b);
+        return QString("%1-%2").arg(first).arg(second);
+    };
+
+    QHash<QString, int> divisionTimesByKey = m_realDivisionTimingByPairKey;
+
+    for (const RealDivisionRecord &record : m_realDivisionRecords) {
+        const QString key = pairKey(record.firstId, record.secondId);
+        if (!divisionTimesByKey.contains(key))
+            divisionTimesByKey.insert(key, record.time);
+    }
+
+    for (const auto &pair : m_realDivisionPairs) {
+        const QString key = pairKey(pair.first, pair.second);
+        if (!divisionTimesByKey.contains(key))
+            divisionTimesByKey.insert(key, -1);
+    }
+
+    for (auto &entry : labeled) {
+        const QString key = pairKey(entry.firstId, entry.secondId);
+        entry.observedDivision = divisionTimesByKey.contains(key);
+        entry.divisionTime = entry.observedDivision ? divisionTimesByKey.value(key, -1) : -1;
+    }
+
+    return labeled;
 }
 
 void MainWindow::resetEstimatedDivisionNumberLabel()
@@ -2710,12 +2750,7 @@ void MainWindow::onCompareWithRealDivision(){
         if (line.isEmpty())
             continue;
 
-        if (lineNumber == 1 && !line.at(0).isDigit()) {
-            // Treat non-numeric first line as header
-            continue;
-        }
-
-        const QStringList parts = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+        const QStringList parts = line.split(QRegularExpression("[,;\\s]+"), Qt::SkipEmptyParts);
         if (parts.size() < 2) {
             parseWarnings.append(QString("Line %1: Expected at least two integers.").arg(lineNumber));
             continue;
@@ -2724,16 +2759,33 @@ void MainWindow::onCompareWithRealDivision(){
         bool okFirst = false;
         bool okSecond = false;
         bool okTime = true;
-        const int firstId = parts.at(0).toInt(&okFirst);
-        const int secondId = parts.at(1).toInt(&okSecond);
-        int time = -1;
-        if (parts.size() >= 3)
-            time = parts.at(2).toInt(&okTime);
-
-        if (!okFirst || !okSecond || !okTime) {
-            parseWarnings.append(QString("Line %1: Unable to parse integers.").arg(lineNumber));
+        int firstIndex = 0;
+        int secondIndex = 1;
+        int timeIndex = 2;
+        int firstId = parts.at(firstIndex).toInt(&okFirst);
+        if (!okFirst && parts.size() >= 3) {
+            firstIndex = 1;
+            secondIndex = 2;
+            timeIndex = 3;
+            firstId = parts.at(firstIndex).toInt(&okFirst);
+        }
+        if (parts.size() <= secondIndex) {
+            parseWarnings.append(QString("Line %1: Expected at least two integers.").arg(lineNumber));
             continue;
         }
+        const int secondId = parts.at(secondIndex).toInt(&okSecond);
+        int time = -1;
+        if (parts.size() > timeIndex)
+            time = parts.at(timeIndex).toInt(&okTime);
+
+        if (!okFirst || !okSecond) {
+            if (lineNumber == 1)
+                continue;
+            parseWarnings.append(QString("Line %1: Unable to parse polygon ids.").arg(lineNumber));
+            continue;
+        }
+        if (!okTime)
+            time = -1;
 
         parsedRecords.append({firstId, secondId, time});
     }
@@ -2798,6 +2850,7 @@ void MainWindow::onCompareWithRealDivision(){
             continue;
         realKeys.insert(key);
         m_realDivisionPairs.append(QPair<int, int>(record.firstId, record.secondId));
+        m_realDivisionTimingByPairKey.insert(key, record.time);
         realPairByKey.insert(key, QPair<int, int>(record.firstId, record.secondId));
     }
 

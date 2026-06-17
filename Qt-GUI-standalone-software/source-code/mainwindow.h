@@ -4,6 +4,8 @@
 #include <QMainWindow>
 #include <QVector>
 #include <QPair>
+#include <QHash>
+#include <QString>
 
 #include "canvasmanager.h"
 #include "vertexitem.h"
@@ -60,6 +62,7 @@ private:
     QVector<QPair<int, int>> m_falsePositivePairs;
     QVector<QPair<int, int>> m_falseNegativePairs;
     QVector<RealDivisionRecord> m_realDivisionRecords;
+    QHash<QString, int> m_realDivisionTimingByPairKey;
     QPixmap m_backgroundPixmap;
     QGraphicsPixmapItem *m_backgroundItem = nullptr;
     int m_backgroundWidth = 0;
@@ -102,6 +105,8 @@ private:
     void resetPerformanceMetrics();
     void resetEstimationRule();
     void applyDivisionMetricsToLabels(const BatchDivisionEstimator::DivisionMetrics &metrics);
+    QVector<BatchDivisionEstimator::GeometryEntry> geometryEntriesWithDivisionLabels(
+            const QVector<BatchDivisionEstimator::GeometryEntry> &entries) const;
 
     bool openRawImageInternal(const QString &filePath = QString());
     bool importJsonFile(const QString &filePath);
