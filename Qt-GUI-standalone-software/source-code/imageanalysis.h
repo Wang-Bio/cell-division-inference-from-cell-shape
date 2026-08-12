@@ -51,7 +51,9 @@ cv::Mat removeSpurs(const cv::Mat &skeletonImage);
 // High-level helper: convert the input image to grayscale, binarize it, and thin it using Guo-Hall.
 cv::Mat segmentWithGuoHall(const cv::Mat &input, double threshold = -1.0, bool invertInput = true);
 
-// Detect skeleton vertices: pixels with more than three 8-neighbors.
+// Detect three- or four-branch skeleton vertices from crossing number and local branch topology.
+// The local check recovers acute or stair-stepped junctions whose arms merge
+// in the immediate 8-neighbour ring.
 // Expects a single-channel (CV_8UC1) skeleton image where foreground pixels are non-zero.
 // Returns zero-based pixel coordinates for each detected vertex.
 std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage);

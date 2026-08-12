@@ -44,6 +44,57 @@ int countNeighbors(const cv::Mat &img, int r, int c) {
     return std::min(n1, n2);
 }
 
+// Count branches after removing the immediate 3x3 junction neighbourhood.
+// Looking only at the eight neighbours can merge two genuine arms into one
+// foreground run when a diagonal/stair-stepped arm leaves a junction beside a
+// horizontal or vertical arm.
+int countLocalBranches(const cv::Mat &img, int centerY, int centerX) {
+    constexpr int radius = 3;
+    constexpr int coreRadius = 1;
+    constexpr int side = radius * 2 + 1;
+    bool foreground[side][side] = {};
+    bool visited[side][side] = {};
+
+    for (int localY = 0; localY < side; ++localY) {
+        for (int localX = 0; localX < side; ++localX) {
+            const int dx = localX - radius;
+            const int dy = localY - radius;
+            if (std::max(std::abs(dx), std::abs(dy)) <= coreRadius)
+                continue;
+            foreground[localY][localX] =
+                img.at<uchar>(centerY + dy, centerX + dx) != 0;
+        }
+    }
+
+    int branches = 0;
+    const int offsets[8][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1},
+                               {0, 1},   {1, -1},  {1, 0},  {1, 1}};
+    for (int y = 0; y < side; ++y) {
+        for (int x = 0; x < side; ++x) {
+            if (!foreground[y][x] || visited[y][x])
+                continue;
+
+            ++branches;
+            std::vector<cv::Point> stack{cv::Point(x, y)};
+            visited[y][x] = true;
+            while (!stack.empty()) {
+                const cv::Point point = stack.back();
+                stack.pop_back();
+                for (const auto &offset : offsets) {
+                    const int nextY = point.y + offset[0];
+                    const int nextX = point.x + offset[1];
+                    if (nextX < 0 || nextY < 0 || nextX >= side || nextY >= side
+                        || !foreground[nextY][nextX] || visited[nextY][nextX])
+                        continue;
+                    visited[nextY][nextX] = true;
+                    stack.emplace_back(nextX, nextY);
+                }
+            }
+        }
+    }
+    return branches;
+}
+
 // One of the two Guo-Hall sub-iterations.
 void guoHallIteration(cv::Mat &img, int iter) {
     cv::Mat marker = cv::Mat::zeros(img.size(), CV_8UC1);
@@ -292,6 +343,7 @@ std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage) {
     std::vector<cv::Point> vertices;
     vertices.reserve(rows * cols / 16); // heuristic reserve
 
+    constexpr int branchRadius = 3;
     for (int y = 1; y < rows - 1; ++y) {
         const uchar *row = skeletonImage.ptr<uchar>(y);
         for (int x = 1; x < cols - 1; ++x) {
@@ -303,13 +355,27 @@ std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage) {
             static const int ring[8][2] = {{0,-1},{1,-1},{1,0},{1,1},
                                            {0,1},{-1,1},{-1,0},{-1,-1}};
             bool occupied[8];
-            for (int k = 0; k < 8; ++k)
+            int occupiedNeighbors = 0;
+            for (int k = 0; k < 8; ++k) {
                 occupied[k] = skeletonImage.at<uchar>(y + ring[k][1], x + ring[k][0]) != 0;
+                occupiedNeighbors += occupied[k] ? 1 : 0;
+            }
             int runs = 0;
             for (int k = 0; k < 8; ++k)
                 if (!occupied[(k + 7) % 8] && occupied[k]) ++runs;
 
-            if (runs >= 3)
+            // Use the larger local topology wherever it fits: besides recovering
+            // acute junctions, it rejects nearby unrelated lines and junctions
+            // with more than four arms. Crossing number is only a frame fallback.
+            const bool canCheckLocalTopology =
+                x >= branchRadius && y >= branchRadius
+                && x < cols - branchRadius && y < rows - branchRadius;
+            const int localBranches = canCheckLocalTopology
+                ? countLocalBranches(skeletonImage, y, x) : 0;
+            const bool hasThreeOrFourBranches = localBranches == 3 || localBranches == 4;
+            const bool boundaryFallback = !canCheckLocalTopology
+                && (runs == 3 || runs == 4);
+            if ((occupiedNeighbors >= 3 && hasThreeOrFourBranches) || boundaryFallback)
                 vertices.emplace_back(x, y);
         }
     }

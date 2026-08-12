@@ -2886,13 +2886,14 @@ public class CellDivisionInference implements PlugIn {
     // Vertex detection
     // =========================
 
-    private static List<Point> findPixelsWithNeighborCount(ByteProcessor bp, int target){
+    private static List<Point> findJunctionPixels(ByteProcessor bp){
 
         int w = bp.getWidth();
         int h = bp.getHeight();
 
         List<Point> out = new ArrayList<>();
 
+        final int branchRadius=3;
         for (int y = 1; y < h - 1; y++){
             for (int x = 1; x < w - 1; x++){
 
@@ -2902,15 +2903,60 @@ public class CellDivisionInference implements PlugIn {
                 final int[] rx={0,1,1,1,0,-1,-1,-1};
                 final int[] ry={-1,-1,0,1,1,1,0,-1};
                 boolean[] occupied=new boolean[8];
-                for(int k=0;k<8;k++) occupied[k]=(bp.get(x+rx[k],y+ry[k])&0xff)!=0;
+                int occupiedNeighbors=0;
+                for(int k=0;k<8;k++){
+                    occupied[k]=(bp.get(x+rx[k],y+ry[k])&0xff)!=0;
+                    if(occupied[k]) occupiedNeighbors++;
+                }
                 int c=0;
                 for(int k=0;k<8;k++) if(!occupied[(k+7)%8] && occupied[k]) c++;
-                if (c >= target)
+                // The wider topology check separates acute arms and rejects
+                // nearby unrelated lines or junctions with more than four arms.
+                boolean canCheckLocalTopology=x>=branchRadius&&y>=branchRadius
+                        &&x<w-branchRadius&&y<h-branchRadius;
+                int localBranches=canCheckLocalTopology
+                        ?countLocalBranches(bp,x,y,branchRadius):0;
+                boolean hasThreeOrFourBranches=localBranches==3||localBranches==4;
+                boolean boundaryFallback=!canCheckLocalTopology&&(c==3||c==4);
+                if ((occupiedNeighbors>=3&&hasThreeOrFourBranches)||boundaryFallback)
                     out.add(new Point(x,y));
             }
         }
 
         return out;
+    }
+
+    private static int countLocalBranches(ByteProcessor bp,int centerX,int centerY,int radius){
+        final int side=2*radius+1, coreRadius=1;
+        boolean[] foreground=new boolean[side*side];
+        boolean[] visited=new boolean[side*side];
+        for(int localY=0;localY<side;localY++) for(int localX=0;localX<side;localX++){
+            int dx=localX-radius,dy=localY-radius;
+            if(Math.max(Math.abs(dx),Math.abs(dy))>coreRadius)
+                foreground[localY*side+localX]=(bp.get(centerX+dx,centerY+dy)&0xff)!=0;
+        }
+
+        final int[] ox={-1,0,1,-1,1,-1,0,1};
+        final int[] oy={-1,-1,-1,0,0,1,1,1};
+        int branches=0;
+        ArrayDeque<Integer> stack=new ArrayDeque<>();
+        for(int y=0;y<side;y++) for(int x=0;x<side;x++){
+            int start=y*side+x;
+            if(!foreground[start]||visited[start]) continue;
+            branches++;
+            visited[start]=true;
+            stack.push(start);
+            while(!stack.isEmpty()){
+                int point=stack.pop(),px=point%side,py=point/side;
+                for(int k=0;k<8;k++){
+                    int nx=px+ox[k],ny=py+oy[k];
+                    if(nx<0||ny<0||nx>=side||ny>=side) continue;
+                    int next=ny*side+nx;
+                    if(foreground[next]&&!visited[next]){visited[next]=true;stack.push(next);}
+                }
+            }
+        }
+        return branches;
     }
 
     private static boolean[] exteriorBackground4(ByteProcessor bp){
@@ -3024,7 +3070,7 @@ public class CellDivisionInference implements PlugIn {
             ImageProcessor ip0=currentImp.getProcessor();
             ByteProcessor bp=(ByteProcessor)ip0.convertToByte(true);
 
-            List<Point> raw=findPixelsWithNeighborCount(bp,3);
+            List<Point> raw=findJunctionPixels(bp);
             List<Point> clustered=clusterPoints(raw,2.0);
             clustered=suppressNearbyOuterVertices(clustered,bp);
 
