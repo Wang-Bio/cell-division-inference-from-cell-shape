@@ -58,9 +58,10 @@ cv::Mat segmentWithGuoHall(const cv::Mat &input, double threshold = -1.0, bool i
 // Returns zero-based pixel coordinates for each detected vertex.
 std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage);
 
-// Trace the skeleton/exterior interface deterministically (4-connected exterior,
-// 8-connected wall) and return RDP contour supports.  Empty means that the
-// outline is open, frame-truncated, or otherwise unreliable.
+// Trace each disconnected foreground network as an independent outer polygon
+// and return its simplified contour supports. Internal wall junctions do not
+// invalidate a contour, and a frame-truncated or tiny network is skipped
+// without discarding supports from other valid networks.
 std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &skeletonImage,
                                                    std::string *warning = nullptr);
 bool isOuterBoundaryPoint(const cv::Mat &skeletonImage, const cv::Point2d &point);

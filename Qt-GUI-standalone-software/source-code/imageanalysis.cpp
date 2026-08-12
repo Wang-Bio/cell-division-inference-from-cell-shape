@@ -443,12 +443,6 @@ cv::Mat exteriorMask(const cv::Mat &s)
     while(!queue.empty()){cv::Point p=queue.front();queue.pop_front();for(auto &o:d){int x=p.x+o[0],y=p.y+o[1];if(x>=0&&y>=0&&x<s.cols&&y<s.rows)add(x,y);}}
     return exterior;
 }
-void rdp(const std::vector<cv::Point> &p,int a,int b,double eps,std::vector<int>&keep)
-{
-    double best=-1;int at=-1; const cv::Point2d A=p[a],B=p[b]; const double dx=B.x-A.x,dy=B.y-A.y,den=std::hypot(dx,dy);
-    for(int i=a+1;i<b;++i){double d=den>0?std::abs(dy*p[i].x-dx*p[i].y+B.x*A.y-B.y*A.x)/den:cv::norm(cv::Point2d(p[i])-A);if(d>best){best=d;at=i;}}
-    if(best>eps&&at>0){rdp(p,a,at,eps,keep);keep.push_back(at);rdp(p,at,b,eps,keep);}
-}
 }
 
 bool isOuterBoundaryPoint(const cv::Mat &s,const cv::Point2d &point)
@@ -468,17 +462,48 @@ double outerVertexSpacingThreshold(const cv::Size &imageSize, double characteris
 
 std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &s,std::string *warning)
 {
-    CV_Assert(s.type()==CV_8UC1); cv::Mat ex=exteriorMask(s), boundary(s.size(),CV_8UC1,cv::Scalar(0)); std::vector<cv::Point> pixels;
-    const int d4[4][2]={{1,0},{0,1},{-1,0},{0,-1}};
-    for(int y=0;y<s.rows;++y)for(int x=0;x<s.cols;++x)if(s.at<uchar>(y,x)){if(x==0||y==0||x==s.cols-1||y==s.rows-1){if(warning)*warning="outer contour touches image frame";return{};}for(auto&o:d4)if(ex.at<uchar>(y+o[1],x+o[0])){boundary.at<uchar>(y,x)=1;pixels.emplace_back(x,y);break;}}
-    if(pixels.size()<8){if(warning)*warning="no reliable closed outer contour";return{};}
-    std::sort(pixels.begin(),pixels.end(),[](auto a,auto b){return std::tie(a.y,a.x)<std::tie(b.y,b.x);});
-    std::vector<cv::Point> contour{pixels.front()}; cv::Point prev(-999,-999),cur=pixels.front(); const int d8[8][2]={{0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}};
-    for(size_t step=0;step<=pixels.size()+8;++step){std::vector<cv::Point> next;for(auto&o:d8){cv::Point q(cur.x+o[0],cur.y+o[1]);if(q!=prev&&q.x>=0&&q.y>=0&&q.x<s.cols&&q.y<s.rows&&boundary.at<uchar>(q))next.push_back(q);}std::sort(next.begin(),next.end(),[](auto a,auto b){return std::tie(a.y,a.x)<std::tie(b.y,b.x);});if(next.empty())break;cv::Point q=next.front();if(q==contour.front()){if(contour.size()<pixels.size()/2)break;contour.push_back(q);goto closed;}prev=cur;cur=q;contour.push_back(cur);}
-    if(warning)*warning="outer contour is open or has unstable branches";return{};
-closed:
-    const double S=kFallbackCharacteristicSizeDiagonalFraction*std::hypot(double(s.cols),double(s.rows)); const double eps=std::max(1.0,0.015*S); int mid=int(contour.size()-1)/2;std::vector<int> keep{0};rdp(contour,0,mid,eps,keep);keep.push_back(mid);rdp(contour,mid,int(contour.size()-1),eps,keep);
-    std::sort(keep.begin(),keep.end());keep.erase(std::unique(keep.begin(),keep.end()),keep.end());std::vector<cv::Point2d> out;for(int i:keep)if(i!=0&&i!=int(contour.size()-1)&&i!=mid)out.emplace_back(contour[i]);return out;
+    CV_Assert(s.type()==CV_8UC1);
+    if(warning) warning->clear();
+    cv::Mat foreground;
+    cv::compare(s,0,foreground,cv::CMP_GT);
+    std::vector<std::vector<cv::Point>> contours;
+    // RETR_EXTERNAL deliberately returns one contour for each disconnected
+    // tissue lobe. Unlike walking exterior-adjacent skeleton pixels, OpenCV's
+    // border follower is not confused by branches where internal cell walls
+    // meet a lobe's perimeter.
+    cv::findContours(foreground,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_NONE);
+
+    std::vector<cv::Point2d> out;
+    int skippedFrame=0,skippedSmall=0;
+    for(const auto &contour:contours){
+        if(contour.size()<8){++skippedSmall;continue;}
+        bool touchesFrame=false;
+        for(const cv::Point &point:contour){
+            if(point.x==0||point.y==0||point.x==s.cols-1||point.y==s.rows-1){
+                touchesFrame=true;
+                break;
+            }
+        }
+        if(touchesFrame){++skippedFrame;continue;}
+
+        // Scale simplification per lobe. A very large or distant second lobe
+        // must not change which vertices are retained on this contour.
+        const cv::Rect bounds=cv::boundingRect(contour);
+        const double characteristicSize=kFallbackCharacteristicSizeDiagonalFraction
+                *std::hypot(double(bounds.width),double(bounds.height));
+        const double epsilon=std::max(1.0,0.015*characteristicSize);
+        std::vector<cv::Point> supports;
+        cv::approxPolyDP(contour,supports,epsilon,true);
+        for(const cv::Point &point:supports)
+            out.emplace_back(point);
+    }
+    const int skipped=skippedFrame+skippedSmall;
+    if(warning&&skipped){
+        *warning=std::to_string(skipped)+" outer contour"+(skipped==1?" was":"s were")+" skipped";
+        if(skippedFrame)*warning+=" ("+std::to_string(skippedFrame)+" frame-truncated)";
+        if(skippedSmall)*warning+=" ("+std::to_string(skippedSmall)+" too small)";
+    }
+    return out;
 }
 
 std::vector<LineConnection> detectLines(const cv::Mat &skeletonImage,
