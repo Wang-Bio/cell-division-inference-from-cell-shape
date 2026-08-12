@@ -1,5 +1,6 @@
 debug/canvasmanager.o
 debug/debugmanager.o
+debug/networkdebugger.o
 debug/divisionestimator.o
 debug/imageanalysis.o
 debug/interactivegraphicsview.o

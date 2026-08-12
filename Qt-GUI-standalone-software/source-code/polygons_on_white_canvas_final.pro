@@ -11,6 +11,7 @@ CONFIG += c++17
 SOURCES += \
     canvasmanager.cpp \
     debugmanager.cpp \
+    networkdebugger.cpp \
     divisionestimator.cpp \
     imageanalysis.cpp \
     interactivegraphicsview.cpp \
@@ -28,6 +29,7 @@ SOURCES += \
 HEADERS += \
     canvasmanager.h \
     debugmanager.h \
+    networkdebugger.h \
     divisionestimator.h \
     imageanalysis.h \
     interactivegraphicsview.h \

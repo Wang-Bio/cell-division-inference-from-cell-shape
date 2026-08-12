@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "debugmanager.h"
+#include "networkdebugger.h"
 #include "ui_mainwindow.h"
 
 #include "vertexitem.h"
@@ -178,6 +179,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionGenerate_Random_Network, &QAction::triggered, this, &MainWindow::onGenerateRandomNetwork);
     connect(ui->actionComparing_Batch_Estimation, &QAction::triggered, this, &MainWindow::onCompareBatchEstimations);
     connect(ui->actionExport_Geometric_Feature_Names, &QAction::triggered, this, &MainWindow::onExportFeatureNames);
+    connect(ui->actionDebug_All, &QAction::triggered, this, &MainWindow::onDebugAll);
 
 
 }
@@ -1596,6 +1598,11 @@ void MainWindow::addPolygonFromSelectedVertices()
 
 void MainWindow::onGenerateRandomNetwork(){
     DebugManager::generate(this);
+}
+
+void MainWindow::onDebugAll()
+{
+    NetworkDebugger::show(this, ui->graphicsView->scene(), ui->graphicsView);
 }
 
 void MainWindow::onCompareBatchEstimations()

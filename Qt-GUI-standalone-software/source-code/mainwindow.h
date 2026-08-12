@@ -211,6 +211,7 @@ private slots:
     void onGenerateRandomNetwork();
     void onCompareBatchEstimations();
     void onExportFeatureNames();
+    void onDebugAll();
 
     friend class DebugManager;
 

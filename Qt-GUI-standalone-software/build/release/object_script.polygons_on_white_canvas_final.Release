@@ -1,5 +1,6 @@
 release/canvasmanager.o
 release/debugmanager.o
+release/networkdebugger.o
 release/divisionestimator.o
 release/imageanalysis.o
 release/interactivegraphicsview.o

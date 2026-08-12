@@ -427,7 +427,8 @@
    <property name="title">
      <string>Debug</string>
     </property>
-    <addaction name="actionGenerate_Random_Network"/>
+   <addaction name="actionGenerate_Random_Network"/>
+    <addaction name="actionDebug_All"/>
     <addaction name="actionCheck_Geometry_Calculation_Single_Pair"/>
     <addaction name="actionComparing_Batch_Estimation"/>
     <addaction name="actionExport_Geometric_Feature_Names"/>
@@ -469,6 +470,9 @@
    <addaction name="menuDebug"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionDebug_All">
+   <property name="text"><string>Debug All</string></property>
+  </action>
   <action name="actionOpen_Raw_Image">
    <property name="text">
     <string>Open Raw Image</string>

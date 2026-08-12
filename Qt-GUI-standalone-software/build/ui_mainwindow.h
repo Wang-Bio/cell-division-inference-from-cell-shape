@@ -27,6 +27,7 @@ QT_BEGIN_NAMESPACE
 class Ui_MainWindow
 {
 public:
+    QAction *actionDebug_All;
     QAction *actionOpen_Raw_Image;
     QAction *actionOpen_Background;
     QAction *actionCreate_Canvas;
@@ -144,6 +145,8 @@ public:
         if (MainWindow->objectName().isEmpty())
             MainWindow->setObjectName("MainWindow");
         MainWindow->resize(800, 600);
+        actionDebug_All = new QAction(MainWindow);
+        actionDebug_All->setObjectName("actionDebug_All");
         actionOpen_Raw_Image = new QAction(MainWindow);
         actionOpen_Raw_Image->setObjectName("actionOpen_Raw_Image");
         actionOpen_Background = new QAction(MainWindow);
@@ -560,6 +563,7 @@ public:
         menuDisplay->addAction(actionNeighbor_Pair_Display_Setting);
         menuDisplay->addAction(actionDivision_Pair_Display_Setting);
         menuDebug->addAction(actionGenerate_Random_Network);
+        menuDebug->addAction(actionDebug_All);
         menuDebug->addAction(actionCheck_Geometry_Calculation_Single_Pair);
         menuDebug->addAction(actionComparing_Batch_Estimation);
         menuDebug->addAction(actionExport_Geometric_Feature_Names);
@@ -582,6 +586,7 @@ public:
     void retranslateUi(QMainWindow *MainWindow)
     {
         MainWindow->setWindowTitle(QCoreApplication::translate("MainWindow", "MainWindow", nullptr));
+        actionDebug_All->setText(QCoreApplication::translate("MainWindow", "Debug All", nullptr));
         actionOpen_Raw_Image->setText(QCoreApplication::translate("MainWindow", "Open Raw Image", nullptr));
         actionOpen_Background->setText(QCoreApplication::translate("MainWindow", "Open Background", nullptr));
         actionCreate_Canvas->setText(QCoreApplication::translate("MainWindow", "Create Canvas", nullptr));
