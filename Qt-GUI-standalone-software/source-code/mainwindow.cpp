@@ -1806,20 +1806,43 @@ void MainWindow::onVertexDetection()
     }
 
     const std::vector<cv::Point2d> detectedVertices = ImageAnalysis::detectVertices(m_currentImage);
+    const double outerSpacing = ImageAnalysis::outerVertexSpacingThreshold(m_currentImage.size());
 
     int addedCount = 0;
     for (const auto &point : detectedVertices) {
         QPointF position(point.x, point.y);
-        if (VertexItem::findVertexByPosition(scene, position, 0.0))
-            continue;
+        const bool boundary = ImageAnalysis::isOuterBoundaryPoint(m_currentImage, point);
+        // Boundary candidates are intentionally less sensitive than interior
+        // junctions: tiny local skeleton changes must not create a second
+        // angle-defining vertex.  Existing/manual vertices win ties.
+        VertexItem *nearby = VertexItem::findVertexByPosition(scene, position, boundary ? outerSpacing : 0.0);
+        if (nearby) {
+            // A biological junction is a mandatory anchor and therefore wins
+            // over an older automatically inserted support point.
+            if (boundary && nearby->kind() == VertexItem::Kind::ContourSupport) {
+                scene->removeItem(nearby);
+                delete nearby;
+            } else {
+                continue;
+            }
+        }
 
         auto *vertex = new VertexItem(m_nextVertexId++, position);
+        vertex->setKind(boundary
+                        ? VertexItem::Kind::BoundaryJunction : VertexItem::Kind::InteriorJunction);
         scene->addItem(vertex);
         vertex->setFlag(QGraphicsItem::ItemIsMovable, m_allowVertexManualMove);
         connect(vertex, &VertexItem::selected, this, &MainWindow::onVertexSelected);
         connect(vertex, &VertexItem::moved, this, &MainWindow::onVertexMoved);
         ++addedCount;
     }
+
+    std::string contourWarning;
+    const auto supports=ImageAnalysis::detectOuterContourSupport(m_currentImage,&contourWarning);
+    for(const auto &point:supports){QPointF position(point.x,point.y);if(VertexItem::findVertexByPosition(scene,position,outerSpacing))continue;
+        auto *vertex=new VertexItem(m_nextVertexId++,position);vertex->setKind(VertexItem::Kind::ContourSupport);scene->addItem(vertex);
+        vertex->setFlag(QGraphicsItem::ItemIsMovable,m_allowVertexManualMove);connect(vertex,&VertexItem::selected,this,&MainWindow::onVertexSelected);connect(vertex,&VertexItem::moved,this,&MainWindow::onVertexMoved);++addedCount;}
+    if(!contourWarning.empty()) QMessageBox::warning(this,"Outer contour",QString::fromStdString(contourWarning)+"; manual boundary vertices were retained.");
 
     updateVertexCountLabel();
 
@@ -1890,6 +1913,11 @@ void MainWindow::onLineDetection()
             continue;
 
         auto *line = new LineItem(v1, v2);
+        QVector<QPointF> centerline;
+        centerline.reserve(int(connection.path.size()));
+        for (const cv::Point &p : connection.path)
+            centerline.append(QPointF(p.x, p.y));
+        line->setCenterlinePath(centerline);
         scene->addItem(line);
         connectLineSignals(line);
         ++addedCount;

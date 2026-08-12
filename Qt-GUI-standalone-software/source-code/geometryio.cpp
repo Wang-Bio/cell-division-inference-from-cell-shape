@@ -549,7 +549,7 @@ GeometryImportResult GeometryIO::importFromJson(const QString &filePath, bool al
         return result;
     }
 
-    struct VertexData{int id; double x; double y;};
+    struct VertexData{int id; double x; double y; QString kind;};
     QVector<VertexData> vertices;
     vertices.reserve(vertexArray.size());
 
@@ -567,7 +567,8 @@ GeometryImportResult GeometryIO::importFromJson(const QString &filePath, bool al
         const double x = obj.value("x").toDouble();
         const double y = obj.value("y").toDouble();
 
-        vertices.push_back({id,x,y});
+        // Absence is deliberately legacy/manual, never inferred from degree.
+        vertices.push_back({id,x,y,obj.value("kind").toString("MANUAL_TOPOLOGICAL")});
         minX = std::min(minX, x);
         minY = std::min(minY, y);
         maxX = std::max(maxX, x);
@@ -593,6 +594,7 @@ GeometryImportResult GeometryIO::importFromJson(const QString &filePath, bool al
     int maxVertexId = 0;
     for(const auto &vData : vertices){
         auto *vertex = new VertexItem(vData.id, QPointF(vData.x, vData.y));
+        vertex->setKind(VertexItem::kindFromName(vData.kind));
         scene->addItem(vertex);
         vertex->setFlag(QGraphicsItem::ItemIsMovable, allowVertexManualMove);
 
@@ -620,6 +622,14 @@ GeometryImportResult GeometryIO::importFromJson(const QString &filePath, bool al
         }
 
         auto *line = new LineItem(v1, v2, id);
+        if (obj.value("pathValid").toBool(true) && obj.value("path").isArray()) {
+            QVector<QPointF> path;
+            for (const QJsonValue &pointValue : obj.value("path").toArray()) {
+                const QJsonArray point = pointValue.toArray();
+                if (point.size() == 2) path.append(QPointF(point[0].toDouble(), point[1].toDouble()));
+            }
+            line->setCenterlinePath(path);
+        }
         scene->addItem(line);
     }
 
@@ -763,6 +773,7 @@ QJsonArray serializeVertices(QGraphicsScene *scene)
         obj.insert("id", vertex->id());
         obj.insert("x", pos.x());
         obj.insert("y", pos.y());
+        obj.insert("kind", VertexItem::kindName(vertex->kind()));
         array.append(obj);
     }
 
@@ -789,6 +800,14 @@ QJsonArray serializeLines(QGraphicsScene *scene)
         obj.insert("id", line->id());
         obj.insert("startVertexId", line->v1Id());
         obj.insert("endVertexId", line->v2Id());
+        obj.insert("pathValid", line->hasValidPath());
+        if (line->hasValidPath()) {
+            QJsonArray path;
+            for (const QPointF &p : line->centerlinePath()) {
+                QJsonArray point; point.append(p.x()); point.append(p.y()); path.append(point);
+            }
+            obj.insert("path", path);
+        }
         array.append(obj);
     }
 

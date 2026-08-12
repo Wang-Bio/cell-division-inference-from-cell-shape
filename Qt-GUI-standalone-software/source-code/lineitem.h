@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QGraphicsLineItem>
 #include <QGraphicsView>
+#include <QVector>
+#include <QPointF>
 
 class VertexItem;
 class QGraphicsScene;
@@ -26,6 +28,10 @@ public:
     double angle0to180() const;
     double angle0to90() const;
     QPointF meanPos() const;
+    const QVector<QPointF>& centerlinePath() const { return m_path; }
+    bool hasValidPath() const { return m_pathValid && m_path.size() >= 2; }
+    void setCenterlinePath(const QVector<QPointF> &path) { m_path = path; m_pathValid = path.size() >= 2; }
+    void invalidatePath() { m_pathValid = false; }
 
 //Basic function: add, delete, find, count
     void updateGeometry();
@@ -66,6 +72,8 @@ private:
 
     VertexItem *m_v1 = nullptr;
     VertexItem *m_v2 = nullptr;
+    QVector<QPointF> m_path;
+    bool m_pathValid = false;
 };
 
 #endif // LINEITEM_H

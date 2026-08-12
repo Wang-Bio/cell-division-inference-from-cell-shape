@@ -17,10 +17,15 @@ class VertexItem : public QObject, public QGraphicsEllipseItem
 
 
 public:
+    enum class Kind { InteriorJunction, BoundaryJunction, ContourSupport, Ambiguous, ManualTopological };
     VertexItem(int id, const QPointF &pos, qreal radius = 2.0);
 
     int id() const {return m_id;}
     int type() const override { return Type; }
+    Kind kind() const { return m_kind; }
+    void setKind(Kind kind);
+    static QString kindName(Kind kind);
+    static Kind kindFromName(const QString &name);
 
     enum { Type = QGraphicsItem::UserType + 1001 };
 
@@ -62,6 +67,7 @@ protected:
 private:
     int m_id;
     qreal m_radius;
+    Kind m_kind = Kind::ManualTopological; // legacy JSON and manual points remain topological
     QGraphicsSimpleTextItem *m_label = nullptr;
 
     void updateLabelPos();

@@ -9,6 +9,7 @@
 #include <utility>
 #include <unordered_map>
 #include <unordered_set>
+#include <deque>
 
 namespace {
 // Compute the number of 0->1 transitions in the ordered neighborhood.
@@ -297,17 +298,18 @@ std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage) {
             if (row[x] == 0)
                 continue;
 
-            int neighborCount = 0;
-            for (int dy = -1; dy <= 1; ++dy) {
-                const uchar *neighborRow = skeletonImage.ptr<uchar>(y + dy);
-                for (int dx = -1; dx <= 1; ++dx) {
-                    if (dx == 0 && dy == 0)
-                        continue;
-                    neighborCount += neighborRow[x + dx] > 0 ? 1 : 0;
-                }
-            }
+            // Crossing number: separate foreground runs in the clockwise
+            // 8-neighbour ring, rather than raw occupied-neighbour count.
+            static const int ring[8][2] = {{0,-1},{1,-1},{1,0},{1,1},
+                                           {0,1},{-1,1},{-1,0},{-1,-1}};
+            bool occupied[8];
+            for (int k = 0; k < 8; ++k)
+                occupied[k] = skeletonImage.at<uchar>(y + ring[k][1], x + ring[k][0]) != 0;
+            int runs = 0;
+            for (int k = 0; k < 8; ++k)
+                if (!occupied[(k + 7) % 8] && occupied[k]) ++runs;
 
-            if (neighborCount >= 3)
+            if (runs >= 3)
                 vertices.emplace_back(x, y);
         }
     }
@@ -357,11 +359,60 @@ std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage) {
         }
 
         const double count = static_cast<double>(cluster.size());
-        const cv::Point2d center(cvRound(sumX / count), cvRound(sumY / count));
+        const cv::Point2d center(sumX / count, sumY / count);
         clustered.push_back(center);
     }
 
     return clustered;
+}
+
+namespace {
+cv::Mat exteriorMask(const cv::Mat &s)
+{
+    cv::Mat exterior(s.size(), CV_8UC1, cv::Scalar(0));
+    std::deque<cv::Point> queue;
+    auto add=[&](int x,int y){if(s.at<uchar>(y,x)==0&&!exterior.at<uchar>(y,x)){exterior.at<uchar>(y,x)=1;queue.emplace_back(x,y);}};
+    for(int x=0;x<s.cols;++x){add(x,0);add(x,s.rows-1);} for(int y=0;y<s.rows;++y){add(0,y);add(s.cols-1,y);}
+    const int d[4][2]={{1,0},{0,1},{-1,0},{0,-1}};
+    while(!queue.empty()){cv::Point p=queue.front();queue.pop_front();for(auto &o:d){int x=p.x+o[0],y=p.y+o[1];if(x>=0&&y>=0&&x<s.cols&&y<s.rows)add(x,y);}}
+    return exterior;
+}
+void rdp(const std::vector<cv::Point> &p,int a,int b,double eps,std::vector<int>&keep)
+{
+    double best=-1;int at=-1; const cv::Point2d A=p[a],B=p[b]; const double dx=B.x-A.x,dy=B.y-A.y,den=std::hypot(dx,dy);
+    for(int i=a+1;i<b;++i){double d=den>0?std::abs(dy*p[i].x-dx*p[i].y+B.x*A.y-B.y*A.x)/den:cv::norm(cv::Point2d(p[i])-A);if(d>best){best=d;at=i;}}
+    if(best>eps&&at>0){rdp(p,a,at,eps,keep);keep.push_back(at);rdp(p,at,b,eps,keep);}
+}
+}
+
+bool isOuterBoundaryPoint(const cv::Mat &s,const cv::Point2d &point)
+{
+    cv::Mat ex=exteriorMask(s); int x=cvRound(point.x),y=cvRound(point.y); if(x<0||y<0||x>=s.cols||y>=s.rows)return false;
+    const int d[4][2]={{1,0},{0,1},{-1,0},{0,-1}}; for(auto&o:d){int nx=x+o[0],ny=y+o[1];if(nx>=0&&ny>=0&&nx<s.cols&&ny<s.rows&&ex.at<uchar>(ny,nx))return true;} return false;
+}
+
+double outerVertexSpacingThreshold(const cv::Size &imageSize, double characteristicSize)
+{
+    const double diagonal = std::hypot(double(imageSize.width), double(imageSize.height));
+    const double scale = characteristicSize > 0.0
+        ? characteristicSize : kFallbackCharacteristicSizeDiagonalFraction * diagonal;
+    return std::max(kMinimumOuterVertexSpacingPixels,
+                    kOuterVertexSpacingScaleFraction * scale);
+}
+
+std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &s,std::string *warning)
+{
+    CV_Assert(s.type()==CV_8UC1); cv::Mat ex=exteriorMask(s), boundary(s.size(),CV_8UC1,cv::Scalar(0)); std::vector<cv::Point> pixels;
+    const int d4[4][2]={{1,0},{0,1},{-1,0},{0,-1}};
+    for(int y=0;y<s.rows;++y)for(int x=0;x<s.cols;++x)if(s.at<uchar>(y,x)){if(x==0||y==0||x==s.cols-1||y==s.rows-1){if(warning)*warning="outer contour touches image frame";return{};}for(auto&o:d4)if(ex.at<uchar>(y+o[1],x+o[0])){boundary.at<uchar>(y,x)=1;pixels.emplace_back(x,y);break;}}
+    if(pixels.size()<8){if(warning)*warning="no reliable closed outer contour";return{};}
+    std::sort(pixels.begin(),pixels.end(),[](auto a,auto b){return std::tie(a.y,a.x)<std::tie(b.y,b.x);});
+    std::vector<cv::Point> contour{pixels.front()}; cv::Point prev(-999,-999),cur=pixels.front(); const int d8[8][2]={{0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}};
+    for(size_t step=0;step<=pixels.size()+8;++step){std::vector<cv::Point> next;for(auto&o:d8){cv::Point q(cur.x+o[0],cur.y+o[1]);if(q!=prev&&q.x>=0&&q.y>=0&&q.x<s.cols&&q.y<s.rows&&boundary.at<uchar>(q))next.push_back(q);}std::sort(next.begin(),next.end(),[](auto a,auto b){return std::tie(a.y,a.x)<std::tie(b.y,b.x);});if(next.empty())break;cv::Point q=next.front();if(q==contour.front()){if(contour.size()<pixels.size()/2)break;contour.push_back(q);goto closed;}prev=cur;cur=q;contour.push_back(cur);}
+    if(warning)*warning="outer contour is open or has unstable branches";return{};
+closed:
+    const double S=kFallbackCharacteristicSizeDiagonalFraction*std::hypot(double(s.cols),double(s.rows)); const double eps=std::max(1.0,0.015*S); int mid=int(contour.size()-1)/2;std::vector<int> keep{0};rdp(contour,0,mid,eps,keep);keep.push_back(mid);rdp(contour,mid,int(contour.size()-1),eps,keep);
+    std::sort(keep.begin(),keep.end());keep.erase(std::unique(keep.begin(),keep.end()),keep.end());std::vector<cv::Point2d> out;for(int i:keep)if(i!=0&&i!=int(contour.size()-1)&&i!=mid)out.emplace_back(contour[i]);return out;
 }
 
 std::vector<LineConnection> detectLines(const cv::Mat &skeletonImage,

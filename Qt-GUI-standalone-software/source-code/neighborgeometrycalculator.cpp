@@ -27,6 +27,59 @@
 
 static NeighborPairGeometrySettings g_neighborPairGeometrySettings;
 
+namespace {
+// Shared Java/Qt defaults for path-aware local tangents.
+constexpr double kCentralFraction = 0.03, kCentralMinimum = 1.5;
+constexpr double kWindowFractions[3] = {0.15, 0.20, 0.25};
+
+LineItem *lineBetween(VertexItem *a, VertexItem *b)
+{
+    if (!a || !b || !a->scene()) return nullptr;
+    return LineItem::findLineByVertexIds(a->scene(), a->id(), b->id());
+}
+
+QVector<QPointF> pathAway(LineItem *line, const QPointF &junction)
+{
+    if (!line || !line->hasValidPath()) return {};
+    QVector<QPointF> p = line->centerlinePath();
+    if (QLineF(p.last(), junction).length() < QLineF(p.first(), junction).length())
+        std::reverse(p.begin(), p.end());
+    return p;
+}
+
+// Uniform arc-length samples followed by robust PCA/TLS.  The three scale
+// median makes the result independent of contour support vertex placement.
+bool tangentAtScale(const QVector<QPointF> &path, const QPointF &junction,
+                    double exclude, double window, QPointF &tangent)
+{
+    QVector<QPointF> samples;
+    double s = QLineF(junction, path.first()).length();
+    QPointF previous = path.first();
+    for (const QPointF &p : path) {
+        s += QLineF(previous, p).length(); previous = p;
+        if (s >= exclude && s <= exclude + window) samples.append(p);
+    }
+    if (samples.size() < 3) return false;
+    // Three fixed Huber IRLS iterations around a total-least-squares line.
+    QVector<double> weights(samples.size(), 1.0);
+    QPointF axis;
+    for (int iteration = 0; iteration < 3; ++iteration) {
+        double sw=0,cx=0,cy=0;
+        for (int i=0;i<samples.size();++i){sw+=weights[i];cx+=weights[i]*samples[i].x();cy+=weights[i]*samples[i].y();}
+        cx/=sw; cy/=sw; double xx=0,xy=0,yy=0;
+        for(int i=0;i<samples.size();++i){double x=samples[i].x()-cx,y=samples[i].y()-cy;xx+=weights[i]*x*x;xy+=weights[i]*x*y;yy+=weights[i]*y*y;}
+        const double angle=0.5*std::atan2(2*xy,xx-yy); axis=QPointF(std::cos(angle),std::sin(angle));
+        QVector<double> residuals; residuals.reserve(samples.size());
+        for(const QPointF&p:samples) residuals.append(std::abs((p.x()-cx)*axis.y()-(p.y()-cy)*axis.x()));
+        QVector<double> sorted=residuals; std::sort(sorted.begin(),sorted.end()); double scale=1.4826*sorted[sorted.size()/2]+1e-9;
+        const double cutoff=1.345*scale;
+        for(int i=0;i<weights.size();++i) weights[i]=residuals[i]<=cutoff?1.0:cutoff/residuals[i];
+    }
+    if (QPointF::dotProduct(axis, path.last()-junction) < 0) axis=-axis;
+    tangent=axis; return true;
+}
+}
+
 NeighborPairGeometrySettings NeighborPairGeometryCalculator::currentSettings(){
     return g_neighborPairGeometrySettings;
 }
@@ -472,8 +525,13 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
     const double solA = solidityForPolygon(first);
     const double solB = solidityForPolygon(second);
 
-    const double vertexCountA = first ? double(first->polygon().size()) : std::numeric_limits<double>::quiet_NaN();
-    const double vertexCountB = second ? double(second->polygon().size()) : std::numeric_limits<double>::quiet_NaN();
+    const auto biologicalVertexCount = [](const PolygonItem *p) {
+        if (!p) return std::numeric_limits<double>::quiet_NaN();
+        int n=0; for (VertexItem *v : p->vertices()) if (v && v->kind()!=VertexItem::Kind::ContourSupport) ++n;
+        return double(n);
+    };
+    const double vertexCountA = biologicalVertexCount(first);
+    const double vertexCountB = biologicalVertexCount(second);
 
     const bool needsNeighborPair = settings.computeNormalizedSharedEdgeLength
                                    || settings.computeSharedEdgeUnsharedVerticesDistance
@@ -806,12 +864,23 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
                 const QPointF base = shared->scenePos();
                 const QPointF vecA = connA->scenePos() - base;
                 const QPointF vecB = connB->scenePos() - base;
-
-                const double crossProd = vecA.x() * vecB.y() - vecA.y() * vecB.x();
-                const double dotProd = vecA.x() * vecB.x() + vecA.y() * vecB.y();
-                const double angleRad = std::atan2(crossProd, dotProd);
-                const double magnitude = std::abs(angleRad);
-                anglesDeg.append(qRadiansToDegrees(magnitude));
+                QVector<double> scaleAngles;
+                const QVector<QPointF> pathA=pathAway(lineBetween(shared,connA),base);
+                const QVector<QPointF> pathB=pathAway(lineBetween(shared,connB),base);
+                const double exclude=std::max(kCentralMinimum,kCentralFraction*avgSqrtArea);
+                for(double fraction:kWindowFractions){
+                    QPointF ta,tb; const double cap=std::min(fraction*avgSqrtArea,
+                        std::min(pathA.size()>1?QLineF(pathA.first(),pathA.last()).length()/3.0:0.0,
+                                 pathB.size()>1?QLineF(pathB.first(),pathB.last()).length()/3.0:0.0));
+                    if(cap>0 && tangentAtScale(pathA,base,exclude,cap,ta) && tangentAtScale(pathB,base,exclude,cap,tb))
+                        scaleAngles.append(qRadiansToDegrees(std::atan2(std::abs(ta.x()*tb.y()-ta.y()*tb.x()),QPointF::dotProduct(ta,tb))));
+                }
+                if(!scaleAngles.isEmpty()) { std::sort(scaleAngles.begin(),scaleAngles.end()); anglesDeg.append(scaleAngles[scaleAngles.size()/2]); }
+                else { // Documented backward-compatible adjacent-vertex fallback.
+                    const double crossProd=vecA.x()*vecB.y()-vecA.y()*vecB.x();
+                    anglesDeg.append(qRadiansToDegrees(std::abs(std::atan2(crossProd,QPointF::dotProduct(vecA,vecB)))));
+                    qWarning() << "junction angle used legacy fallback: missing/short/invalid centerline path";
+                }
             }
 
             if (!anglesDeg.isEmpty()) {

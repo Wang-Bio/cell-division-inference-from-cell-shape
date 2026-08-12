@@ -98,6 +98,7 @@ void LineItem::updateGeometry()
 
 void LineItem::onVertexMoved(VertexItem * /*v*/, const QPointF & /*pos*/)
 {
+    invalidatePath();
     updateGeometry();
 }
 

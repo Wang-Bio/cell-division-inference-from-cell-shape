@@ -157,12 +157,21 @@ public class CellDivisionInference implements PlugIn {
     // ===== Vertex ====
     private List<Point> vertexPoints = new ArrayList<>();
     private List<Point2D.Double> vertexGeometryPoints = new ArrayList<>();
+    private enum VertexKind { INTERIOR_JUNCTION, BOUNDARY_JUNCTION, CONTOUR_SUPPORT, AMBIGUOUS, MANUAL_TOPOLOGICAL }
+    private List<VertexKind> vertexKinds = new ArrayList<>();
+    // Keep automatic exterior vertices far enough apart that single-pixel
+    // contour noise cannot become an angle-defining topological change.
+    private static final double MIN_OUTER_VERTEX_SPACING_PX = 5.0;
+    private static final double OUTER_VERTEX_SPACING_SCALE_FRACTION = 0.10;
+    private static final double FALLBACK_SIZE_DIAGONAL_FRACTION = 0.05;
 
     // ===== Lines =====
     static class LineEdge {
 
         final int v1;
         final int v2;
+        List<Point2D.Double> path = new ArrayList<>();
+        boolean pathValid;
 
         LineEdge(int a,int b){
 
@@ -1687,6 +1696,7 @@ public class CellDivisionInference implements PlugIn {
     private static class ImportResult{
         ArrayList<Point> vertices = new ArrayList<>();
         ArrayList<Point2D.Double> geometryVertices = new ArrayList<>();
+        ArrayList<VertexKind> vertexKinds = new ArrayList<>();
         ArrayList<LineEdge> lines = new ArrayList<>();
         ArrayList<List<Integer>> polygons = new ArrayList<>();
         ArrayList<Integer> polygonIds = new ArrayList<>();
@@ -1744,6 +1754,7 @@ public class CellDivisionInference implements PlugIn {
         // Replace current topology
         vertexPoints = result.vertices;
         vertexGeometryPoints = result.geometryVertices;
+        vertexKinds = result.vertexKinds;
         lineEdges = result.lines;
         polygons = result.polygons;
 
@@ -2153,7 +2164,8 @@ public class CellDivisionInference implements PlugIn {
             final int id;
             final double x;
             final double y;
-            VRec(int id, double x, double y){ this.id=id; this.x=x; this.y=y; }
+            final VertexKind kind;
+            VRec(int id, double x, double y, VertexKind kind){ this.id=id; this.x=x; this.y=y; this.kind=kind; }
         }
 
         ArrayList<VRec> vlist = new ArrayList<>();
@@ -2176,7 +2188,9 @@ public class CellDivisionInference implements PlugIn {
             double x = xD;
             double y = yD;
 
-            vlist.add(new VRec(id, x, y));
+            VertexKind kind=VertexKind.MANUAL_TOPOLOGICAL;
+            if(o.has("kind")) try { kind=VertexKind.valueOf(o.get("kind").getAsString()); } catch(Exception ignored) {}
+            vlist.add(new VRec(id, x, y, kind));
             result.maxX = Math.max(result.maxX, (int)Math.ceil(x));
             result.maxY = Math.max(result.maxY, (int)Math.ceil(y));
         }
@@ -2192,6 +2206,7 @@ public class CellDivisionInference implements PlugIn {
             }
             result.vertices.add(new Point((int)Math.round(vr.x), (int)Math.round(vr.y)));
             result.geometryVertices.add(new Point2D.Double(vr.x, vr.y));
+            result.vertexKinds.add(vr.kind);
             vIdToIndex.put(vr.id, result.vertices.size() - 1);
         }
 
@@ -2230,7 +2245,13 @@ public class CellDivisionInference implements PlugIn {
                     continue;
                 }
 
-                set.add(new LineEdge(a, b));
+                LineEdge edge=new LineEdge(a,b);
+                if(o.has("path") && o.get("path").isJsonArray()){
+                    for(JsonElement pe:o.getAsJsonArray("path")) if(pe.isJsonArray() && pe.getAsJsonArray().size()==2)
+                        edge.path.add(new Point2D.Double(pe.getAsJsonArray().get(0).getAsDouble(),pe.getAsJsonArray().get(1).getAsDouble()));
+                    edge.pathValid=(!o.has("pathValid") || o.get("pathValid").getAsBoolean()) && edge.path.size()>=2;
+                }
+                set.add(edge);
             }
 
             result.lines.addAll(set);
@@ -2376,6 +2397,8 @@ public class CellDivisionInference implements PlugIn {
             o.addProperty("id", i+1);
             o.addProperty("x", p.x);
             o.addProperty("y", p.y);
+            VertexKind kind=(i<vertexKinds.size())?vertexKinds.get(i):VertexKind.MANUAL_TOPOLOGICAL;
+            o.addProperty("kind", kind.name());
             vArr.add(o);
         }
         root.add("vertices", vArr);
@@ -2389,6 +2412,8 @@ public class CellDivisionInference implements PlugIn {
                 o.addProperty("id", lid++);
                 o.addProperty("startVertexId", e.v1 + 1);
                 o.addProperty("endVertexId", e.v2 + 1);
+                o.addProperty("pathValid", e.pathValid);
+                if(e.pathValid){ JsonArray path=new JsonArray(); for(Point2D.Double p:e.path){JsonArray q=new JsonArray();q.add(p.x);q.add(p.y);path.add(q);} o.add("path",path); }
                 lArr.add(o);
             }
             root.add("lines", lArr);
@@ -2874,23 +2899,64 @@ public class CellDivisionInference implements PlugIn {
                 if ((bp.get(x,y) & 0xff) == 0)
                     continue;
 
-                int c = 0;
-
-                for (int dy = -1; dy <= 1; dy++)
-                    for (int dx = -1; dx <= 1; dx++){
-
-                        if (dx == 0 && dy == 0) continue;
-
-                        if ((bp.get(x+dx,y+dy) & 0xff) != 0)
-                            c++;
-                    }
-
-                if (c == target)
+                final int[] rx={0,1,1,1,0,-1,-1,-1};
+                final int[] ry={-1,-1,0,1,1,1,0,-1};
+                boolean[] occupied=new boolean[8];
+                for(int k=0;k<8;k++) occupied[k]=(bp.get(x+rx[k],y+ry[k])&0xff)!=0;
+                int c=0;
+                for(int k=0;k<8;k++) if(!occupied[(k+7)%8] && occupied[k]) c++;
+                if (c >= target)
                     out.add(new Point(x,y));
             }
         }
 
         return out;
+    }
+
+    private static boolean[] exteriorBackground4(ByteProcessor bp){
+        int w=bp.getWidth(), h=bp.getHeight();
+        boolean[] exterior=new boolean[w*h];
+        ArrayDeque<Integer> queue=new ArrayDeque<>();
+        for(int x=0;x<w;x++){ enqueueExterior(bp,x,0,exterior,queue); enqueueExterior(bp,x,h-1,exterior,queue); }
+        for(int y=0;y<h;y++){ enqueueExterior(bp,0,y,exterior,queue); enqueueExterior(bp,w-1,y,exterior,queue); }
+        final int[] dx={1,0,-1,0}, dy={0,1,0,-1};
+        while(!queue.isEmpty()){
+            int index=queue.removeFirst(), x=index%w, y=index/w;
+            for(int k=0;k<4;k++){int nx=x+dx[k],ny=y+dy[k];if(nx>=0&&ny>=0&&nx<w&&ny<h)enqueueExterior(bp,nx,ny,exterior,queue);}
+        }
+        return exterior;
+    }
+
+    private static void enqueueExterior(ByteProcessor bp,int x,int y,boolean[] exterior,ArrayDeque<Integer> queue){
+        int index=y*bp.getWidth()+x;
+        if(!exterior[index] && (bp.get(x,y)&0xff)==0){exterior[index]=true;queue.addLast(index);}
+    }
+
+    private static boolean isOuterBoundaryPoint(Point p,boolean[] exterior,int w,int h){
+        final int[] dx={1,0,-1,0},dy={0,1,0,-1};
+        for(int k=0;k<4;k++){int x=p.x+dx[k],y=p.y+dy[k];if(x>=0&&y>=0&&x<w&&y<h&&exterior[y*w+x])return true;}
+        return false;
+    }
+
+    private static double outerVertexSpacingThreshold(int w,int h){
+        double characteristicSize=FALLBACK_SIZE_DIAGONAL_FRACTION*Math.hypot(w,h);
+        return Math.max(MIN_OUTER_VERTEX_SPACING_PX,OUTER_VERTEX_SPACING_SCALE_FRACTION*characteristicSize);
+    }
+
+    private static List<Point> suppressNearbyOuterVertices(List<Point> candidates,ByteProcessor bp){
+        boolean[] exterior=exteriorBackground4(bp); int w=bp.getWidth(),h=bp.getHeight();
+        double spacing=outerVertexSpacingThreshold(w,h), spacing2=spacing*spacing;
+        ArrayList<Point> accepted=new ArrayList<>();
+        for(Point candidate:candidates){
+            if(!isOuterBoundaryPoint(candidate,exterior,w,h)){accepted.add(candidate);continue;}
+            boolean tooClose=false;
+            for(Point prior:accepted) if(isOuterBoundaryPoint(prior,exterior,w,h)){
+                double dx=candidate.x-prior.x,dy=candidate.y-prior.y;
+                if(dx*dx+dy*dy<spacing2){tooClose=true;break;}
+            }
+            if(!tooClose)accepted.add(candidate); // scan order is the deterministic tie-break
+        }
+        return accepted;
     }
 
     private static List<Point> clusterPoints(List<Point> pts, double r){
@@ -2960,8 +3026,14 @@ public class CellDivisionInference implements PlugIn {
 
             List<Point> raw=findPixelsWithNeighborCount(bp,3);
             List<Point> clustered=clusterPoints(raw,2.0);
+            clustered=suppressNearbyOuterVertices(clustered,bp);
 
             vertexPoints=clustered;
+            vertexGeometryPoints=new ArrayList<>();
+            vertexKinds=new ArrayList<>();
+            boolean[] exterior=exteriorBackground4(bp);
+            for(Point p:clustered){ vertexGeometryPoints.add(new Point2D.Double(p.x,p.y));
+                vertexKinds.add(isOuterBoundaryPoint(p,exterior,bp.getWidth(),bp.getHeight())?VertexKind.BOUNDARY_JUNCTION:VertexKind.INTERIOR_JUNCTION); }
 
             lineEdges.clear();
             polygons.clear();
@@ -4221,8 +4293,8 @@ public class CellDivisionInference implements PlugIn {
         double solA = solidityForPolygon(idsA);                // Qt: area / convexHullArea, invalid -> -1
         double solB = solidityForPolygon(idsB);
 
-        double vCountA = (double) idsA.size();
-        double vCountB = (double) idsB.size();
+        double vCountA = idsA.stream().filter(i -> i < 0 || i >= vertexKinds.size() || vertexKinds.get(i) != VertexKind.CONTOUR_SUPPORT).count();
+        double vCountB = idsB.stream().filter(i -> i < 0 || i >= vertexKinds.size() || vertexKinds.get(i) != VertexKind.CONTOUR_SUPPORT).count();
 
         // Qt avgSqrtArea = 0.5*(sqrt(areaA)+sqrt(areaB))
         double avgSqrtArea = 0.5 * (Math.sqrt(areaA) + Math.sqrt(areaB));

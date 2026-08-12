@@ -45,6 +45,39 @@ VertexItem::VertexItem(int id, const QPointF &pos, qreal radius) : m_id(id),m_ra
     setZValue(10);
 }
 
+QString VertexItem::kindName(Kind k)
+{
+    switch (k) {
+    case Kind::InteriorJunction: return "INTERIOR_JUNCTION";
+    case Kind::BoundaryJunction: return "BOUNDARY_JUNCTION";
+    case Kind::ContourSupport: return "CONTOUR_SUPPORT";
+    case Kind::Ambiguous: return "AMBIGUOUS";
+    default: return "MANUAL_TOPOLOGICAL";
+    }
+}
+
+VertexItem::Kind VertexItem::kindFromName(const QString &s)
+{
+    if (s == "INTERIOR_JUNCTION") return Kind::InteriorJunction;
+    if (s == "BOUNDARY_JUNCTION") return Kind::BoundaryJunction;
+    if (s == "CONTOUR_SUPPORT") return Kind::ContourSupport;
+    if (s == "AMBIGUOUS") return Kind::Ambiguous;
+    return Kind::ManualTopological;
+}
+
+void VertexItem::setKind(Kind kind)
+{
+    m_kind = kind;
+    if (kind == Kind::ContourSupport) {
+        m_radius = 1.5;
+        setRect(-m_radius, -m_radius, 2*m_radius, 2*m_radius);
+        setBrush(Qt::NoBrush);
+        setPen(QPen(QColor(0xaaffff), 1.0));
+    } else {
+        applyCurrentStyle();
+    }
+}
+
 void VertexItem::updateLabelPos(){
     if (!m_label) return;
 

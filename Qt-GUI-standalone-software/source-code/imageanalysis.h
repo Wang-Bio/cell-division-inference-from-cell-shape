@@ -7,6 +7,13 @@
 
 namespace ImageAnalysis {
 
+// Minimum separation used by both automatic boundary-junction and contour-
+// support placement.  The scale term is 0.10*S, where the no-face fallback
+// S is 0.05 of the image diagonal.
+constexpr double kMinimumOuterVertexSpacingPixels = 5.0;
+constexpr double kOuterVertexSpacingScaleFraction = 0.10;
+constexpr double kFallbackCharacteristicSizeDiagonalFraction = 0.05;
+
 struct LineConnection {
     int startVertexIndex = -1;
     int endVertexIndex = -1;
@@ -48,6 +55,14 @@ cv::Mat segmentWithGuoHall(const cv::Mat &input, double threshold = -1.0, bool i
 // Expects a single-channel (CV_8UC1) skeleton image where foreground pixels are non-zero.
 // Returns zero-based pixel coordinates for each detected vertex.
 std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage);
+
+// Trace the skeleton/exterior interface deterministically (4-connected exterior,
+// 8-connected wall) and return RDP contour supports.  Empty means that the
+// outline is open, frame-truncated, or otherwise unreliable.
+std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &skeletonImage,
+                                                   std::string *warning = nullptr);
+bool isOuterBoundaryPoint(const cv::Mat &skeletonImage, const cv::Point2d &point);
+double outerVertexSpacingThreshold(const cv::Size &imageSize, double characteristicSize = -1.0);
 
 // Detect lines along the skeleton that connect clustered vertices. Starting from each
 // vertex (with a tolerance radius of 1 pixel), track along the skeleton in every
