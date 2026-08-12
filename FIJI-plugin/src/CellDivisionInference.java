@@ -164,6 +164,8 @@ public class CellDivisionInference implements PlugIn {
     private static final double MIN_OUTER_VERTEX_SPACING_PX = 2.0;
     private static final double OUTER_VERTEX_SPACING_SCALE_FRACTION = 0.04;
     private static final double FALLBACK_SIZE_DIAGONAL_FRACTION = 0.05;
+    private static final double INTERNAL_VOID_MEDIAN_AREA_FACTOR = 4.0;
+    private static final int MIN_INTERNAL_VOID_AREA_PX = 16;
 
     // ===== Lines =====
     static class LineEdge {
@@ -2998,23 +3000,35 @@ public class CellDivisionInference implements PlugIn {
         return branches;
     }
 
+    // Return frame-connected background plus enclosed components that are much
+    // larger than a typical cell face. Those components are tissue voids and
+    // their perimeters should behave like the exterior tissue perimeter.
     private static boolean[] exteriorBackground4(ByteProcessor bp){
         int w=bp.getWidth(), h=bp.getHeight();
-        boolean[] exterior=new boolean[w*h];
+        int[] labels=new int[w*h]; Arrays.fill(labels,-1);
+        ArrayList<Integer> areas=new ArrayList<>();
+        ArrayList<Boolean> frameConnected=new ArrayList<>();
         ArrayDeque<Integer> queue=new ArrayDeque<>();
-        for(int x=0;x<w;x++){ enqueueExterior(bp,x,0,exterior,queue); enqueueExterior(bp,x,h-1,exterior,queue); }
-        for(int y=0;y<h;y++){ enqueueExterior(bp,0,y,exterior,queue); enqueueExterior(bp,w-1,y,exterior,queue); }
         final int[] dx={1,0,-1,0}, dy={0,1,0,-1};
-        while(!queue.isEmpty()){
-            int index=queue.removeFirst(), x=index%w, y=index/w;
-            for(int k=0;k<4;k++){int nx=x+dx[k],ny=y+dy[k];if(nx>=0&&ny>=0&&nx<w&&ny<h)enqueueExterior(bp,nx,ny,exterior,queue);}
+        for(int seed=0;seed<w*h;seed++){
+            if(labels[seed]>=0||(bp.get(seed%w,seed/w)&0xff)!=0)continue;
+            int label=areas.size(),area=0;boolean frame=false;
+            labels[seed]=label;queue.add(seed);
+            while(!queue.isEmpty()){
+                int index=queue.removeFirst(),x=index%w,y=index/w;area++;
+                frame|=x==0||y==0||x==w-1||y==h-1;
+                for(int k=0;k<4;k++){int nx=x+dx[k],ny=y+dy[k];if(nx>=0&&ny>=0&&nx<w&&ny<h){int next=ny*w+nx;if(labels[next]<0&&(bp.get(nx,ny)&0xff)==0){labels[next]=label;queue.add(next);}}}
+            }
+            areas.add(area);frameConnected.add(frame);
         }
+        ArrayList<Integer> enclosed=new ArrayList<>();
+        for(int i=0;i<areas.size();i++)if(!frameConnected.get(i))enclosed.add(areas.get(i));
+        Collections.sort(enclosed);
+        double median=enclosed.isEmpty()?0.0:enclosed.get(enclosed.size()/2);
+        double voidArea=Math.max(MIN_INTERNAL_VOID_AREA_PX,INTERNAL_VOID_MEDIAN_AREA_FACTOR*median);
+        boolean[] exterior=new boolean[w*h];
+        for(int i=0;i<labels.length;i++){int label=labels[i];exterior[i]=label>=0&&(frameConnected.get(label)||(median>0.0&&areas.get(label)>=voidArea));}
         return exterior;
-    }
-
-    private static void enqueueExterior(ByteProcessor bp,int x,int y,boolean[] exterior,ArrayDeque<Integer> queue){
-        int index=y*bp.getWidth()+x;
-        if(!exterior[index] && (bp.get(x,y)&0xff)==0){exterior[index]=true;queue.addLast(index);}
     }
 
     private static boolean isOuterBoundaryPoint(Point p,boolean[] exterior,int w,int h){

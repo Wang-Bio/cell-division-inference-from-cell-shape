@@ -13,6 +13,12 @@ namespace ImageAnalysis {
 constexpr double kMinimumOuterVertexSpacingPixels = 2.0;
 constexpr double kOuterVertexSpacingScaleFraction = 0.04;
 constexpr double kFallbackCharacteristicSizeDiagonalFraction = 0.05;
+// An enclosed background component is treated as a tissue void, rather than a
+// normal cell face, when it is at least this many times the median enclosed
+// face area. This lets internal void perimeters participate in outer-boundary
+// vertex detection without classifying every cell wall as an outer boundary.
+constexpr double kInternalVoidMedianAreaFactor = 4.0;
+constexpr int kMinimumInternalVoidAreaPixels = 16;
 
 struct LineConnection {
     int startVertexIndex = -1;
@@ -58,10 +64,9 @@ cv::Mat segmentWithGuoHall(const cv::Mat &input, double threshold = -1.0, bool i
 // Returns zero-based pixel coordinates for each detected vertex.
 std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage);
 
-// Trace each disconnected foreground network as an independent outer polygon
-// and return its simplified contour supports. Internal wall junctions do not
-// invalidate a contour, and a frame-truncated or tiny network is skipped
-// without discarding supports from other valid networks.
+// Trace each disconnected foreground network and return simplified contour
+// supports for both its exterior and any unusually large enclosed background
+// components (tissue voids). Ordinary cell faces are excluded.
 std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &skeletonImage,
                                                    std::string *warning = nullptr);
 bool isOuterBoundaryPoint(const cv::Mat &skeletonImage, const cv::Point2d &point);

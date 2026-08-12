@@ -434,21 +434,41 @@ std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage) {
 }
 
 namespace {
-cv::Mat exteriorMask(const cv::Mat &s)
+cv::Mat boundaryBackgroundMask(const cv::Mat &s)
 {
-    cv::Mat exterior(s.size(), CV_8UC1, cv::Scalar(0));
-    std::deque<cv::Point> queue;
-    auto add=[&](int x,int y){if(s.at<uchar>(y,x)==0&&!exterior.at<uchar>(y,x)){exterior.at<uchar>(y,x)=1;queue.emplace_back(x,y);}};
-    for(int x=0;x<s.cols;++x){add(x,0);add(x,s.rows-1);} for(int y=0;y<s.rows;++y){add(0,y);add(s.cols-1,y);}
-    const int d[4][2]={{1,0},{0,1},{-1,0},{0,-1}};
-    while(!queue.empty()){cv::Point p=queue.front();queue.pop_front();for(auto &o:d){int x=p.x+o[0],y=p.y+o[1];if(x>=0&&y>=0&&x<s.cols&&y<s.rows)add(x,y);}}
-    return exterior;
+    cv::Mat background;
+    cv::compare(s, 0, background, cv::CMP_EQ);
+    cv::Mat labels, stats, centroids;
+    const int count=cv::connectedComponentsWithStats(background,labels,stats,centroids,4);
+    std::vector<bool> frame(count,false);
+    const auto markFrame=[&](int x,int y){const int label=labels.at<int>(y,x);if(label>0)frame[label]=true;};
+    for(int x=0;x<s.cols;++x){markFrame(x,0);markFrame(x,s.rows-1);}
+    for(int y=0;y<s.rows;++y){markFrame(0,y);markFrame(s.cols-1,y);}
+
+    std::vector<int> enclosedAreas;
+    for(int label=1;label<count;++label)
+        if(!frame[label]) enclosedAreas.push_back(stats.at<int>(label,cv::CC_STAT_AREA));
+    double median=0.0;
+    if(!enclosedAreas.empty()){
+        const auto middle=enclosedAreas.begin()+enclosedAreas.size()/2;
+        std::nth_element(enclosedAreas.begin(),middle,enclosedAreas.end());
+        median=*middle;
+    }
+    const double voidArea=std::max(double(kMinimumInternalVoidAreaPixels),
+                                   kInternalVoidMedianAreaFactor*median);
+    std::vector<bool> accepted(count,false);
+    for(int label=1;label<count;++label)
+        accepted[label]=frame[label]||(!frame[label]&&median>0.0&&stats.at<int>(label,cv::CC_STAT_AREA)>=voidArea);
+    cv::Mat result(s.size(),CV_8UC1,cv::Scalar(0));
+    for(int y=0;y<s.rows;++y)for(int x=0;x<s.cols;++x)
+        if(accepted[labels.at<int>(y,x)]) result.at<uchar>(y,x)=1;
+    return result;
 }
 }
 
 bool isOuterBoundaryPoint(const cv::Mat &s,const cv::Point2d &point)
 {
-    cv::Mat ex=exteriorMask(s); int x=cvRound(point.x),y=cvRound(point.y); if(x<0||y<0||x>=s.cols||y>=s.rows)return false;
+    cv::Mat ex=boundaryBackgroundMask(s); int x=cvRound(point.x),y=cvRound(point.y); if(x<0||y<0||x>=s.cols||y>=s.rows)return false;
     const int d[4][2]={{1,0},{0,1},{-1,0},{0,-1}}; for(auto&o:d){int nx=x+o[0],ny=y+o[1];if(nx>=0&&ny>=0&&nx<s.cols&&ny<s.rows&&ex.at<uchar>(ny,nx))return true;} return false;
 }
 
@@ -465,14 +485,12 @@ std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &s,std::string 
 {
     CV_Assert(s.type()==CV_8UC1);
     if(warning) warning->clear();
-    cv::Mat foreground;
-    cv::compare(s,0,foreground,cv::CMP_GT);
+    const cv::Mat acceptedBackground=boundaryBackgroundMask(s);
     std::vector<std::vector<cv::Point>> contours;
-    // RETR_EXTERNAL deliberately returns one contour for each disconnected
-    // tissue lobe. Unlike walking exterior-adjacent skeleton pixels, OpenCV's
-    // border follower is not confused by branches where internal cell walls
-    // meet a lobe's perimeter.
-    cv::findContours(foreground,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_NONE);
+    // The accepted-background mask contains the frame-connected exterior and
+    // only abnormally large enclosed faces, so ordinary cells cannot generate
+    // contour supports here.
+    cv::findContours(acceptedBackground,contours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE);
 
     std::vector<cv::Point2d> out;
     int skippedFrame=0,skippedSmall=0;
@@ -485,6 +503,9 @@ std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &s,std::string 
                 break;
             }
         }
+        // For the exterior background findContours returns both the image-frame
+        // edge and the tissue-facing edge. Discard only the former; internal
+        // void contours never touch the frame and remain eligible.
         if(touchesFrame){++skippedFrame;continue;}
 
         // Scale simplification per lobe. A very large or distant second lobe
