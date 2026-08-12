@@ -161,8 +161,8 @@ public class CellDivisionInference implements PlugIn {
     private List<VertexKind> vertexKinds = new ArrayList<>();
     // Keep automatic exterior vertices far enough apart that single-pixel
     // contour noise cannot become an angle-defining topological change.
-    private static final double MIN_OUTER_VERTEX_SPACING_PX = 5.0;
-    private static final double OUTER_VERTEX_SPACING_SCALE_FRACTION = 0.10;
+    private static final double MIN_OUTER_VERTEX_SPACING_PX = 2.0;
+    private static final double OUTER_VERTEX_SPACING_SCALE_FRACTION = 0.04;
     private static final double FALLBACK_SIZE_DIAGONAL_FRACTION = 0.05;
 
     // ===== Lines =====
@@ -3119,86 +3119,49 @@ public class CellDivisionInference implements PlugIn {
             // For each skeleton pixel, store which vertex index it belongs to (within hitRadius), else -1.
             int[] vertexAtPixel = buildVertexAtPixelMap(bp, verts, hitRadius);
 
-            HashSet<Long> visitedPixelEdges = new HashSet<>();
+            // Grow every vertex label through the skeleton simultaneously. A vertex
+            // is an absorbing source, so a route cannot cross it and connect to a
+            // distant vertex. Meeting wave fronts still recover valid branches that
+            // remain connected immediately outside the small vertex neighbourhood.
+            int[] owner = vertexAtPixel.clone();
+            int[] distance = new int[w*h];
+            Arrays.fill(distance, Integer.MAX_VALUE);
+            ArrayDeque<Integer> queue = new ArrayDeque<>();
+            for(int pixel=0; pixel<owner.length; pixel++){
+                if(owner[pixel] >= 0){
+                    distance[pixel] = 0;
+                    queue.addLast(pixel);
+                }
+            }
+
+            HashMap<Long, Integer> bestEdgeLength = new HashMap<>();
             HashSet<LineEdge> edges = new HashSet<>();
+            while(!queue.isEmpty()){
+                int cur = queue.removeFirst();
+                int cx = cur % w;
+                int cy = cur / w;
 
-            for(int vi=0; vi<verts.size(); vi++){
-
-                Point v = verts.get(vi);
-
-                // If vertex coordinates can be out of bounds (rare), guard:
-                if(v.x < 0 || v.y < 0 || v.x >= w || v.y >= h) continue;
-
-                int vIdx = v.y*w + v.x;
-
-                // Start from each adjacent skeleton pixel
                 for(int dy=-1; dy<=1; dy++)
                 for(int dx=-1; dx<=1; dx++){
-
                     if(dx==0 && dy==0) continue;
+                    int nx = cx + dx;
+                    int ny = cy + dy;
+                    if(nx<0 || ny<0 || nx>=w || ny>=h || bp.get(nx,ny)==0) continue;
+                    int next = ny*w + nx;
 
-                    int sx = v.x + dx;
-                    int sy = v.y + dy;
-
-                    if(sx<0 || sy<0 || sx>=w || sy>=h) continue;
-                    if(bp.get(sx,sy)==0) continue;
-
-                    int sIdx = sy*w + sx;
-
-                    // If we already explored this edge, skip
-                    if(wasVisited(visitedPixelEdges, vIdx, sIdx)) continue;
-
-                    // DFS stack items: (prevIdx, curIdx)
-                    ArrayDeque<int[]> stack = new ArrayDeque<>();
-                    stack.push(new int[]{vIdx, sIdx});
-
-                    while(!stack.isEmpty()){
-
-                        int[] state = stack.pop();
-                        int prev = state[0];
-                        int cur  = state[1];
-
-                        if(wasVisited(visitedPixelEdges, prev, cur)) continue;
-
-                        addVisited(visitedPixelEdges, prev, cur);
-
-                        // If current pixel is mapped to a vertex (not itself), we found an edge
-                        int foundVertex = vertexAtPixel[cur];
-                        if(foundVertex >= 0 && foundVertex != vi){
-                            edges.add(new LineEdge(vi, foundVertex));
-                            continue;
-                        }
-
-                        int cx = cur % w;
-                        int cy = cur / w;
-
-                        // Explore all skeleton neighbors (no greedy first-choice)
-                        for(int ndy=-1; ndy<=1; ndy++)
-                        for(int ndx=-1; ndx<=1; ndx++){
-
-                            if(ndx==0 && ndy==0) continue;
-
-                            int nx = cx + ndx;
-                            int ny = cy + ndy;
-
-                            if(nx<0 || ny<0 || nx>=w || ny>=h) continue;
-
-                            int nIdx = ny*w + nx;
-
-                            if(nIdx == prev) continue;
-
-                            // If neighbor is a vertex pixel, connect immediately
-                            int neighborVertex = vertexAtPixel[nIdx];
-                            if(neighborVertex >= 0 && neighborVertex != vi){
-                                edges.add(new LineEdge(vi, neighborVertex));
-                                addVisited(visitedPixelEdges, cur, nIdx);
-                                continue;
-                            }
-
-                            if(bp.get(nx,ny)==0) continue;
-                            if(wasVisited(visitedPixelEdges, cur, nIdx)) continue;
-
-                            stack.push(new int[]{cur, nIdx});
+                    if(owner[next] < 0){
+                        owner[next] = owner[cur];
+                        distance[next] = distance[cur] + 1;
+                        queue.addLast(next);
+                    } else if(owner[next] != owner[cur]){
+                        int first = Math.min(owner[cur], owner[next]);
+                        int second = Math.max(owner[cur], owner[next]);
+                        long key = edgeKey(first, second);
+                        int length = distance[cur] + distance[next] + 1;
+                        Integer previousLength = bestEdgeLength.get(key);
+                        if(previousLength == null || length < previousLength){
+                            bestEdgeLength.put(key, length);
+                            edges.add(new LineEdge(first, second));
                         }
                     }
                 }
@@ -3211,14 +3174,6 @@ public class CellDivisionInference implements PlugIn {
         }).start();
     }
 
-    private static void addVisited(HashSet<Long> visited, int fromIdx, int toIdx){
-        visited.add(edgeKey(fromIdx,toIdx));
-        visited.add(edgeKey(toIdx,fromIdx));
-    }
-
-    private static boolean wasVisited(HashSet<Long> visited, int fromIdx, int toIdx){
-        return visited.contains(edgeKey(fromIdx,toIdx));
-    }
 
     /**
      * Build a lookup table: for each skeleton pixel, which vertex index is within hitRadius (closest d^2 wins).
@@ -3235,8 +3190,6 @@ public class CellDivisionInference implements PlugIn {
         Arrays.fill(vertexAt, -1);
         Arrays.fill(bestD2, Integer.MAX_VALUE);
 
-        int r2 = hitRadius * hitRadius;
-
         for(int i=0; i<vertices.size(); i++){
 
             Point v = vertices.get(i);
@@ -3245,8 +3198,7 @@ public class CellDivisionInference implements PlugIn {
             for(int dx=-hitRadius; dx<=hitRadius; dx++){
 
                 int d2 = dx*dx + dy*dy;
-                if(d2 > r2) continue;
-
+                if(d2 > hitRadius * hitRadius) continue;
                 int x = v.x + dx;
                 int y = v.y + dy;
 

@@ -8,10 +8,10 @@
 namespace ImageAnalysis {
 
 // Minimum separation used by both automatic boundary-junction and contour-
-// support placement.  The scale term is 0.10*S, where the no-face fallback
+// support placement.  The scale term is 0.08*S, where the no-face fallback
 // S is 0.05 of the image diagonal.
-constexpr double kMinimumOuterVertexSpacingPixels = 5.0;
-constexpr double kOuterVertexSpacingScaleFraction = 0.10;
+constexpr double kMinimumOuterVertexSpacingPixels = 2.0;
+constexpr double kOuterVertexSpacingScaleFraction = 0.04;
 constexpr double kFallbackCharacteristicSizeDiagonalFraction = 0.05;
 
 struct LineConnection {
@@ -67,11 +67,9 @@ std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &skeletonImage,
 bool isOuterBoundaryPoint(const cv::Mat &skeletonImage, const cv::Point2d &point);
 double outerVertexSpacingThreshold(const cv::Size &imageSize, double characteristicSize = -1.0);
 
-// Detect lines along the skeleton that connect clustered vertices. Starting from each
-// vertex (with a tolerance radius of 1 pixel), track along the skeleton in every
-// possible direction. When the traversal reaches another vertex within the tolerance,
-// a connection between the two vertices is reported along with the traversed path.
-// Each undirected connection is reported once.
+// Detect neighboring vertices with a multi-source traversal of the skeleton. Vertex
+// labels act as barriers, while meeting wave fronts identify adjacent outline segments.
+// Each undirected connection is reported once with its ordered skeleton path.
 std::vector<LineConnection> detectLines(const cv::Mat &skeletonImage, const std::vector<cv::Point> &vertices, int tolerance = 1);
 
 // Detect polygons by walking connected edges counterclockwise. Vertices are

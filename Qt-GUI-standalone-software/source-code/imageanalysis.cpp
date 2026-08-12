@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <opencv2/imgproc.hpp>
 #include <set>
+#include <map>
 #include <tuple>
 #include <cmath>
 #include <limits>
@@ -517,140 +518,108 @@ std::vector<LineConnection> detectLines(const cv::Mat &skeletonImage,
     if (rows == 0 || cols == 0 || vertices.size() < 2)
         return {};
 
-    const int tolSquared = tolerance * tolerance;
-    const int neighborOffsets[8][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1},
-                                       {0, 1},  {1, -1}, {1, 0},  {1, 1}};
-
-    auto vertexIndexAt = [&vertices, tolSquared](const cv::Point &p) -> int {
-        for (std::size_t i = 0; i < vertices.size(); ++i) {
-            const int dx = vertices[i].x - p.x;
-            const int dy = vertices[i].y - p.y;
-            if (dx * dx + dy * dy <= tolSquared)
-                return static_cast<int>(i);
-        }
-        return -1;
-    };
-
-    struct PointPairLess {
-        bool operator()(const std::pair<cv::Point, cv::Point> &a,
-                        const std::pair<cv::Point, cv::Point> &b) const {
-            return std::tie(a.first.y, a.first.x, a.second.y, a.second.x) <
-                   std::tie(b.first.y, b.first.x, b.second.y, b.second.x);
-        }
-    };
-
-    struct EdgeLess {
-        bool operator()(const std::pair<int, int> &a, const std::pair<int, int> &b) const {
-            return a < b;
-        }
-    };
-
-    std::set<std::pair<cv::Point, cv::Point>, PointPairLess> visitedPixelEdges;
-    std::set<std::pair<int, int>, EdgeLess> reportedVertexEdges;
-    std::vector<LineConnection> connections;
-
-    auto addVisited = [&visitedPixelEdges](const cv::Point &from, const cv::Point &to) {
-        visitedPixelEdges.insert({from, to});
-        visitedPixelEdges.insert({to, from});
-    };
-
-    auto wasVisited = [&visitedPixelEdges](const cv::Point &from, const cv::Point &to) {
-        return visitedPixelEdges.find({from, to}) != visitedPixelEdges.end();
-    };
-
-    for (std::size_t vIdx = 0; vIdx < vertices.size(); ++vIdx) {
-        const cv::Point &vertex = vertices[vIdx];
-        for (const auto &offset : neighborOffsets) {
-            cv::Point next(vertex.x + offset[1], vertex.y + offset[0]);
-            if (next.x < 0 || next.x >= cols || next.y < 0 || next.y >= rows)
-                continue;
-
-            if (skeletonImage.at<uchar>(next) == 0)
-                continue;
-
-            if (wasVisited(vertex, next))
-                continue;
-
-            struct WalkState {
-                cv::Point prev;
-                cv::Point current;
-                std::vector<cv::Point> path;
-            };
-
-            std::vector<WalkState> stack;
-            stack.push_back({vertex, next, {vertex, next}});
-
-            while (!stack.empty()) {
-                WalkState state = stack.back();
-                stack.pop_back();
-
-                const cv::Point &prev = state.prev;
-                const cv::Point &current = state.current;
-                std::vector<cv::Point> path = state.path;
-
-                if (wasVisited(prev, current))
+    // Grow all vertex labels through the skeleton at the same time.  A vertex
+    // is an absorbing source: a route cannot pass through it and continue to a
+    // distant vertex.  Unlike connected-component filtering, wave fronts can
+    // still distinguish several legitimate arms that remain 8-connected just
+    // outside a small junction neighbourhood.
+    cv::Mat owner(rows, cols, CV_32SC1, cv::Scalar(-1));
+    cv::Mat distance(rows, cols, CV_32SC1, cv::Scalar(std::numeric_limits<int>::max()));
+    cv::Mat parent(rows, cols, CV_32SC2, cv::Scalar(-1, -1));
+    std::deque<cv::Point> queue;
+    const int radius = std::max(1, tolerance);
+    const int radiusSquared = radius * radius;
+    for (std::size_t index = 0; index < vertices.size(); ++index) {
+        const cv::Point &vertex = vertices[index];
+        for (int dy = -radius; dy <= radius; ++dy) {
+            for (int dx = -radius; dx <= radius; ++dx) {
+                const int x = vertex.x + dx;
+                const int y = vertex.y + dy;
+                const int d2 = dx * dx + dy * dy;
+                if (d2 > radiusSquared || x < 0 || y < 0 || x >= cols || y >= rows
+                    || skeletonImage.at<uchar>(y, x) == 0 || d2 >= distance.at<int>(y, x))
                     continue;
+                owner.at<int>(y, x) = static_cast<int>(index);
+                distance.at<int>(y, x) = 0;
+            }
+        }
+    }
+    for (int y = 0; y < rows; ++y)
+        for (int x = 0; x < cols; ++x)
+            if (owner.at<int>(y, x) >= 0)
+                queue.emplace_back(x, y);
 
-                addVisited(prev, current);
-                const int foundVertex = vertexIndexAt(current);
-                if (foundVertex >= 0 && foundVertex != static_cast<int>(vIdx)) {
-                    const int a = static_cast<int>(vIdx);
-                    const int b = foundVertex;
-                    const std::pair<int, int> edgeKey = a < b ? std::make_pair(a, b) : std::make_pair(b, a);
+    struct Candidate {
+        int length = std::numeric_limits<int>::max();
+        cv::Point firstMeeting;
+        cv::Point secondMeeting;
+    };
+    std::map<std::pair<int, int>, Candidate> candidates;
+    const int offsets[8][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1},
+                               {0, 1},  {1, -1},  {1, 0},  {1, 1}};
+    while (!queue.empty()) {
+        const cv::Point current = queue.front();
+        queue.pop_front();
+        const int currentOwner = owner.at<int>(current);
+        for (const auto &offset : offsets) {
+            const cv::Point next(current.x + offset[1], current.y + offset[0]);
+            if (next.x < 0 || next.y < 0 || next.x >= cols || next.y >= rows
+                || skeletonImage.at<uchar>(next) == 0)
+                continue;
+            int &nextOwner = owner.at<int>(next);
+            if (nextOwner < 0) {
+                nextOwner = currentOwner;
+                distance.at<int>(next) = distance.at<int>(current) + 1;
+                parent.at<cv::Vec2i>(next) = cv::Vec2i(current.x, current.y);
+                queue.push_back(next);
+                continue;
+            }
+            if (nextOwner == currentOwner)
+                continue;
 
-                    if (reportedVertexEdges.insert(edgeKey).second) {
-                        connections.push_back({a, b, path});
-                    }
-                    continue;
-                }
-
-                for (const auto &innerOffset : neighborOffsets) {
-                    cv::Point neighbor(current.x + innerOffset[1], current.y + innerOffset[0]);
-                    if (neighbor.x < 0 || neighbor.x >= cols || neighbor.y < 0 || neighbor.y >= rows)
-                        continue;
-
-                    if (neighbor == prev)
-                        continue;
-
-                    // If the next point is already within tolerance of a vertex, treat it as the
-                    // ending vertex even if the skeleton does not extend exactly to that pixel.
-                    const int neighborVertex = vertexIndexAt(neighbor);
-                    if (neighborVertex >= 0 && neighborVertex != static_cast<int>(vIdx)) {
-                        const int a = static_cast<int>(vIdx);
-                        const int b = neighborVertex;
-                        const std::pair<int, int> edgeKey =
-                            a < b ? std::make_pair(a, b) : std::make_pair(b, a);
-
-                        if (reportedVertexEdges.insert(edgeKey).second) {
-                            std::vector<cv::Point> finalPath = path;
-                            if (finalPath.empty() || finalPath.back() != current)
-                                finalPath.push_back(current);
-                            finalPath.push_back(neighbor);
-
-                            connections.push_back({a, b, std::move(finalPath)});
-                        }
-
-                        addVisited(current, neighbor);
-                        continue;
-                    }
-
-                    if (skeletonImage.at<uchar>(neighbor) == 0)
-                        continue;
-
-                    if (wasVisited(current, neighbor))
-                        continue;
-
-                    std::vector<cv::Point> nextPath = path;
-                    if (nextPath.empty() || nextPath.back() != current)
-                        nextPath.push_back(current);
-                    nextPath.push_back(neighbor);
-
-                    stack.push_back({current, neighbor, std::move(nextPath)});
+            const auto key = std::minmax(currentOwner, nextOwner);
+            const int length = distance.at<int>(current) + distance.at<int>(next) + 1;
+            Candidate &candidate = candidates[key];
+            if (length < candidate.length) {
+                candidate.length = length;
+                if (currentOwner == key.first) {
+                    candidate.firstMeeting = current;
+                    candidate.secondMeeting = next;
+                } else {
+                    candidate.firstMeeting = next;
+                    candidate.secondMeeting = current;
                 }
             }
         }
     }
 
+    auto pathToSource = [&parent](cv::Point point) {
+        std::vector<cv::Point> path;
+        while (point.x >= 0 && point.y >= 0) {
+            path.push_back(point);
+            const cv::Vec2i previous = parent.at<cv::Vec2i>(point);
+            point = cv::Point(previous[0], previous[1]);
+        }
+        return path;
+    };
+
+    std::vector<LineConnection> connections;
+    connections.reserve(candidates.size());
+    for (const auto &entry : candidates) {
+        const int first = entry.first.first;
+        const int second = entry.first.second;
+        std::vector<cv::Point> firstHalf = pathToSource(entry.second.firstMeeting);
+        std::reverse(firstHalf.begin(), firstHalf.end());
+        std::vector<cv::Point> secondHalf = pathToSource(entry.second.secondMeeting);
+
+        std::vector<cv::Point> path;
+        path.reserve(firstHalf.size() + secondHalf.size() + 2);
+        path.push_back(vertices[first]);
+        path.insert(path.end(), firstHalf.begin(), firstHalf.end());
+        path.insert(path.end(), secondHalf.begin(), secondHalf.end());
+        path.push_back(vertices[second]);
+        connections.push_back({first, second, std::move(path)});
+    }
     return connections;
 }
 
