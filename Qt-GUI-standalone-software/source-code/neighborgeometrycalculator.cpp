@@ -652,11 +652,16 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
         for (const QPolygonF &p : polygons)
             combined << p;
 
+        // d_U = (A_hull,U - A_U) / ((A_1 + A_2) / 2). For neighboring cells
+        // with disjoint interiors, the denominator also equals A_U / 2.
         const double meanAreaOfTwoCells = 0.5 * (areaA + areaB);
-        if (!combined.isEmpty() && meanAreaOfTwoCells > 0.0) {
+        if (!combined.isEmpty() && meanAreaOfTwoCells > 0.0 && std::isfinite(unionArea)) {
             const double hullArea = polygonArea(convexHull(combined));
-            if (hullArea > 0.0)
-                result.unionConvexDeficiency = (hullArea - unionArea) / meanAreaOfTwoCells;
+            if (hullArea > 0.0) {
+                // A hull cannot be smaller than its union; suppress only floating-point roundoff.
+                const double convexDeficiencyArea = std::max(0.0, hullArea - unionArea);
+                result.unionConvexDeficiency = convexDeficiencyArea / meanAreaOfTwoCells;
+            }
         }
     }
 

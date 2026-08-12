@@ -397,7 +397,7 @@ QVector<DivisionEstimator::FeatureOption> DivisionEstimator::featureOptions()
     options.append({"centroidDistance", "Centroid Distance", "Distance between polygon centroids"});
     options.append({"unionAspectRatio", "Union Aspect Ratio", "Aspect ratio of the polygon union"});
     options.append({"unionCircularity", "Union Circularity", "Circularity of the polygon union"});
-    options.append({"unionConvexDeficiency", "Union Convex Deficiency", "Convex deficiency of the union"});
+    options.append({"unionConvexDeficiency", "Union Convex Deficiency", "(Union convex-hull area - union area)/mean cell area"});
     options.append({"normalizedSharedEdgeLength", "Normalized Shared Edge Length", "Shared edge length normalized by perimeters"});
     options.append({"sharedEdgeUnsharedVerticesDistance", "Shared Edge to Unshared Vertices Distance", "Average distance from shared edge to unshared vertices"});
     options.append({"sharedEdgeUnsharedVerticesDistanceNormalized", "Normalized Shared Edge to Unshared Vertices Distance", "Normalized distance from shared edge to unshared vertices"});
