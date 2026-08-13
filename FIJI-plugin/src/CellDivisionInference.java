@@ -164,6 +164,9 @@ public class CellDivisionInference implements PlugIn {
     // contour noise cannot become an angle-defining topological change.
     private static final double MIN_OUTER_VERTEX_SPACING_PX = 2.0;
     private static final double OUTER_VERTEX_SPACING_SCALE_FRACTION = 0.04;
+    // User-adjustable lower bound for geometric contour supports. Biological
+    // junctions are never removed by this value.
+    private double outerContourSupportSpacingPx = 12.0;
     private static final double FALLBACK_SIZE_DIAGONAL_FRACTION = 0.05;
     private static final double INTERNAL_VOID_MEDIAN_AREA_FACTOR = 4.0;
     private static final int MIN_INTERNAL_VOID_AREA_PX = 16;
@@ -3090,6 +3093,149 @@ public class CellDivisionInference implements PlugIn {
         return accepted;
     }
 
+    /* A directed edge of the accepted-background pixel mask.  Keeping the
+       background on the same side of every edge makes the resulting walks
+       deterministic and, unlike a connected-component walk over boundary
+       pixels, keeps the frame-facing and tissue-facing contours separate. */
+    private static long contourEdgeKey(int from,int to){
+        return ((long)from<<32)|(to&0xffffffffL);
+    }
+
+    private static void addContourEdge(Map<Integer,List<Integer>> next,int from,int to){
+        List<Integer> destinations=next.get(from);
+        if(destinations==null){destinations=new ArrayList<>();next.put(from,destinations);}
+        destinations.add(to);
+    }
+
+    private static int contourDirection(int from,int to,int stride){
+        int difference=to-from;
+        if(difference==1)return 0;
+        if(difference==stride)return 1;
+        if(difference==-1)return 2;
+        return 3;
+    }
+
+    private static int contourTurnPriority(int incoming,int outgoing){
+        int turn=(outgoing-incoming+4)%4;
+        if(turn==1)return 0; // keep accepted background on the right
+        if(turn==0)return 1;
+        if(turn==3)return 2;
+        return 3;
+    }
+
+    private static List<List<Point2D.Double>> traceAcceptedBackgroundContours(boolean[] accepted,int w,int h){
+        int stride=w+1;
+        Map<Integer,List<Integer>> next=new TreeMap<>();
+        for(int y=0;y<h;y++) for(int x=0;x<w;x++){
+            if(!accepted[y*w+x])continue;
+            if(y==0||!accepted[(y-1)*w+x])addContourEdge(next,y*stride+x,y*stride+x+1);
+            if(x==w-1||!accepted[y*w+x+1])addContourEdge(next,y*stride+x+1,(y+1)*stride+x+1);
+            if(y==h-1||!accepted[(y+1)*w+x])addContourEdge(next,(y+1)*stride+x+1,(y+1)*stride+x);
+            if(x==0||!accepted[y*w+x-1])addContourEdge(next,(y+1)*stride+x,y*stride+x);
+        }
+        for(List<Integer> destinations:next.values())Collections.sort(destinations);
+        Set<Long> used=new HashSet<>();
+        List<List<Point2D.Double>> contours=new ArrayList<>();
+        for(Map.Entry<Integer,List<Integer>> entry:next.entrySet()) for(int firstTo:entry.getValue()){
+            int first=entry.getKey();
+            if(used.contains(contourEdgeKey(first,firstTo)))continue;
+            ArrayList<Point2D.Double> contour=new ArrayList<>();
+            int from=first,to=firstTo;
+            while(true){
+                long edge=contourEdgeKey(from,to);
+                if(used.contains(edge))break;
+                used.add(edge);
+                contour.add(new Point2D.Double(from%stride,from/stride));
+                List<Integer> destinations=next.get(to);
+                if(destinations==null)break;
+                int chosen=-1,bestPriority=Integer.MAX_VALUE;
+                int incoming=contourDirection(from,to,stride);
+                for(int candidate:destinations)if(!used.contains(contourEdgeKey(to,candidate))){
+                    int priority=contourTurnPriority(incoming,contourDirection(to,candidate,stride));
+                    if(priority<bestPriority){bestPriority=priority;chosen=candidate;}
+                }
+                if(chosen<0)break;
+                from=to;to=chosen;
+                if(from==first&&to==firstTo)break;
+            }
+            if(contour.size()>1)contours.add(contour);
+        }
+        return contours;
+    }
+
+    private static double pointSegmentDistance(Point2D.Double p,Point2D.Double a,Point2D.Double b){
+        double dx=b.x-a.x,dy=b.y-a.y;
+        if(dx==0.0&&dy==0.0)return p.distance(a);
+        double t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy);
+        t=Math.max(0.0,Math.min(1.0,t));
+        return Point2D.distance(p.x,p.y,a.x+t*dx,a.y+t*dy);
+    }
+
+    private static void simplifyOpenContour(List<Point2D.Double> points,int first,int last,double epsilon,boolean[] keep){
+        if(last<=first+1)return;
+        double greatest=-1.0;int index=-1;
+        for(int i=first+1;i<last;i++){
+            double distance=pointSegmentDistance(points.get(i),points.get(first),points.get(last));
+            if(distance>greatest){greatest=distance;index=i;}
+        }
+        if(greatest>epsilon){keep[index]=true;simplifyOpenContour(points,first,index,epsilon,keep);simplifyOpenContour(points,index,last,epsilon,keep);}
+    }
+
+    // Closed-contour Ramer-Douglas-Peucker.  Splitting at the farthest pair
+    // avoids the arbitrary seam that an open-polyline implementation creates.
+    private static List<Point2D.Double> simplifyClosedContour(List<Point2D.Double> contour,double epsilon){
+        int n=contour.size(),a=0,b=0;double greatest=-1.0;
+        // Two linear farthest-point sweeps provide a stable, well-separated
+        // seam without making simplification quadratic on long pixel contours.
+        for(int sweep=0;sweep<2;sweep++){
+            greatest=-1.0;
+            Point2D.Double anchor=contour.get(a);
+            for(int i=0;i<n;i++){
+                double distance=anchor.distanceSq(contour.get(i));
+                if(distance>greatest){greatest=distance;b=i;}
+            }
+            if(sweep==0)a=b;
+        }
+        ArrayList<Point2D.Double> ordered=new ArrayList<>(n+1);
+        for(int i=0;i<=n;i++)ordered.add(contour.get((a+i)%n));
+        int split=(b-a+n)%n;
+        boolean[] keep=new boolean[n+1];keep[0]=keep[split]=keep[n]=true;
+        simplifyOpenContour(ordered,0,split,epsilon,keep);
+        simplifyOpenContour(ordered,split,n,epsilon,keep);
+        ArrayList<Point2D.Double> result=new ArrayList<>();
+        for(int i=0;i<n;i++)if(keep[i])result.add(ordered.get(i));
+        return result;
+    }
+
+    private static List<Point2D.Double> detectOuterContourSupport(ByteProcessor bp){
+        int w=bp.getWidth(),h=bp.getHeight();
+        boolean[] accepted=exteriorBackground4(bp);
+        ArrayList<Point2D.Double> supports=new ArrayList<>();
+        for(List<Point2D.Double> contour:traceAcceptedBackgroundContours(accepted,w,h)){
+            if(contour.size()<8)continue;
+            boolean frame=false;double minX=Double.MAX_VALUE,minY=Double.MAX_VALUE,maxX=-1,maxY=-1;
+            for(Point2D.Double p:contour){
+                if(p.x==0||p.y==0||p.x==w||p.y==h)frame=true;
+                minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);
+            }
+            if(frame)continue;
+            double characteristicSize=FALLBACK_SIZE_DIAGONAL_FRACTION*Math.hypot(maxX-minX+1.0,maxY-minY+1.0);
+            supports.addAll(simplifyClosedContour(contour,Math.max(1.0,0.015*characteristicSize)));
+        }
+        return supports;
+    }
+
+    private static Point nearestSkeletonPoint(ByteProcessor bp,Point2D.Double position,int radius){
+        int w=bp.getWidth(),h=bp.getHeight(),cx=(int)Math.round(position.x),cy=(int)Math.round(position.y);
+        Point best=null;double bestDistance=Double.MAX_VALUE;
+        for(int y=Math.max(0,cy-radius);y<=Math.min(h-1,cy+radius);y++)
+            for(int x=Math.max(0,cx-radius);x<=Math.min(w-1,cx+radius);x++)if((bp.get(x,y)&0xff)!=0){
+                double distance=Point2D.distanceSq(position.x,position.y,x,y);
+                if(distance<bestDistance||(distance==bestDistance&&(best==null||y<best.y||y==best.y&&x<best.x))){bestDistance=distance;best=new Point(x,y);}
+            }
+        return best;
+    }
+
     private static List<Point> clusterPoints(List<Point> pts, double r){
 
         double r2 = r*r;
@@ -3150,6 +3296,19 @@ public class CellDivisionInference implements PlugIn {
 
         if(currentImp==null) return;
 
+        JSpinner spacingSpinner=new JSpinner(new SpinnerNumberModel(
+                outerContourSupportSpacingPx,MIN_OUTER_VERTEX_SPACING_PX,1000.0,1.0));
+        JSpinner.NumberEditor spacingEditor=new JSpinner.NumberEditor(spacingSpinner,"0.0");
+        spacingSpinner.setEditor(spacingEditor);
+        JPanel spacingPanel=new JPanel(new BorderLayout(8,0));
+        spacingPanel.add(new JLabel("Minimum distance between outer contour vertices (px):"),BorderLayout.WEST);
+        spacingPanel.add(spacingSpinner,BorderLayout.CENTER);
+        int option=JOptionPane.showConfirmDialog(frame,spacingPanel,"Detect Vertices",
+                JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE);
+        if(option!=JOptionPane.OK_OPTION)return;
+        outerContourSupportSpacingPx=((Number)spacingSpinner.getValue()).doubleValue();
+        final double requestedSupportSpacing=outerContourSupportSpacingPx;
+
         new Thread(() -> {
 
             ImageProcessor ip0=currentImp.getProcessor();
@@ -3165,6 +3324,27 @@ public class CellDivisionInference implements PlugIn {
             boolean[] exterior=exteriorBackground4(bp);
             for(Point p:clustered){ vertexGeometryPoints.add(new Point2D.Double(p.x,p.y));
                 vertexKinds.add(isOuterBoundaryPoint(p,exterior,bp.getWidth(),bp.getHeight())?VertexKind.BOUNDARY_JUNCTION:VertexKind.INTERIOR_JUNCTION); }
+
+            // Qt performs this as an independent second pass: contour turns do
+            // not need to satisfy the three/four-branch biological test.
+            // Preserve Qt's scale-aware floor, while allowing dense contours to
+            // be thinned further in physical image pixels by the user.
+            double spacing=Math.max(outerVertexSpacingThreshold(bp.getWidth(),bp.getHeight()),
+                    requestedSupportSpacing);
+            double spacing2=spacing*spacing;
+            for(Point2D.Double geometry:detectOuterContourSupport(bp)){
+                boolean duplicate=false;
+                for(int i=0;i<vertexPoints.size();i++){
+                    Point2D.Double existing=vertexGeometryPoints.get(i);
+                    if(existing.distanceSq(geometry)<spacing2){duplicate=true;break;}
+                }
+                if(duplicate)continue; // biological boundary junctions win
+                Point skeletonPoint=nearestSkeletonPoint(bp,geometry,3);
+                if(skeletonPoint==null)continue;
+                vertexPoints.add(skeletonPoint);
+                vertexGeometryPoints.add(new Point2D.Double(geometry.x,geometry.y));
+                vertexKinds.add(VertexKind.CONTOUR_SUPPORT);
+            }
 
             lineEdges.clear();
             polygons.clear();
