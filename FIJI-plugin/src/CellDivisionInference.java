@@ -6747,9 +6747,12 @@ public class CellDivisionInference implements PlugIn {
     // Viewer
     // =========================
 
-    class ImagePanel extends JComponent{
+    private enum BaseImageDisplayMode {
+        SOURCE_IMAGE,
+        REPLACEMENT_BACKGROUND
+    }
 
-        private enum BaseImageDisplayMode { SOURCE_IMAGE, REPLACEMENT_BACKGROUND }
+    class ImagePanel extends JComponent{
 
         private BufferedImage image; // analytical/source raster
         private BufferedImage backgroundImage; // display-only raster
@@ -6785,8 +6788,10 @@ public class CellDivisionInference implements PlugIn {
 
         private final JPopupMenu popup;
 
-        private int clickX,clickY;
-        private int mouseX, mouseY;
+        private int clickX;
+        private int clickY;
+        private int mouseX;
+        private int mouseY;
 
         // helper for manually adding line and polygon
         private boolean isPicked(int idx){
