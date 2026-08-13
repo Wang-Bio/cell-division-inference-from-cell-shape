@@ -65,6 +65,7 @@ public class CellDivisionInference implements PlugIn {
     private JScrollPane scrollPane;
     private JFrame mainFrame;
     private JPanel infoPanel;
+    private JMenuItem showSourceImageMenuItem;
 
     // ====== Left panel information =====
     private JLabel infoSourceValue;
@@ -273,6 +274,15 @@ public class CellDivisionInference implements PlugIn {
                     openBackground(frame);
                 }
             }));
+
+            showSourceImageMenuItem = new JMenuItem(new AbstractAction("Remove Background / Show Source Image"){
+                public void actionPerformed(ActionEvent e){
+                    imagePanel.showSourceImage();
+                    updateInfoPanel();
+                }
+            });
+            showSourceImageMenuItem.setEnabled(false);
+            fileMenu.add(showSourceImageMenuItem);
 
             JMenu processMenu=new JMenu("Detect");
 
@@ -1702,7 +1712,29 @@ public class CellDivisionInference implements PlugIn {
             return;
         }
 
-        imagePanel.setBackgroundImage(bg);
+        int canvasW = imagePanel.getCanvasWidth();
+        int canvasH = imagePanel.getCanvasHeight();
+        boolean scaled = false;
+        if(canvasW > 0 && canvasH > 0 && (bg.getWidth() != canvasW || bg.getHeight() != canvasH)){
+            Object[] choices = {"Scale Background to Network Canvas", "Cancel"};
+            int answer = JOptionPane.showOptionDialog(frame,
+                    "Network canvas: " + canvasW + " x " + canvasH + "\nBackground: "
+                            + bg.getWidth() + " x " + bg.getHeight()
+                            + "\n\nNo automatic registration will be performed.",
+                    "Background dimensions differ", JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.WARNING_MESSAGE, null, choices, choices[1]);
+            if(answer != 0) return;
+            BufferedImage resized = new BufferedImage(canvasW, canvasH, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = resized.createGraphics();
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            graphics.drawImage(bg, 0, 0, canvasW, canvasH, null);
+            graphics.dispose();
+            bg = resized;
+            scaled = true;
+        }
+
+        imagePanel.setBackgroundImage(bg, scaled);
+        if(showSourceImageMenuItem != null) showSourceImageMenuItem.setEnabled(true);
         updateInfoPanel();
         adjustWindowToContent();
     }
@@ -6717,8 +6749,12 @@ public class CellDivisionInference implements PlugIn {
 
     class ImagePanel extends JComponent{
 
-        private BufferedImage image;
-        private BufferedImage backgroundImage;
+        private enum BaseImageDisplayMode { SOURCE_IMAGE, REPLACEMENT_BACKGROUND }
+
+        private BufferedImage image; // analytical/source raster
+        private BufferedImage backgroundImage; // display-only raster
+        private BaseImageDisplayMode displayMode = BaseImageDisplayMode.SOURCE_IMAGE;
+        private boolean backgroundDisplayScaled = false;
         private double zoom=1.0;
 
         private List<Point> overlayPoints=new ArrayList<>();
@@ -7622,6 +7658,10 @@ public class CellDivisionInference implements PlugIn {
         void setImage(BufferedImage img){
 
             image=img;
+            backgroundImage=null;
+            backgroundDisplayScaled=false;
+            displayMode=BaseImageDisplayMode.SOURCE_IMAGE;
+            if(showSourceImageMenuItem != null) showSourceImageMenuItem.setEnabled(false);
 
             revalidate();
             repaint();
@@ -7629,10 +7669,28 @@ public class CellDivisionInference implements PlugIn {
         }
 
         void setBackgroundImage(BufferedImage img){
+            setBackgroundImage(img, false);
+        }
+
+        void setBackgroundImage(BufferedImage img, boolean scaled){
             backgroundImage = img;
+            backgroundDisplayScaled = scaled;
+            displayMode = img == null ? BaseImageDisplayMode.SOURCE_IMAGE
+                                      : BaseImageDisplayMode.REPLACEMENT_BACKGROUND;
+            if(showSourceImageMenuItem != null)
+                showSourceImageMenuItem.setEnabled(displayMode == BaseImageDisplayMode.REPLACEMENT_BACKGROUND);
             revalidate();
             repaint();
             adjustWindowToContent();
+        }
+
+        void showSourceImage(){
+            displayMode = BaseImageDisplayMode.SOURCE_IMAGE;
+            backgroundImage = null;
+            backgroundDisplayScaled = false;
+            if(showSourceImageMenuItem != null) showSourceImageMenuItem.setEnabled(false);
+            revalidate();
+            repaint();
         }
 
         boolean hasBackgroundImage(){
@@ -8196,17 +8254,13 @@ public class CellDivisionInference implements PlugIn {
         }
 
         private int getCanvasWidth(){
-            int w = 0;
-            if(backgroundImage != null) w = Math.max(w, backgroundImage.getWidth());
-            if(image != null) w = Math.max(w, image.getWidth());
-            return w;
+            if(image != null) return image.getWidth();
+            return backgroundImage != null ? backgroundImage.getWidth() : 0;
         }
 
         private int getCanvasHeight(){
-            int h = 0;
-            if(backgroundImage != null) h = Math.max(h, backgroundImage.getHeight());
-            if(image != null) h = Math.max(h, image.getHeight());
-            return h;
+            if(image != null) return image.getHeight();
+            return backgroundImage != null ? backgroundImage.getHeight() : 0;
         }
 
         private void drawDivisionArrow(Graphics2D g2, double x1, double y1, double x2, double y2,
@@ -8265,13 +8319,11 @@ public class CellDivisionInference implements PlugIn {
 
             Graphics2D g2=(Graphics2D)g;
 
-            if(backgroundImage != null){
+            if(displayMode == BaseImageDisplayMode.REPLACEMENT_BACKGROUND && backgroundImage != null){
                 int bgW = (int)(backgroundImage.getWidth() * zoom);
                 int bgH = (int)(backgroundImage.getHeight() * zoom);
                 g2.drawImage(backgroundImage, 0, 0, bgW, bgH, null);
-            }
-
-            if(image != null){
+            } else if(displayMode == BaseImageDisplayMode.SOURCE_IMAGE && image != null){
                 int w=(int)(image.getWidth()*zoom);
                 int h=(int)(image.getHeight()*zoom);
                 g2.drawImage(image,0,0,w,h,null);

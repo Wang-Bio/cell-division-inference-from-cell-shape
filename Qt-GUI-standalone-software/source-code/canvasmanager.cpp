@@ -212,6 +212,10 @@ ImageInfo CanvasManager::openRawImage(QGraphicsView *view, QWidget *dialogParent
     //5. Add pximap to scene
     QGraphicsPixmapItem *item = scene->addPixmap(pixmap);
     item->setPos(0,0);
+    item->setZValue(-1000.0);
+    item->setFlag(QGraphicsItem::ItemIsSelectable, false);
+    item->setFlag(QGraphicsItem::ItemIsMovable, false);
+    info.sourceItem = item;
 
     //6. Fit in view
     view->fitInView(scene->sceneRect(),Qt::KeepAspectRatio);

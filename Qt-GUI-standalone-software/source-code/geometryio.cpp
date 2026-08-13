@@ -1209,7 +1209,7 @@ bool GeometryIO::showExportDialog(QWidget *parent, const QString &directoryHint,
     auto *performanceMatrixCheck = new QCheckBox("Performance matrix (CSV)", &dialog);
     performanceMatrixCheck->setChecked(options->exportPerformanceMatrixCsv);
 
-    auto *rawImageCheck = new QCheckBox("Raw image (background only)", &dialog);
+    auto *rawImageCheck = new QCheckBox("Visible base image only", &dialog);
     rawImageCheck->setChecked(options->exportRawImage);
     auto *geometryImageCheck = new QCheckBox("Image with polygons/lines/vertices", &dialog);
     geometryImageCheck->setChecked(options->exportImageWithGeometry);

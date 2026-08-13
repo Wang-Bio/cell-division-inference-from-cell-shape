@@ -18,6 +18,7 @@
 #include <QKeySequence>
 #include <QGraphicsItem>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
 #include <QPixmap>
@@ -44,6 +45,7 @@
 #include <vector>
 
 namespace {
+constexpr qreal BaseRasterZ = -1000.0;
 bool anyGeometryCalculationEnabled(const NeighborPairGeometrySettings &settings)
 {
     return settings.computeAreaRatio
@@ -123,6 +125,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionCreate_Canvas, &QAction::triggered, this, &MainWindow::onCreateCanvas);
     connect(ui->actionOpen_Raw_Image, &QAction::triggered,this, &MainWindow::onOpenRawImage);
     connect(ui->actionOpen_Background, &QAction::triggered, this, &MainWindow::onOpenBackground);
+    m_showSourceImageAction = new QAction("Remove Background / Show Source Image", this);
+    m_showSourceImageAction->setEnabled(false);
+    ui->menuOpen->insertAction(ui->actionCreate_Canvas, m_showSourceImageAction);
+    connect(m_showSourceImageAction, &QAction::triggered, this, &MainWindow::onShowSourceImage);
     connect(ui->actionImport, &QAction::triggered, this, &MainWindow::onImport);
     connect(ui->actionImport_All_Data, &QAction::triggered, this, &MainWindow::onImportAllData);
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::onExport);
@@ -222,8 +228,9 @@ void MainWindow::onCreateCanvas()
 
     m_currentCanvasWidth = info.width;
     m_currentCanvasHeight = info.height;
-
-    attachBackgroundToScene();
+    m_sourceImageItem = nullptr;
+    clearReplacementBackground();
+    activateSourceImage();
     fitViewToScene();
     double zoomPercent = static_cast<InteractiveGraphicsView*>(ui->graphicsView)->currentZoomPercent();
     updateCanvasSizeLabel(zoomPercent);
@@ -253,14 +260,42 @@ void MainWindow::onOpenBackground()
         return;
     }
 
-    m_backgroundPixmap = QPixmap::fromImage(image);
+    const int canvasWidth = m_currentCanvasWidth > 0 ? m_currentCanvasWidth : image.width();
+    const int canvasHeight = m_currentCanvasHeight > 0 ? m_currentCanvasHeight : image.height();
+    bool scaleToCanvas = false;
+    if (image.width() != canvasWidth || image.height() != canvasHeight) {
+        QMessageBox box(QMessageBox::Warning, "Background dimensions differ",
+                        QString("Network canvas: %1 x %2\nBackground: %3 x %4\n\n"
+                                "The background will not be registered automatically.")
+                            .arg(canvasWidth).arg(canvasHeight).arg(image.width()).arg(image.height()),
+                        QMessageBox::Cancel, this);
+        auto *scaleButton = box.addButton("Scale Background to Network Canvas", QMessageBox::AcceptRole);
+        box.setDefaultButton(QMessageBox::Cancel);
+        box.exec();
+        if (box.clickedButton() != scaleButton)
+            return;
+        scaleToCanvas = true;
+    }
+
+    m_backgroundPixmap = QPixmap::fromImage(scaleToCanvas
+        ? image.scaled(canvasWidth, canvasHeight, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+        : image);
     m_backgroundWidth = image.width();
     m_backgroundHeight = image.height();
+    m_backgroundDisplayScaled = scaleToCanvas;
+    m_baseImageDisplayMode = BaseImageDisplayMode::REPLACEMENT_BACKGROUND;
 
     attachBackgroundToScene();
-    fitViewToScene();
+    if (m_sourceImageItem) m_sourceImageItem->setVisible(false);
+    m_showSourceImageAction->setEnabled(true);
     double zoomPercent = static_cast<InteractiveGraphicsView*>(ui->graphicsView)->currentZoomPercent();
     updateCanvasSizeLabel(zoomPercent);
+}
+
+void MainWindow::onShowSourceImage()
+{
+    activateSourceImage();
+    ui->graphicsView->viewport()->update();
 }
 
 void MainWindow::onImport()
@@ -416,10 +451,10 @@ void MainWindow::onExport()
         }
     };
 
-    if (options.exportRawImage && !hasBackgroundPixmap()) {
-        warningMessages << "No background image available for raw image export.";
+    if (options.exportRawImage && !hasBackgroundPixmap() && !m_sourceImageItem) {
+        warningMessages << "No visible base image available for base-image export.";
     } else {
-        exportImageIfRequested(options.exportRawImage, "_raw", false, false, false, false, false, false, options.imageScaleFactor);
+        exportImageIfRequested(options.exportRawImage, "_visible_base", false, false, false, false, false, false, options.imageScaleFactor);
     }
     exportImageIfRequested(options.exportImageWithGeometry, "_geometry", true, true, true, false, false, false, options.imageScaleFactor);
     exportImageIfRequested(options.exportImageWithRealDivisions, "_real_divisions", true, true, true, true, false, false, options.imageScaleFactor);
@@ -599,8 +634,6 @@ bool MainWindow::openRawImageInternal(const QString &filePath)
     m_currentImage.release();
     m_currentCanvasHeight=0;
     m_currentCanvasWidth=0;
-    bool hadBackground = hasBackgroundPixmap();
-    detachBackgroundItem();
 
     clearNeighborLines();
     clearEstimatedDivisionArrows();
@@ -618,20 +651,15 @@ bool MainWindow::openRawImageInternal(const QString &filePath)
 
     auto info = m_canvasManager.openRawImage(ui->graphicsView, this, filePath);
     if(!info.valid) {
-        if (hadBackground) {
-            attachBackgroundToScene();
-            fitViewToScene();
-            double zoomPercent = static_cast<InteractiveGraphicsView*>(ui->graphicsView)->currentZoomPercent();
-            updateCanvasSizeLabel(zoomPercent);
-        }
         return false;
     }
 
     m_currentCanvasWidth = info.image.cols;
     m_currentCanvasHeight = info.image.rows;
     m_currentImage = info.image.clone();
-
-    attachBackgroundToScene();
+    m_sourceImageItem = info.sourceItem;
+    clearReplacementBackground();
+    activateSourceImage();
     fitViewToScene();
     double zoomPercent = static_cast<InteractiveGraphicsView*>(ui->graphicsView)->currentZoomPercent();
     updateCanvasSizeLabel(zoomPercent);
@@ -667,6 +695,8 @@ bool MainWindow::importJsonFile(const QString &filePath)
     m_currentImage.release();
 
     m_canvasManager.deleteImageAndCanvas(ui->graphicsView, true);
+    m_sourceImageItem = nullptr;
+    clearReplacementBackground();
 
     auto *scene = result.scene;
     if(!scene){
@@ -865,7 +895,6 @@ bool MainWindow::importJsonFile(const QString &filePath)
 
     ui->label_input_directory_value->setText(filePath);
     ui->label_input_file_name_value->setText(QFileInfo(filePath).fileName());
-    attachBackgroundToScene();
     fitViewToScene();
     double zoomPercent = static_cast<InteractiveGraphicsView*>(ui->graphicsView)->currentZoomPercent();
     updateCanvasSizeLabel(zoomPercent);
@@ -882,6 +911,18 @@ void MainWindow::onMousePositionChanged(const QPointF &scenePos)
 {
     m_lastMouseScenePos = scenePos;
 
+    if(m_baseImageDisplayMode == BaseImageDisplayMode::REPLACEMENT_BACKGROUND && !m_backgroundPixmap.isNull()) {
+        int x = static_cast<int>(std::floor(scenePos.x()));
+        int y = static_cast<int>(std::floor(scenePos.y()));
+        if (x >= 0 && y >= 0 && x < m_backgroundPixmap.width() && y < m_backgroundPixmap.height()) {
+            const QColor c = m_backgroundPixmap.toImage().pixelColor(x, y);
+            ui->label_mouse_position_value->setText(QString("(%1,%2)").arg(x).arg(y));
+            ui->label_mouse_pixel_value->setText(QString("RGB=(%1,%2,%3)").arg(c.red()).arg(c.green()).arg(c.blue()));
+        } else {
+            ui->label_mouse_position_value->setText("-"); ui->label_mouse_pixel_value->setText("-");
+        }
+        return;
+    }
     if(m_currentImage.empty()){
         ui->label_mouse_position_value->setText("-");
         ui->label_mouse_pixel_value->setText("-");
@@ -961,19 +1002,28 @@ void MainWindow::attachBackgroundToScene()
     }
 
     m_backgroundItem = scene->addPixmap(m_backgroundPixmap);
-    m_backgroundItem->setZValue(-1000.0);
+    m_backgroundItem->setZValue(BaseRasterZ);
     m_backgroundItem->setFlag(QGraphicsItem::ItemIsSelectable, false);
     m_backgroundItem->setFlag(QGraphicsItem::ItemIsMovable, false);
     m_backgroundItem->setPos(0, 0);
 
-    const QRectF bgRect = m_backgroundItem->boundingRect();
-    const QRectF currentRect = scene->sceneRect();
+    m_backgroundItem->setVisible(m_baseImageDisplayMode == BaseImageDisplayMode::REPLACEMENT_BACKGROUND);
+}
 
-    if (currentRect.isNull() || currentRect.width() <= 0 || currentRect.height() <= 0) {
-        scene->setSceneRect(bgRect);
-    } else {
-        scene->setSceneRect(currentRect.united(bgRect));
-    }
+void MainWindow::activateSourceImage()
+{
+    m_baseImageDisplayMode = BaseImageDisplayMode::SOURCE_IMAGE;
+    if (m_sourceImageItem) m_sourceImageItem->setVisible(true);
+    if (m_backgroundItem) m_backgroundItem->setVisible(false);
+    if (m_showSourceImageAction) m_showSourceImageAction->setEnabled(false);
+}
+
+void MainWindow::clearReplacementBackground()
+{
+    detachBackgroundItem();
+    m_backgroundPixmap = QPixmap();
+    m_backgroundWidth = m_backgroundHeight = 0;
+    m_backgroundDisplayScaled = false;
 }
 
 QVector<QGraphicsItem*> MainWindow::collectItemsByType(int type) const
@@ -1117,6 +1167,7 @@ void MainWindow::onDeleteImage(){
     clearRealDivisionArrows();
     detachBackgroundItem();
     m_canvasManager.deleteImageAndCanvas(ui->graphicsView, true);
+    m_sourceImageItem = nullptr;
 
     //Clear application state
     m_currentImage.release();
@@ -1770,11 +1821,15 @@ void MainWindow::onSkeletonization()
     detachBackgroundItem();
     scene->clear();
     scene->setSceneRect(0, 0, copy.width(), copy.height());
-    scene->addPixmap(QPixmap::fromImage(copy));
+    m_sourceImageItem = scene->addPixmap(QPixmap::fromImage(copy));
+    m_sourceImageItem->setZValue(BaseRasterZ);
+    m_sourceImageItem->setFlag(QGraphicsItem::ItemIsSelectable, false);
+    m_sourceImageItem->setFlag(QGraphicsItem::ItemIsMovable, false);
 
     m_currentCanvasWidth = segmented.cols;
     m_currentCanvasHeight = segmented.rows;
-    attachBackgroundToScene();
+    clearReplacementBackground();
+    activateSourceImage();
     fitViewToScene();
     double zoomPercent = static_cast<InteractiveGraphicsView*>(ui->graphicsView)->currentZoomPercent();
     updateCanvasSizeLabel(zoomPercent);

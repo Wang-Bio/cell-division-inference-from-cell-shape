@@ -37,6 +37,7 @@ public:
     ~MainWindow();
 
 private:
+    enum class BaseImageDisplayMode { SOURCE_IMAGE, REPLACEMENT_BACKGROUND };
     struct RealDivisionRecord {
         int firstId = -1;
         int secondId = -1;
@@ -65,6 +66,10 @@ private:
     QHash<QString, int> m_realDivisionTimingByPairKey;
     QPixmap m_backgroundPixmap;
     QGraphicsPixmapItem *m_backgroundItem = nullptr;
+    QGraphicsPixmapItem *m_sourceImageItem = nullptr;
+    BaseImageDisplayMode m_baseImageDisplayMode = BaseImageDisplayMode::SOURCE_IMAGE;
+    bool m_backgroundDisplayScaled = false;
+    QAction *m_showSourceImageAction = nullptr;
     int m_backgroundWidth = 0;
     int m_backgroundHeight = 0;
     QVector<BatchDivisionEstimator::GeometryEntry> m_lastGeometryEntries;
@@ -78,6 +83,8 @@ private:
     void updateCanvasSizeLabel(double zoomPercent);
     void attachBackgroundToScene();
     void detachBackgroundItem();
+    void activateSourceImage();
+    void clearReplacementBackground();
     void fitViewToScene();
     bool hasBackgroundPixmap() const;
     QPointF m_lastMouseScenePos = QPointF(0,0);
@@ -155,6 +162,7 @@ private slots:
     void onCreateCanvas();
     void onOpenRawImage();
     void onOpenBackground();
+    void onShowSourceImage();
     void onImport();
     void onImportAllData();
     void onExport();

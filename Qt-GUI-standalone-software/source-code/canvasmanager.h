@@ -7,6 +7,7 @@
 #include <QString>
 
 class QGraphicsView;
+class QGraphicsPixmapItem;
 
 
 struct CanvasInfo{
@@ -21,6 +22,7 @@ struct ImageInfo{
     QString filePath;
     QString fileName;
     bool valid;
+    QGraphicsPixmapItem *sourceItem = nullptr; // owned by the view's scene
 };
 
 
