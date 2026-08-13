@@ -1,4 +1,5 @@
 #include "divisionestimator.h"
+#include "weightedmatching.h"
 
 #include "batchdivisionestimator.h"
 #include "precisionrecallsweepworker.h"
@@ -1144,14 +1145,15 @@ QVector<DivisionEstimator::CandidateMatch> DivisionEstimator::greedyMatching(int
 {
     QVector<CandidateMatch> sorted = candidates;
     std::sort(sorted.begin(), sorted.end(), [](const CandidateMatch &a, const CandidateMatch &b) {
-        return a.score > b.score;
+        if (a.score != b.score) return a.score > b.score;
+        return std::minmax(a.first, a.second) < std::minmax(b.first, b.second);
     });
 
     QVector<bool> used(static_cast<qsizetype>(polygonCount), false);
     QVector<CandidateMatch> chosen;
 
     for (const auto &cand : sorted) {
-        if (cand.first < 0 || cand.second < 0)
+        if (cand.first < 0 || cand.second < 0 || cand.first == cand.second || !std::isfinite(cand.score))
             continue;
         if (cand.first >= polygonCount || cand.second >= polygonCount)
             continue;
@@ -1159,7 +1161,9 @@ QVector<DivisionEstimator::CandidateMatch> DivisionEstimator::greedyMatching(int
             continue;
         used[cand.first] = true;
         used[cand.second] = true;
-        chosen.append(cand);
+        CandidateMatch canonical = cand;
+        if (canonical.first > canonical.second) std::swap(canonical.first, canonical.second);
+        chosen.append(canonical);
     }
 
     return chosen;
@@ -1168,74 +1172,17 @@ QVector<DivisionEstimator::CandidateMatch> DivisionEstimator::greedyMatching(int
 QVector<DivisionEstimator::CandidateMatch> DivisionEstimator::maximumWeightMatching(int polygonCount,
                                                                                    const QVector<CandidateMatch> &candidates)
 {
-    if (polygonCount <= 1 || candidates.isEmpty())
-        return {};
-
-    if (polygonCount >= static_cast<int>(sizeof(quint64) * 8)) {
-        qWarning() << "Global maximum weight matching supports up to"
-                   << (static_cast<int>(sizeof(quint64) * 8) - 1)
-                   << "polygons. Falling back to greedy matching.";
-        return greedyMatching(polygonCount, candidates);
+    QVector<WeightedMatching::Edge> edges;
+    for (int i = 0; i < candidates.size(); ++i)
+        edges.append({candidates[i].first, candidates[i].second, candidates[i].score, i});
+    QVector<CandidateMatch> result;
+    for (const auto &edge : WeightedMatching::solve(polygonCount, edges)) {
+        CandidateMatch candidate = candidates[edge.sourceIndex];
+        if (candidate.first > candidate.second)
+            std::swap(candidate.first, candidate.second);
+        result.append(candidate);
     }
-
-    QVector<QVector<CandidateMatch>> adjacency(polygonCount);
-    for (const auto &cand : candidates) {
-        if (cand.first < 0 || cand.second < 0)
-            continue;
-        if (cand.first >= polygonCount || cand.second >= polygonCount)
-            continue;
-        adjacency[cand.first].append(cand);
-        adjacency[cand.second].append({cand.second, cand.first, cand.score, cand.featureValue});
-    }
-
-    struct Solution {
-        double weight = 0.0;
-        QVector<CandidateMatch> matches;
-    };
-
-    std::unordered_map<quint64, Solution> cache;
-    const auto solve = [&](auto &&self, quint64 usedMask) -> Solution {
-        auto it = cache.find(usedMask);
-        if (it != cache.end())
-            return it->second;
-
-        int firstFree = -1;
-        for (int idx = 0; idx < polygonCount; ++idx) {
-            if ((usedMask & (quint64(1) << idx)) == 0) {
-                firstFree = idx;
-                break;
-            }
-        }
-
-        if (firstFree == -1)
-            return {};
-
-        const quint64 baseMask = usedMask | (quint64(1) << firstFree);
-        Solution best = self(self, baseMask);
-
-        for (const auto &edge : adjacency[firstFree]) {
-            const int other = edge.second;
-            if (other == firstFree)
-                continue;
-            if (baseMask & (quint64(1) << other))
-                continue;
-
-            const quint64 newMask = baseMask | (quint64(1) << other);
-            Solution candidate = self(self, newMask);
-            const double totalWeight = candidate.weight + edge.score;
-            if (totalWeight > best.weight) {
-                candidate.weight = totalWeight;
-                candidate.matches.append(edge);
-                best = candidate;
-            }
-        }
-
-        cache.insert({usedMask, best});
-        return best;
-    };
-
-    Solution finalSolution = solve(solve, 0);
-    return finalSolution.matches;
+    return result;
 }
 
 QVector<DivisionEstimator::CandidateMatch> DivisionEstimator::selectMatches(int polygonCount,

@@ -30,6 +30,11 @@ import java.awt.geom.FlatteningPathIterator;
 import java.text.DecimalFormat;
 
 import com.google.gson.*;
+import org.jgrapht.Graph;
+import org.jgrapht.alg.interfaces.MatchingAlgorithm;
+import org.jgrapht.alg.matching.blossom.v5.KolmogorovWeightedMatching;
+import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.graph.SimpleWeightedGraph;
 
 public class CellDivisionInference implements PlugIn {
 
@@ -3880,19 +3885,6 @@ public class CellDivisionInference implements PlugIn {
         }
     }
 
-    private static class Solution {
-        double weight;
-        ArrayList<CandidateMatch> matches;
-        Solution(){
-            this.weight = 0.0;
-            this.matches = new ArrayList<>();
-        }
-        Solution(double w, ArrayList<CandidateMatch> m){
-            this.weight = w;
-            this.matches = m;
-        }
-    }
-
     private static long pairKey(int a, int b){
         int lo = Math.min(a, b);
         int hi = Math.max(a, b);
@@ -5446,6 +5438,20 @@ public class CellDivisionInference implements PlugIn {
         gc.gridx = 0; gc.weightx = 0;
         form.add(new JLabel("Matching:"), gc);
         JComboBox<Criterion.MatchingMode> modeCombo = new JComboBox<>(Criterion.MatchingMode.values());
+        modeCombo.setRenderer(new DefaultListCellRenderer(){
+            @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                                     boolean selected, boolean focus){
+                super.getListCellRendererComponent(list, value, index, selected, focus);
+                Criterion.MatchingMode mode = (Criterion.MatchingMode)value;
+                if(mode == Criterion.MatchingMode.GlobalMaximumWeight)
+                    setText("Global maximum-weight matching (default)");
+                else if(mode == Criterion.MatchingMode.LocalOptimal)
+                    setText("Greedy matching");
+                else
+                    setText("No constraint");
+                return this;
+            }
+        });
         modeCombo.setSelectedItem(criterion.matchingMode);
         gc.gridx = 1; gc.weightx = 1;
         form.add(modeCombo, gc);
@@ -5613,100 +5619,60 @@ public class CellDivisionInference implements PlugIn {
     private static ArrayList<CandidateMatch> greedyMatching(int polygonCount, ArrayList<CandidateMatch> candidates){
 
         ArrayList<CandidateMatch> all = new ArrayList<>(candidates);
-        all.sort((a, b) -> Double.compare(b.score, a.score));
+        all.removeIf(a -> a == null);
+        all.sort((a, b) -> {
+            int scoreOrder = Double.compare(b.score, a.score);
+            if(scoreOrder != 0) return scoreOrder;
+            int firstOrder = Integer.compare(Math.min(a.first, a.second), Math.min(b.first, b.second));
+            return firstOrder != 0 ? firstOrder : Integer.compare(Math.max(a.first, a.second), Math.max(b.first, b.second));
+        });
 
         boolean[] used = new boolean[Math.max(0, polygonCount)];
         ArrayList<CandidateMatch> chosen = new ArrayList<>();
 
         for(CandidateMatch cand : all){
-            if(cand == null) continue;
-            if(cand.first < 0 || cand.second < 0) continue;
+            if(cand.first < 0 || cand.second < 0 || cand.first == cand.second || !Double.isFinite(cand.score)) continue;
             if(cand.first >= polygonCount || cand.second >= polygonCount) continue;
             if(used[cand.first] || used[cand.second]) continue;
             used[cand.first] = true;
             used[cand.second] = true;
-            chosen.add(cand);
+            chosen.add(new CandidateMatch(Math.min(cand.first, cand.second), Math.max(cand.first, cand.second),
+                                          cand.score, cand.featureValue));
         }
         return chosen;
     }
 
     private static ArrayList<CandidateMatch> maximumWeightMatching(int polygonCount, ArrayList<CandidateMatch> candidates){
+        ArrayList<CandidateMatch> answer = new ArrayList<>();
+        if(polygonCount <= 1 || candidates == null) return answer;
 
-        if(polygonCount <= 1 || candidates == null || candidates.isEmpty()){
-            return new ArrayList<>();
+        // TreeMap establishes the common cross-application tie rule: canonical
+        // polygon pairs are presented to blossom in lexicographic order.
+        TreeMap<Long, CandidateMatch> unique = new TreeMap<>();
+        for(CandidateMatch original : candidates){
+            if(original == null || !Double.isFinite(original.score) || original.score <= 0.0) continue;
+            int first = Math.min(original.first, original.second);
+            int second = Math.max(original.first, original.second);
+            if(first < 0 || second >= polygonCount || first == second) continue;
+            CandidateMatch canonical = new CandidateMatch(first, second, original.score, original.featureValue);
+            long key = pairKey(first, second);
+            CandidateMatch prior = unique.get(key);
+            if(prior == null || canonical.score > prior.score) unique.put(key, canonical);
         }
 
-        // Qt: supports up to 63 polygons using a 64-bit mask; fallback to greedy otherwise
-        if(polygonCount >= 64){
-            //IJ.log("Global maximum weight matching supports up to 63 polygons. Falling back to greedy matching.");
-            return greedyMatching(polygonCount, candidates);
+        Graph<Integer, DefaultWeightedEdge> graph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        for(int i = 0; i < polygonCount; ++i) graph.addVertex(i);
+        HashMap<DefaultWeightedEdge, CandidateMatch> source = new HashMap<>();
+        for(CandidateMatch candidate : unique.values()){
+            DefaultWeightedEdge edge = graph.addEdge(candidate.first, candidate.second);
+            graph.setEdgeWeight(edge, candidate.score);
+            source.put(edge, candidate);
         }
-
-        ArrayList<ArrayList<CandidateMatch>> adjacency = new ArrayList<>(polygonCount);
-        for(int i=0; i<polygonCount; i++){
-            adjacency.add(new ArrayList<>());
-        }
-
-        for(CandidateMatch cand : candidates){
-            if(cand == null) continue;
-            if(cand.first < 0 || cand.second < 0) continue;
-            if(cand.first >= polygonCount || cand.second >= polygonCount) continue;
-
-            adjacency.get(cand.first).add(cand);
-            adjacency.get(cand.second).add(new CandidateMatch(cand.second, cand.first, cand.score, cand.featureValue));
-        }
-
-        class Solver {
-            HashMap<Long, Solution> cache = new HashMap<>();
-
-            Solution solve(long usedMask){
-
-                Solution cached = cache.get(usedMask);
-                if(cached != null) return cached;
-
-                int firstFree = -1;
-                for(int idx=0; idx<polygonCount; idx++){
-                    if((usedMask & (1L << idx)) == 0){
-                        firstFree = idx;
-                        break;
-                    }
-                }
-
-                if(firstFree == -1){
-                    Solution empty = new Solution();
-                    cache.put(usedMask, empty);
-                    return empty;
-                }
-
-                long baseMask = usedMask | (1L << firstFree);
-
-                // option: leave firstFree unmatched
-                Solution best = solve(baseMask);
-
-                // try pairing firstFree with each free neighbor
-                for(CandidateMatch edge : adjacency.get(firstFree)){
-                    int other = edge.second;
-                    if(other == firstFree) continue;
-                    if((baseMask & (1L << other)) != 0) continue;
-
-                    long newMask = baseMask | (1L << other);
-                    Solution candSol = solve(newMask);
-                    double total = candSol.weight + edge.score;
-
-                    if(total > best.weight){
-                        ArrayList<CandidateMatch> newMatches = new ArrayList<>(candSol.matches);
-                        newMatches.add(edge);
-                        best = new Solution(total, newMatches);
-                    }
-                }
-
-                cache.put(usedMask, best);
-                return best;
-            }
-        }
-
-        Solution finalSol = new Solver().solve(0L);
-        return finalSol.matches;
+        MatchingAlgorithm.Matching<Integer, DefaultWeightedEdge> matching =
+            new KolmogorovWeightedMatching<Integer, DefaultWeightedEdge>(graph).getMatching();
+        for(DefaultWeightedEdge edge : matching.getEdges()) answer.add(source.get(edge));
+        answer.sort(Comparator.comparingInt((CandidateMatch e) -> e.first).thenComparingInt(e -> e.second));
+        return answer;
     }
 
 
