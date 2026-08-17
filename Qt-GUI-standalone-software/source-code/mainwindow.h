@@ -68,7 +68,6 @@ private:
     QGraphicsPixmapItem *m_backgroundItem = nullptr;
     QGraphicsPixmapItem *m_sourceImageItem = nullptr;
     BaseImageDisplayMode m_baseImageDisplayMode = BaseImageDisplayMode::SOURCE_IMAGE;
-    bool m_backgroundDisplayScaled = false;
     QAction *m_showSourceImageAction = nullptr;
     int m_backgroundWidth = 0;
     int m_backgroundHeight = 0;

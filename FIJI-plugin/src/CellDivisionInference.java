@@ -1720,28 +1720,7 @@ public class CellDivisionInference implements PlugIn {
             return;
         }
 
-        int canvasW = imagePanel.getCanvasWidth();
-        int canvasH = imagePanel.getCanvasHeight();
-        boolean scaled = false;
-        if(canvasW > 0 && canvasH > 0 && (bg.getWidth() != canvasW || bg.getHeight() != canvasH)){
-            Object[] choices = {"Scale Background to Network Canvas", "Cancel"};
-            int answer = JOptionPane.showOptionDialog(frame,
-                    "Network canvas: " + canvasW + " x " + canvasH + "\nBackground: "
-                            + bg.getWidth() + " x " + bg.getHeight()
-                            + "\n\nNo automatic registration will be performed.",
-                    "Background dimensions differ", JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.WARNING_MESSAGE, null, choices, choices[1]);
-            if(answer != 0) return;
-            BufferedImage resized = new BufferedImage(canvasW, canvasH, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D graphics = resized.createGraphics();
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            graphics.drawImage(bg, 0, 0, canvasW, canvasH, null);
-            graphics.dispose();
-            bg = resized;
-            scaled = true;
-        }
-
-        imagePanel.setBackgroundImage(bg, scaled);
+        imagePanel.setBackgroundImage(bg);
         if(showSourceImageMenuItem != null) showSourceImageMenuItem.setEnabled(true);
         updateInfoPanel();
         adjustWindowToContent();
@@ -6903,7 +6882,6 @@ public class CellDivisionInference implements PlugIn {
         private BufferedImage image; // analytical/source raster
         private BufferedImage backgroundImage; // display-only raster
         private BaseImageDisplayMode displayMode = BaseImageDisplayMode.SOURCE_IMAGE;
-        private boolean backgroundDisplayScaled = false;
         private double zoom=1.0;
 
         private List<Point> overlayPoints=new ArrayList<>();
@@ -7810,7 +7788,6 @@ public class CellDivisionInference implements PlugIn {
 
             image=img;
             backgroundImage=null;
-            backgroundDisplayScaled=false;
             displayMode=BaseImageDisplayMode.SOURCE_IMAGE;
             if(showSourceImageMenuItem != null) showSourceImageMenuItem.setEnabled(false);
 
@@ -7820,12 +7797,7 @@ public class CellDivisionInference implements PlugIn {
         }
 
         void setBackgroundImage(BufferedImage img){
-            setBackgroundImage(img, false);
-        }
-
-        void setBackgroundImage(BufferedImage img, boolean scaled){
             backgroundImage = img;
-            backgroundDisplayScaled = scaled;
             displayMode = img == null ? BaseImageDisplayMode.SOURCE_IMAGE
                                       : BaseImageDisplayMode.REPLACEMENT_BACKGROUND;
             if(showSourceImageMenuItem != null)
@@ -7838,7 +7810,6 @@ public class CellDivisionInference implements PlugIn {
         void showSourceImage(){
             displayMode = BaseImageDisplayMode.SOURCE_IMAGE;
             backgroundImage = null;
-            backgroundDisplayScaled = false;
             if(showSourceImageMenuItem != null) showSourceImageMenuItem.setEnabled(false);
             revalidate();
             repaint();

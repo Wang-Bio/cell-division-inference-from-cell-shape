@@ -261,29 +261,9 @@ void MainWindow::onOpenBackground()
         return;
     }
 
-    const int canvasWidth = m_currentCanvasWidth > 0 ? m_currentCanvasWidth : image.width();
-    const int canvasHeight = m_currentCanvasHeight > 0 ? m_currentCanvasHeight : image.height();
-    bool scaleToCanvas = false;
-    if (image.width() != canvasWidth || image.height() != canvasHeight) {
-        QMessageBox box(QMessageBox::Warning, "Background dimensions differ",
-                        QString("Network canvas: %1 x %2\nBackground: %3 x %4\n\n"
-                                "The background will not be registered automatically.")
-                            .arg(canvasWidth).arg(canvasHeight).arg(image.width()).arg(image.height()),
-                        QMessageBox::Cancel, this);
-        auto *scaleButton = box.addButton("Scale Background to Network Canvas", QMessageBox::AcceptRole);
-        box.setDefaultButton(QMessageBox::Cancel);
-        box.exec();
-        if (box.clickedButton() != scaleButton)
-            return;
-        scaleToCanvas = true;
-    }
-
-    m_backgroundPixmap = QPixmap::fromImage(scaleToCanvas
-        ? image.scaled(canvasWidth, canvasHeight, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
-        : image);
+    m_backgroundPixmap = QPixmap::fromImage(image);
     m_backgroundWidth = image.width();
     m_backgroundHeight = image.height();
-    m_backgroundDisplayScaled = scaleToCanvas;
     m_baseImageDisplayMode = BaseImageDisplayMode::REPLACEMENT_BACKGROUND;
 
     attachBackgroundToScene();
@@ -1027,7 +1007,6 @@ void MainWindow::clearReplacementBackground()
     detachBackgroundItem();
     m_backgroundPixmap = QPixmap();
     m_backgroundWidth = m_backgroundHeight = 0;
-    m_backgroundDisplayScaled = false;
 }
 
 QVector<QGraphicsItem*> MainWindow::collectItemsByType(int type) const
