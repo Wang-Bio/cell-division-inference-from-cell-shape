@@ -135,6 +135,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionExport_All_Data, &QAction::triggered, this, &MainWindow::onExportAllData);
 
 //menuBar Edit function
+    connect(ui->actionReset_All, &QAction::triggered, this, &MainWindow::onResetAll);
     connect(ui->actionDelete_Image, &QAction::triggered, this, &MainWindow::onDeleteImage);
     connect(ui->actionEdit_Setting, &QAction::triggered, this, &MainWindow::onEditSetting);
     connect(ui->actionAdd_Vertex, &QAction::triggered, this, &MainWindow::onAddVertex);
@@ -1195,6 +1196,83 @@ void MainWindow::onDeleteImage(){
     double zoomPercent = static_cast<InteractiveGraphicsView*>(ui->graphicsView)->currentZoomPercent();
     updateCanvasSizeLabel(zoomPercent);
 
+}
+
+void MainWindow::onResetAll()
+{
+    const auto answer = QMessageBox::question(
+        this,
+        "Reset All",
+        "Delete the image, canvas, all geometry, results, and reset all index numbers?",
+        QMessageBox::Reset | QMessageBox::Cancel,
+        QMessageBox::Cancel);
+    if (answer != QMessageBox::Reset)
+        return;
+
+    // Remove graphics that are also tracked outside the scene before destroying it.
+    clearNeighborLines();
+    clearEstimatedDivisionArrows();
+    clearRealDivisionArrows();
+    detachBackgroundItem();
+    m_canvasManager.deleteImageAndCanvas(ui->graphicsView, true);
+
+    // Restore all document data and generated identifiers to their startup values.
+    m_currentImage.release();
+    m_currentCanvasWidth = 0;
+    m_currentCanvasHeight = 0;
+    m_sourceImageItem = nullptr;
+    clearReplacementBackground();
+    activateSourceImage();
+    m_nextVertexId = 1;
+    LineItem::setNextId(1);
+    PolygonItem::setNextId(0);
+    m_lastMouseScenePos = QPointF(0, 0);
+    m_allowVertexManualMove = false;
+    m_allowManualVertexCreation = true;
+    m_allowManualLineCreation = true;
+    m_allowManualPolygonCreation = true;
+
+    VertexItem::setCurrentStyle(VertexItem::VertexStyle());
+    LineItem::setCurrentStyle(LineItem::LineStyle());
+    PolygonItem::setCurrentStyle(PolygonItem::PolygonStyle());
+    NeighborPairDisplay::setCurrentStyle(NeighborLineStyle());
+    NeighborPairDisplay::setDisplayEnabled(true);
+
+    const QVector<QPair<DivisionDisplay::ArrowCategory, QColor>> defaultArrowColors = {
+        {DivisionDisplay::ArrowCategory::Estimated, QColor("#FF8C00")},
+        {DivisionDisplay::ArrowCategory::Real, QColor("#FF9999")},
+        {DivisionDisplay::ArrowCategory::TruePositive, QColor("#AA1E1E")},
+        {DivisionDisplay::ArrowCategory::FalsePositive, QColor("#50AA78")},
+        {DivisionDisplay::ArrowCategory::FalseNegative, QColor("#3C78C8")},
+    };
+    for (const auto &entry : defaultArrowColors) {
+        DivisionArrowStyle style;
+        style.color = entry.second;
+        DivisionDisplay::setCurrentStyle(entry.first, style);
+        DivisionDisplay::setDisplayEnabled(entry.first, true);
+    }
+
+    m_estimatedDivisionPairs.clear();
+    m_realDivisionPairs.clear();
+    m_realDivisionRecords.clear();
+    m_realDivisionTimingByPairKey.clear();
+    clearDivisionComparisonArrows();
+    resetStoredGeometryResults();
+    resetPerformanceMetrics();
+    resetEstimationRule();
+
+    // Match the labels and empty view shown immediately after application startup.
+    ui->label_input_directory_value->setText("-");
+    ui->label_input_file_name_value->setText("-");
+    ui->label_canvas_size_value->setText("-");
+    ui->label_mouse_position_value->setText("-");
+    ui->label_mouse_pixel_value->setText("-");
+    resetSelectedItemLabels();
+    ui->label_vertex_number_value->setText("-");
+    ui->label_line_number_value->setText("-");
+    ui->label_polygon_number_value->setText("-");
+    resetEstimatedDivisionNumberLabel();
+    resetDivisionComparisonLabels();
 }
 
 void MainWindow::onAddVertex()

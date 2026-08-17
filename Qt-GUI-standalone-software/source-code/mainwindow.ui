@@ -372,6 +372,8 @@
     <property name="title">
      <string>Edit</string>
     </property>
+    <addaction name="actionReset_All"/>
+    <addaction name="separator"/>
     <addaction name="actionEdit_Setting"/>
     <addaction name="actionDelete_Image"/>
     <addaction name="actionAdd_Vertex"/>
@@ -491,6 +493,11 @@
   <action name="actionDelete_Image">
    <property name="text">
     <string>Delete Image</string>
+   </property>
+  </action>
+  <action name="actionReset_All">
+   <property name="text">
+    <string>Reset All</string>
    </property>
   </action>
   <action name="actionAdd_Vertex">

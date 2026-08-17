@@ -32,6 +32,7 @@ public:
     QAction *actionOpen_Background;
     QAction *actionCreate_Canvas;
     QAction *actionDelete_Image;
+    QAction *actionReset_All;
     QAction *actionAdd_Vertex;
     QAction *actionDelete_Vertex;
     QAction *actionDelete_All_Vertices;
@@ -155,6 +156,8 @@ public:
         actionCreate_Canvas->setObjectName("actionCreate_Canvas");
         actionDelete_Image = new QAction(MainWindow);
         actionDelete_Image->setObjectName("actionDelete_Image");
+        actionReset_All = new QAction(MainWindow);
+        actionReset_All->setObjectName("actionReset_All");
         actionAdd_Vertex = new QAction(MainWindow);
         actionAdd_Vertex->setObjectName("actionAdd_Vertex");
         actionDelete_Vertex = new QAction(MainWindow);
@@ -532,6 +535,8 @@ public:
         menuOpen->addAction(actionOpen_Raw_Image);
         menuOpen->addAction(actionOpen_Background);
         menuOpen->addAction(actionCreate_Canvas);
+        menuEdit->addAction(actionReset_All);
+        menuEdit->addSeparator();
         menuEdit->addAction(actionEdit_Setting);
         menuEdit->addAction(actionDelete_Image);
         menuEdit->addAction(actionAdd_Vertex);
@@ -591,6 +596,7 @@ public:
         actionOpen_Background->setText(QCoreApplication::translate("MainWindow", "Open Background", nullptr));
         actionCreate_Canvas->setText(QCoreApplication::translate("MainWindow", "Create Canvas", nullptr));
         actionDelete_Image->setText(QCoreApplication::translate("MainWindow", "Delete Image", nullptr));
+        actionReset_All->setText(QCoreApplication::translate("MainWindow", "Reset All", nullptr));
         actionAdd_Vertex->setText(QCoreApplication::translate("MainWindow", "Add Vertex", nullptr));
         actionDelete_Vertex->setText(QCoreApplication::translate("MainWindow", "Delete Vertex", nullptr));
         actionDelete_All_Vertices->setText(QCoreApplication::translate("MainWindow", "Delete All Vertices", nullptr));

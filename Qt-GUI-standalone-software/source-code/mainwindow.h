@@ -170,6 +170,7 @@ private slots:
 
 //menuBar Edit functions
     void onDeleteImage();
+    void onResetAll();
     void onEditSetting();
     void onAddVertex();
     void onDeleteVertex();
