@@ -729,6 +729,9 @@ bool MainWindow::importJsonFile(const QString &filePath)
         }
     }
 
+    // Keep imported neighbor relationships available without obscuring the
+    // cell shapes; users can reveal the link lines in the display setting.
+    NeighborPairDisplay::setDisplayEnabled(false);
     if (!result.neighborPairs.isEmpty()) {
         rebuildNeighborLinesFromPairs(result.neighborPairs);
     }
