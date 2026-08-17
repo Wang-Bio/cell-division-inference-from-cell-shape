@@ -1980,13 +1980,10 @@ void MainWindow::onVertexDetection()
         ++addedCount;
     }
 
-    std::string contourWarning;
-    const auto supports=ImageAnalysis::detectOuterContourSupport(m_currentImage,&contourWarning);
+    const auto supports=ImageAnalysis::detectOuterContourSupport(m_currentImage);
     for(const auto &point:supports){QPointF position(point.x,point.y);if(VertexItem::findVertexByPosition(scene,position,outerSpacing))continue;
         auto *vertex=new VertexItem(m_nextVertexId++,position);vertex->setKind(VertexItem::Kind::ContourSupport);scene->addItem(vertex);
         vertex->setFlag(QGraphicsItem::ItemIsMovable,m_allowVertexManualMove);connect(vertex,&VertexItem::selected,this,&MainWindow::onVertexSelected);connect(vertex,&VertexItem::moved,this,&MainWindow::onVertexMoved);++addedCount;}
-    if(!contourWarning.empty()) QMessageBox::warning(this,"Outer contour",QString::fromStdString(contourWarning)+"; manual boundary vertices were retained.");
-
     updateVertexCountLabel();
 
     //QMessageBox::information(this, "Vertex Detection", QString("Detected %1 vertices with more than three 8-neighbors.").arg(addedCount));
