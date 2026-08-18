@@ -165,14 +165,14 @@ public class CellDivisionInference implements PlugIn {
     private List<Point2D.Double> vertexGeometryPoints = new ArrayList<>();
     private enum VertexKind { INTERIOR_JUNCTION, BOUNDARY_JUNCTION, CONTOUR_SUPPORT, AMBIGUOUS, MANUAL_TOPOLOGICAL }
     private List<VertexKind> vertexKinds = new ArrayList<>();
-    // Keep automatic exterior vertices far enough apart that single-pixel
-    // contour noise cannot become an angle-defining topological change.
-    private static final double MIN_OUTER_VERTEX_SPACING_PX = 2.0;
-    private static final double OUTER_VERTEX_SPACING_SCALE_FRACTION = 0.04;
-    // User-adjustable lower bound for geometric contour supports. Biological
-    // junctions are never removed by this value.
-    private double outerContourSupportSpacingPx = 12.0;
-    private static final double FALLBACK_SIZE_DIAGONAL_FRACTION = 0.05;
+    private static class OuterDetectionConfig {
+        double contourSampleSpacing=1.0, junctionMergeRadius=2.0, anchorContourTolerance=4.0;
+        double curvatureSigma=2.0, curvatureThresholdDegrees=5.0, fitSigma=2.5;
+        double maximumFitError=1.0, maxAreaErrorFraction=0.02, consensusRadius=2.5, junctionExclusion=3.0;
+        int outerJunctionNeighborhood=3, frameGuard=2, curvatureWindow=2;
+        int curvatureNmsRadius=8, skeletonSnapRadius=3;
+    }
+    private final OuterDetectionConfig outerDetectionConfig=new OuterDetectionConfig();
     private static final double INTERNAL_VOID_MEDIAN_AREA_FACTOR = 4.0;
     private static final int MIN_INTERNAL_VOID_AREA_PX = 16;
 
@@ -3022,7 +3022,8 @@ public class CellDivisionInference implements PlugIn {
     // Return frame-connected background plus enclosed components that are much
     // larger than a typical cell face. Those components are tissue voids and
     // their perimeters should behave like the exterior tissue perimeter.
-    private static boolean[] exteriorBackground4(ByteProcessor bp){
+    private static class BackgroundInfo { int[] labels; boolean[] acceptedPixels, acceptedLabels; }
+    private static BackgroundInfo backgroundInfo4(ByteProcessor bp){
         int w=bp.getWidth(), h=bp.getHeight();
         int[] labels=new int[w*h]; Arrays.fill(labels,-1);
         ArrayList<Integer> areas=new ArrayList<>();
@@ -3045,10 +3046,13 @@ public class CellDivisionInference implements PlugIn {
         Collections.sort(enclosed);
         double median=enclosed.isEmpty()?0.0:enclosed.get(enclosed.size()/2);
         double voidArea=Math.max(MIN_INTERNAL_VOID_AREA_PX,INTERNAL_VOID_MEDIAN_AREA_FACTOR*median);
-        boolean[] exterior=new boolean[w*h];
-        for(int i=0;i<labels.length;i++){int label=labels[i];exterior[i]=label>=0&&(frameConnected.get(label)||(median>0.0&&areas.get(label)>=voidArea));}
-        return exterior;
+        BackgroundInfo info=new BackgroundInfo();info.labels=labels;info.acceptedLabels=new boolean[areas.size()];
+        for(int i=0;i<areas.size();i++)info.acceptedLabels[i]=frameConnected.get(i)||(median>0.0&&areas.get(i)>=voidArea);
+        info.acceptedPixels=new boolean[w*h];
+        for(int i=0;i<labels.length;i++){int label=labels[i];info.acceptedPixels[i]=label>=0&&info.acceptedLabels[label];}
+        return info;
     }
+    private static boolean[] exteriorBackground4(ByteProcessor bp){return backgroundInfo4(bp).acceptedPixels;}
 
     private static boolean isOuterBoundaryPoint(Point p,boolean[] exterior,int w,int h){
         final int[] dx={1,0,-1,0},dy={0,1,0,-1};
@@ -3056,25 +3060,20 @@ public class CellDivisionInference implements PlugIn {
         return false;
     }
 
-    private static double outerVertexSpacingThreshold(int w,int h){
-        double characteristicSize=FALLBACK_SIZE_DIAGONAL_FRACTION*Math.hypot(w,h);
-        return Math.max(MIN_OUTER_VERTEX_SPACING_PX,OUTER_VERTEX_SPACING_SCALE_FRACTION*characteristicSize);
-    }
-
-    private static List<Point> suppressNearbyOuterVertices(List<Point> candidates,ByteProcessor bp){
-        boolean[] exterior=exteriorBackground4(bp); int w=bp.getWidth(),h=bp.getHeight();
-        double spacing=outerVertexSpacingThreshold(w,h), spacing2=spacing*spacing;
-        ArrayList<Point> accepted=new ArrayList<>();
-        for(Point candidate:candidates){
-            if(!isOuterBoundaryPoint(candidate,exterior,w,h)){accepted.add(candidate);continue;}
-            boolean tooClose=false;
-            for(Point prior:accepted) if(isOuterBoundaryPoint(prior,exterior,w,h)){
-                double dx=candidate.x-prior.x,dy=candidate.y-prior.y;
-                if(dx*dx+dy*dy<spacing2){tooClose=true;break;}
-            }
-            if(!tooClose)accepted.add(candidate); // scan order is the deterministic tie-break
+    private static List<Point> regionBoundaryJunctions(ByteProcessor bp,OuterDetectionConfig cfg){
+        int w=bp.getWidth(),h=bp.getHeight(),r=cfg.outerJunctionNeighborhood;
+        BackgroundInfo bg=backgroundInfo4(bp);boolean[] candidate=new boolean[w*h];
+        for(int y=cfg.frameGuard+1;y<h-cfg.frameGuard-1;y++)for(int x=cfg.frameGuard+1;x<w-cfg.frameGuard-1;x++)if((bp.get(x,y)&255)!=0){
+            boolean exterior=false;HashSet<Integer> cells=new HashSet<>();
+            for(int dy=-r;dy<=r;dy++)for(int dx=-r;dx<=r;dx++)if(dx*dx+dy*dy<=r*r){int label=bg.labels[(y+dy)*w+x+dx];if(label>=0){if(bg.acceptedLabels[label])exterior=true;else cells.add(label);}}
+            candidate[y*w+x]=exterior&&cells.size()>=2;
         }
-        return accepted;
+        ArrayList<Point> pixels=new ArrayList<>();for(int i=0;i<candidate.length;i++)if(candidate[i])pixels.add(new Point(i%w,i/w));
+        ArrayList<Point> anchors=new ArrayList<>();for(Point center:clusterPoints(pixels,1.5)){
+            Point snapped=nearestSkeletonPoint(bp,new Point2D.Double(center.x,center.y),r);if(snapped==null)continue;
+            boolean duplicate=false;for(Point prior:anchors)if(prior.distance(snapped)<=cfg.junctionMergeRadius)duplicate=true;if(!duplicate)anchors.add(snapped);
+        }
+        anchors.sort(Comparator.comparingInt((Point p)->p.y).thenComparingInt(p->p.x));return anchors;
     }
 
     /* A directed edge of the accepted-background pixel mask.  Keeping the
@@ -3155,58 +3154,51 @@ public class CellDivisionInference implements PlugIn {
         return Point2D.distance(p.x,p.y,a.x+t*dx,a.y+t*dy);
     }
 
-    private static void simplifyOpenContour(List<Point2D.Double> points,int first,int last,double epsilon,boolean[] keep){
-        if(last<=first+1)return;
-        double greatest=-1.0;int index=-1;
-        for(int i=first+1;i<last;i++){
-            double distance=pointSegmentDistance(points.get(i),points.get(first),points.get(last));
-            if(distance>greatest){greatest=distance;index=i;}
-        }
-        if(greatest>epsilon){keep[index]=true;simplifyOpenContour(points,first,index,epsilon,keep);simplifyOpenContour(points,index,last,epsilon,keep);}
+    private static List<Point2D.Double> resampleClosedContour(List<Point2D.Double> input,double spacing){
+        ArrayList<Point2D.Double> p=new ArrayList<>(input);double area=0;
+        for(int i=0;i<p.size();i++){Point2D.Double x=p.get(i),y=p.get((i+1)%p.size());area+=x.x*y.y-y.x*x.y;}
+        if(area<0)Collections.reverse(p);int seam=0;for(int i=1;i<p.size();i++)if(p.get(i).y<p.get(seam).y||p.get(i).y==p.get(seam).y&&p.get(i).x<p.get(seam).x)seam=i;
+        Collections.rotate(p,-seam);double[] cumulative=new double[p.size()+1];for(int i=0;i<p.size();i++)cumulative[i+1]=cumulative[i]+p.get(i).distance(p.get((i+1)%p.size()));
+        double length=cumulative[p.size()];int count=Math.max(3,(int)Math.round(length/spacing));ArrayList<Point2D.Double> out=new ArrayList<>();int edge=0;
+        for(int i=0;i<count;i++){double d=length*i/count;while(edge+1<cumulative.length&&cumulative[edge+1]<d)edge++;double len=cumulative[edge+1]-cumulative[edge],t=len==0?0:(d-cumulative[edge])/len;Point2D.Double x=p.get(edge),y=p.get((edge+1)%p.size());out.add(new Point2D.Double(x.x+t*(y.x-x.x),x.y+t*(y.y-x.y)));}return out;
     }
-
-    // Closed-contour Ramer-Douglas-Peucker.  Splitting at the farthest pair
-    // avoids the arbitrary seam that an open-polyline implementation creates.
-    private static List<Point2D.Double> simplifyClosedContour(List<Point2D.Double> contour,double epsilon){
-        int n=contour.size(),a=0,b=0;double greatest=-1.0;
-        // Two linear farthest-point sweeps provide a stable, well-separated
-        // seam without making simplification quadratic on long pixel contours.
-        for(int sweep=0;sweep<2;sweep++){
-            greatest=-1.0;
-            Point2D.Double anchor=contour.get(a);
-            for(int i=0;i<n;i++){
-                double distance=anchor.distanceSq(contour.get(i));
-                if(distance>greatest){greatest=distance;b=i;}
-            }
-            if(sweep==0)a=b;
-        }
-        ArrayList<Point2D.Double> ordered=new ArrayList<>(n+1);
-        for(int i=0;i<=n;i++)ordered.add(contour.get((a+i)%n));
-        int split=(b-a+n)%n;
-        boolean[] keep=new boolean[n+1];keep[0]=keep[split]=keep[n]=true;
-        simplifyOpenContour(ordered,0,split,epsilon,keep);
-        simplifyOpenContour(ordered,split,n,epsilon,keep);
-        ArrayList<Point2D.Double> result=new ArrayList<>();
-        for(int i=0;i<n;i++)if(keep[i])result.add(ordered.get(i));
-        return result;
+    private static List<Point2D.Double> circularSmooth(List<Point2D.Double> p,double sigma){
+        int n=p.size(),r=Math.max(1,(int)Math.ceil(3*sigma));double[] weights=new double[2*r+1];double sum=0;for(int k=-r;k<=r;k++){weights[k+r]=Math.exp(-.5*k*k/(sigma*sigma));sum+=weights[k+r];}
+        ArrayList<Point2D.Double> out=new ArrayList<>();for(int i=0;i<n;i++){double x=0,y=0;for(int k=-r;k<=r;k++){Point2D.Double q=p.get((i+k+n)%n);x+=q.x*weights[k+r]/sum;y+=q.y*weights[k+r]/sum;}out.add(new Point2D.Double(x,y));}return out;
     }
-
-    private static List<Point2D.Double> detectOuterContourSupport(ByteProcessor bp){
-        int w=bp.getWidth(),h=bp.getHeight();
-        boolean[] accepted=exteriorBackground4(bp);
-        ArrayList<Point2D.Double> supports=new ArrayList<>();
-        for(List<Point2D.Double> contour:traceAcceptedBackgroundContours(accepted,w,h)){
-            if(contour.size()<8)continue;
-            boolean frame=false;double minX=Double.MAX_VALUE,minY=Double.MAX_VALUE,maxX=-1,maxY=-1;
-            for(Point2D.Double p:contour){
-                if(p.x==0||p.y==0||p.x==w||p.y==h)frame=true;
-                minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);
-            }
-            if(frame)continue;
-            double characteristicSize=FALLBACK_SIZE_DIAGONAL_FRACTION*Math.hypot(maxX-minX+1.0,maxY-minY+1.0);
-            supports.addAll(simplifyClosedContour(contour,Math.max(1.0,0.015*characteristicSize)));
+    private static double shortcutError(List<Point2D.Double> p,int i,int j){double e=0;for(int k=i+1;k<j;k++)e=Math.max(e,pointSegmentDistance(p.get(k),p.get(i),p.get(j)));return e;}
+    private static int skeletonDegree(ByteProcessor bp,Point p){int[] dx={0,1,1,1,0,-1,-1,-1},dy={-1,-1,0,1,1,1,0,-1};boolean[] on=new boolean[8];for(int k=0;k<8;k++){int x=p.x+dx[k],y=p.y+dy[k];on[k]=x>=0&&y>=0&&x<bp.getWidth()&&y<bp.getHeight()&&(bp.get(x,y)&255)!=0;}int runs=0;for(int k=0;k<8;k++)if(on[k]&&!on[(k+7)%8])runs++;return runs;}
+    private static class ArcCandidate {int index;double angle;ArcCandidate(int i,double a){index=i;angle=a;}}
+    private static class AreaCandidate {int index;Point snap;AreaCandidate(int i,Point p){index=i;snap=p;}}
+    private static class AreaArc {int cellLabel;List<Point2D.Double> raw,fit;List<AreaCandidate> valid=new ArrayList<>();TreeSet<Integer> selected=new TreeSet<>();}
+    private static List<Point> detectOuterContourSupport(ByteProcessor bp,List<Point> anchors,OuterDetectionConfig cfg){
+        int w=bp.getWidth(),h=bp.getHeight(),contourId=0;BackgroundInfo background=backgroundInfo4(bp);boolean[] accepted=background.acceptedPixels;ArrayList<Point> supports=new ArrayList<>();ArrayList<AreaArc> areaArcs=new ArrayList<>();
+        for(List<Point2D.Double> traced:traceAcceptedBackgroundContours(accepted,w,h)){
+            boolean frame=false;for(Point2D.Double p:traced)frame|=p.x==0||p.y==0||p.x==w||p.y==h;if(frame||traced.size()<3)continue;
+            List<Point2D.Double> contour=resampleClosedContour(traced,cfg.contourSampleSpacing),curved=circularSmooth(contour,cfg.curvatureSigma),fitted=circularSmooth(contour,cfg.fitSigma);int n=contour.size();
+            TreeMap<Integer,Point> mapped=new TreeMap<>();HashMap<Integer,Double> distances=new HashMap<>();
+            for(Point anchor:anchors){int best=-1;double bd=Double.MAX_VALUE;for(int i=0;i<n;i++){double d=contour.get(i).distanceSq(anchor.x,anchor.y);if(d<bd){bd=d;best=i;}}if(Math.sqrt(bd)<=cfg.anchorContourTolerance){if(!mapped.containsKey(best)||bd<distances.get(best)){mapped.put(best,anchor);distances.put(best,bd);}}}
+            if(mapped.size()<2){IJ.log("Outer contour "+contourId+" has fewer than two reliable anchors; no supports invented.");contourId++;continue;}ArrayList<Integer> indices=new ArrayList<>(mapped.keySet());
+            for(int arc=0;arc<indices.size();arc++){int start=indices.get(arc),end=indices.get((arc+1)%indices.size()),length=(end-start+n)%n;if(length<2)continue;
+                ArrayList<Point2D.Double> raw=new ArrayList<>(),cs=new ArrayList<>(),fs=new ArrayList<>();for(int k=0;k<=length;k++){int z=(start+k)%n;raw.add(contour.get(z));cs.add(curved.get(z));fs.add(fitted.get(z));}
+                ArrayList<ArcCandidate> candidates=new ArrayList<>();int window=cfg.curvatureWindow;for(int i=window;i+window<=length;i++){Point2D.Double a=cs.get(i-window),b=cs.get(i),c=cs.get(i+window);double ux=b.x-a.x,uy=b.y-a.y,vx=c.x-b.x,vy=c.y-b.y,den=Math.hypot(ux,uy)*Math.hypot(vx,vy);if(den==0)continue;double angle=Math.toDegrees(Math.acos(Math.max(-1,Math.min(1,(ux*vx+uy*vy)/den))));if(angle>=cfg.curvatureThresholdDegrees&&raw.get(i).distance(raw.get(0))>=cfg.junctionExclusion&&raw.get(i).distance(raw.get(length))>=cfg.junctionExclusion)candidates.add(new ArcCandidate(i,angle));}
+                candidates.sort((x,y)->x.angle!=y.angle?Double.compare(y.angle,x.angle):Integer.compare(x.index,y.index));ArrayList<ArcCandidate> peaks=new ArrayList<>();for(ArcCandidate c:candidates){boolean close=false;for(ArcCandidate q:peaks)if(Math.abs(c.index-q.index)<=cfg.curvatureNmsRadius)close=true;if(!close)peaks.add(c);}
+                int m=length+1;int[] links=new int[m],previous=new int[m];double[] costs=new double[m];Arrays.fill(links,Integer.MAX_VALUE/2);Arrays.fill(previous,-1);Arrays.fill(costs,Double.POSITIVE_INFINITY);links[0]=0;costs[0]=0;
+                for(int j=1;j<m;j++)for(int i=0;i<j;i++){double error=shortcutError(fs,i,j);if(error>cfg.maximumFitError)continue;int nl=links[i]+1;double nc=costs[i]+error*error;if(nl<links[j]||nl==links[j]&&(nc<costs[j]-1e-12||Math.abs(nc-costs[j])<=1e-12&&(previous[j]<0||i<previous[j]))){links[j]=nl;costs[j]=nc;previous[j]=i;}}
+                ArrayList<Integer> imai=new ArrayList<>();for(int at=previous[m-1];at>0;at=previous[at])imai.add(at);Collections.sort(imai);
+                int supportStart=supports.size();class Pair {double d;int p,q;Pair(double x,int y,int z){d=x;p=y;q=z;}}ArrayList<Pair> pairs=new ArrayList<>();for(int pi=0;pi<peaks.size();pi++)for(int qi=0;qi<imai.size();qi++){double d=raw.get(peaks.get(pi).index).distance(raw.get(imai.get(qi)));if(d<=cfg.consensusRadius)pairs.add(new Pair(d,pi,qi));}pairs.sort(Comparator.comparingDouble((Pair x)->x.d).thenComparingInt(x->x.p).thenComparingInt(x->x.q));HashSet<Integer> usedP=new HashSet<>(),usedQ=new HashSet<>();
+                for(Pair pair:pairs)if(!usedP.contains(pair.p)&&!usedQ.contains(pair.q)){Point snap=nearestSkeletonPoint(bp,raw.get(peaks.get(pair.p).index),cfg.skeletonSnapRadius);if(snap==null||skeletonDegree(bp,snap)!=2)continue;boolean excluded=false;for(Point anchor:anchors)if(anchor.distance(snap)<cfg.junctionExclusion)excluded=true;for(Point prior:supports)if(prior.distance(snap)<=1.0)excluded=true;if(!excluded){supports.add(snap);usedP.add(pair.p);usedQ.add(pair.q);}}
+                AreaArc areaArc=new AreaArc();areaArc.raw=raw;areaArc.fit=fs;HashMap<Integer,Integer> votes=new HashMap<>();for(Point2D.Double point:raw)for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++){int x=(int)Math.round(point.x)+dx,y=(int)Math.round(point.y)+dy;if(x>=0&&y>=0&&x<w&&y<h){int label=background.labels[y*w+x];if(label>=0&&!background.acceptedLabels[label])votes.put(label,votes.getOrDefault(label,0)+1);}}int greatest=0;areaArc.cellLabel=-1;for(Map.Entry<Integer,Integer> vote:votes.entrySet())if(vote.getValue()>greatest){greatest=vote.getValue();areaArc.cellLabel=vote.getKey();}
+                for(ArcCandidate peak:peaks){Point snap=nearestSkeletonPoint(bp,raw.get(peak.index),cfg.skeletonSnapRadius);if(snap==null||skeletonDegree(bp,snap)!=2)continue;boolean excluded=false;for(Point anchor:anchors)if(anchor.distance(snap)<cfg.junctionExclusion)excluded=true;if(!excluded){areaArc.valid.add(new AreaCandidate(peak.index,snap));for(int supportIndex=supportStart;supportIndex<supports.size();supportIndex++)if(supports.get(supportIndex).distance(snap)<=1.0)areaArc.selected.add(peak.index);}}
+                if(areaArc.cellLabel>=0)areaArcs.add(areaArc);
+            }contourId++;
         }
-        return supports;
+        int[] cellAreas=new int[background.acceptedLabels.length];for(int label:background.labels)if(label>=0&&!background.acceptedLabels[label])cellAreas[label]++;
+        java.util.function.IntToDoubleFunction areaError=(cell)->{boolean[] reference=new boolean[w*h],changedMask=new boolean[w*h];for(int i=0;i<background.labels.length;i++)reference[i]=background.labels[i]==cell;for(AreaArc arc:areaArcs)if(arc.cellLabel==cell){Polygon polygon=new Polygon();for(Point2D.Double point:arc.raw)polygon.addPoint((int)Math.round(point.x),(int)Math.round(point.y));polygon.addPoint((int)Math.round(arc.raw.get(arc.raw.size()-1).x),(int)Math.round(arc.raw.get(arc.raw.size()-1).y));for(int index:arc.selected.descendingSet())polygon.addPoint((int)Math.round(arc.raw.get(index).x),(int)Math.round(arc.raw.get(index).y));polygon.addPoint((int)Math.round(arc.raw.get(0).x),(int)Math.round(arc.raw.get(0).y));Rectangle bounds=polygon.getBounds();for(int y=Math.max(0,bounds.y);y<Math.min(h,bounds.y+bounds.height+1);y++)for(int x=Math.max(0,bounds.x);x<Math.min(w,bounds.x+bounds.width+1);x++)if(polygon.contains(x+.5,y+.5))changedMask[y*w+x]=true;}int difference=0;for(int i=0;i<reference.length;i++){boolean approximate=reference[i]^changedMask[i];if(reference[i]^approximate)difference++;}return cellAreas[cell]==0?0.0:(double)difference/cellAreas[cell];};
+        TreeSet<Integer> cells=new TreeSet<>();for(AreaArc arc:areaArcs)cells.add(arc.cellLabel);for(int cell:cells){double before=areaError.applyAsDouble(cell),current=before;while(current>cfg.maxAreaErrorFraction){AreaArc bestArc=null;int bestIndex=-1;double best=current;for(AreaArc arc:areaArcs)if(arc.cellLabel==cell)for(AreaCandidate candidate:arc.valid)if(!arc.selected.contains(candidate.index)){arc.selected.add(candidate.index);double trial=areaError.applyAsDouble(cell);arc.selected.remove(candidate.index);if(trial<best-1e-12){best=trial;bestArc=arc;bestIndex=candidate.index;}}if(bestArc==null)break;bestArc.selected.add(bestIndex);current=best;}
+            boolean changed=true;while(changed){changed=false;for(AreaArc arc:areaArcs)if(arc.cellLabel==cell){ArrayList<Integer> selected=new ArrayList<>(arc.selected);for(int position=0;position<selected.size();position++){int index=selected.get(position),previous=position==0?0:selected.get(position-1),next=position+1==selected.size()?arc.raw.size()-1:selected.get(position+1);if(shortcutError(arc.fit,previous,next)>cfg.maximumFitError)continue;arc.selected.remove(index);double trial=areaError.applyAsDouble(cell);if(trial<=cfg.maxAreaErrorFraction){current=trial;changed=true;break;}arc.selected.add(index);}if(changed)break;}}
+            current=areaError.applyAsDouble(cell);IJ.log("Outer cell "+cell+" area error "+before+" -> "+current+(current>cfg.maxAreaErrorFraction?" (unresolved)":""));}
+        supports.clear();for(AreaArc arc:areaArcs)for(AreaCandidate candidate:arc.valid)if(arc.selected.contains(candidate.index)){boolean duplicate=false;for(Point prior:supports)if(prior.distance(candidate.snap)<=1.0)duplicate=true;if(!duplicate)supports.add(candidate.snap);}return supports;
     }
 
     private static Point nearestSkeletonPoint(ByteProcessor bp,Point2D.Double position,int radius){
@@ -3277,68 +3269,25 @@ public class CellDivisionInference implements PlugIn {
     }
 
     private void detectVertices3Neighbors(JFrame frame){
-
         if(currentImp==null) return;
-
-        JSpinner spacingSpinner=new JSpinner(new SpinnerNumberModel(
-                outerContourSupportSpacingPx,MIN_OUTER_VERTEX_SPACING_PX,1000.0,1.0));
-        JSpinner.NumberEditor spacingEditor=new JSpinner.NumberEditor(spacingSpinner,"0.0");
-        spacingSpinner.setEditor(spacingEditor);
-        JPanel spacingPanel=new JPanel(new BorderLayout(8,0));
-        spacingPanel.add(new JLabel("Minimum distance between outer contour vertices (px):"),BorderLayout.WEST);
-        spacingPanel.add(spacingSpinner,BorderLayout.CENTER);
-        int option=JOptionPane.showConfirmDialog(frame,spacingPanel,"Detect Vertices",
-                JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE);
-        if(option!=JOptionPane.OK_OPTION)return;
-        outerContourSupportSpacingPx=((Number)spacingSpinner.getValue()).doubleValue();
-        final double requestedSupportSpacing=outerContourSupportSpacingPx;
-
+        JSpinner errorSpinner=new JSpinner(new SpinnerNumberModel(outerDetectionConfig.maximumFitError,0.1,100.0,0.1));
+        JSpinner.NumberEditor editor=new JSpinner.NumberEditor(errorSpinner,"0.0");errorSpinner.setEditor(editor);
+        JPanel panel=new JPanel(new BorderLayout(8,0));panel.add(new JLabel("Maximum contour fitting error (px):"),BorderLayout.WEST);panel.add(errorSpinner,BorderLayout.CENTER);
+        if(JOptionPane.showConfirmDialog(frame,panel,"Detect Vertices",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;
+        outerDetectionConfig.maximumFitError=((Number)errorSpinner.getValue()).doubleValue();
         new Thread(() -> {
-
-            ImageProcessor ip0=currentImp.getProcessor();
-            ByteProcessor bp=(ByteProcessor)ip0.convertToByte(true);
-
-            List<Point> raw=findJunctionPixels(bp);
-            List<Point> clustered=clusterPoints(raw,2.0);
-            clustered=suppressNearbyOuterVertices(clustered,bp);
-
-            vertexPoints=clustered;
-            vertexGeometryPoints=new ArrayList<>();
-            vertexKinds=new ArrayList<>();
-            boolean[] exterior=exteriorBackground4(bp);
-            for(Point p:clustered){ vertexGeometryPoints.add(new Point2D.Double(p.x,p.y));
-                vertexKinds.add(isOuterBoundaryPoint(p,exterior,bp.getWidth(),bp.getHeight())?VertexKind.BOUNDARY_JUNCTION:VertexKind.INTERIOR_JUNCTION); }
-
-            // Qt performs this as an independent second pass: contour turns do
-            // not need to satisfy the three/four-branch biological test.
-            // Preserve Qt's scale-aware floor, while allowing dense contours to
-            // be thinned further in physical image pixels by the user.
-            double spacing=Math.max(outerVertexSpacingThreshold(bp.getWidth(),bp.getHeight()),
-                    requestedSupportSpacing);
-            double spacing2=spacing*spacing;
-            for(Point2D.Double geometry:detectOuterContourSupport(bp)){
-                boolean duplicate=false;
-                for(int i=0;i<vertexPoints.size();i++){
-                    Point2D.Double existing=vertexGeometryPoints.get(i);
-                    if(existing.distanceSq(geometry)<spacing2){duplicate=true;break;}
-                }
-                if(duplicate)continue; // biological boundary junctions win
-                Point skeletonPoint=nearestSkeletonPoint(bp,geometry,3);
-                if(skeletonPoint==null)continue;
-                vertexPoints.add(skeletonPoint);
-                vertexGeometryPoints.add(new Point2D.Double(geometry.x,geometry.y));
-                vertexKinds.add(VertexKind.CONTOUR_SUPPORT);
-            }
-
-            lineEdges.clear();
-            polygons.clear();
-
-            SwingUtilities.invokeLater(() -> {
-                imagePanel.setOverlayPoints(vertexPoints);
-                imagePanel.setLines(lineEdges);
-                imagePanel.setPolygons(polygons);
-            });
-
+            ByteProcessor bp=(ByteProcessor)currentImp.getProcessor().convertToByte(true);int w=bp.getWidth(),h=bp.getHeight();
+            List<Point> branches=clusterPoints(findJunctionPixels(bp),2.0),anchors=regionBoundaryJunctions(bp,outerDetectionConfig);boolean[] exterior=exteriorBackground4(bp);
+            ArrayList<Point> automatic=new ArrayList<>();ArrayList<VertexKind> kinds=new ArrayList<>();
+            for(Point anchor:anchors){automatic.add(anchor);kinds.add(VertexKind.BOUNDARY_JUNCTION);}
+            for(Point branch:branches){boolean merged=false;for(Point anchor:anchors)if(anchor.distance(branch)<=outerDetectionConfig.junctionMergeRadius){merged=true;break;}if(!merged){automatic.add(branch);kinds.add(isOuterBoundaryPoint(branch,exterior,w,h)?VertexKind.BOUNDARY_JUNCTION:VertexKind.INTERIOR_JUNCTION);if(isOuterBoundaryPoint(branch,exterior,w,h))anchors.add(branch);}}
+            for(Point support:detectOuterContourSupport(bp,anchors,outerDetectionConfig)){automatic.add(support);kinds.add(VertexKind.CONTOUR_SUPPORT);}
+            // Retain manual work; replace only the previous automatic detection set.
+            ArrayList<Point> combined=new ArrayList<>();ArrayList<Point2D.Double> geometry=new ArrayList<>();ArrayList<VertexKind> combinedKinds=new ArrayList<>();
+            for(int i=0;i<vertexPoints.size();i++){VertexKind kind=i<vertexKinds.size()?vertexKinds.get(i):VertexKind.MANUAL_TOPOLOGICAL;if(kind==VertexKind.MANUAL_TOPOLOGICAL||kind==VertexKind.AMBIGUOUS){combined.add(vertexPoints.get(i));Point2D.Double g=i<vertexGeometryPoints.size()?vertexGeometryPoints.get(i):new Point2D.Double(vertexPoints.get(i).x,vertexPoints.get(i).y);geometry.add(g);combinedKinds.add(kind);}}
+            for(int i=0;i<automatic.size();i++){Point p=automatic.get(i);boolean duplicate=false;for(Point existing:combined)if(existing.distance(p)<=1.0){duplicate=true;break;}if(!duplicate){combined.add(p);geometry.add(new Point2D.Double(p.x,p.y));combinedKinds.add(kinds.get(i));}}
+            vertexPoints=combined;vertexGeometryPoints=geometry;vertexKinds=combinedKinds;lineEdges.clear();polygons.clear();
+            SwingUtilities.invokeLater(() -> {imagePanel.setOverlayPoints(vertexPoints);imagePanel.setLines(lineEdges);imagePanel.setPolygons(polygons);});
         }).start();
     }
 

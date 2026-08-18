@@ -37,6 +37,7 @@
 #include <QRegularExpression>
 #include <QImageReader>
 #include <QPainter>
+#include <QDebug>
 
 #include <opencv2/core.hpp>
 
@@ -1927,31 +1928,39 @@ void MainWindow::onVertexDetection()
         return;
     }
 
-    const std::vector<cv::Point2d> detectedVertices = ImageAnalysis::detectVertices(m_currentImage);
-    const double outerSpacing = ImageAnalysis::outerVertexSpacingThreshold(m_currentImage.size());
-
-    int addedCount = 0;
-    for (const auto &point : detectedVertices) {
-        QPointF position(point.x, point.y);
-        const bool boundary = ImageAnalysis::isOuterBoundaryPoint(m_currentImage, point);
-        // Boundary candidates are intentionally less sensitive than interior
-        // junctions: tiny local skeleton changes must not create a second
-        // angle-defining vertex.  Existing/manual vertices win ties.
-        VertexItem *nearby = VertexItem::findVertexByPosition(scene, position, boundary ? outerSpacing : 0.0);
-        if (nearby) {
-            // A biological junction is a mandatory anchor and therefore wins
-            // over an older automatically inserted support point.
-            if (boundary && nearby->kind() == VertexItem::Kind::ContourSupport) {
-                scene->removeItem(nearby);
-                delete nearby;
-            } else {
-                continue;
+    // Supports are regenerated from cell-local arcs; remove only stale automatic
+    // supports. Manual vertices and derived/manual graph objects are untouched.
+    for (QGraphicsItem *item : scene->items()) {
+        if (item && item->type() == VertexItem::Type) {
+            auto *vertex = static_cast<VertexItem*>(item);
+            if (vertex->kind() == VertexItem::Kind::ContourSupport) {
+                scene->removeItem(vertex);
+                delete vertex;
             }
         }
+    }
+    const auto detection = ImageAnalysis::detectCellArcVertices(m_currentImage);
+    for (const std::string &diagnostic : detection.diagnostics)
+        qInfo().noquote() << QString::fromStdString(diagnostic);
+
+    int addedCount = 0;
+    for (const auto &detected : detection.vertices) {
+        if (detected.kind == ImageAnalysis::DetectedVertexKind::Ambiguous)
+            continue;
+        const auto &point = detected.position;
+        QPointF position(point.x, point.y);
+        // Biological and manual vertices always take precedence. The one-pixel
+        // tolerance only removes true snapped duplicates, not nearby arc detail.
+        if (VertexItem::findVertexByPosition(scene, position, 1.0))
+            continue;
 
         auto *vertex = new VertexItem(m_nextVertexId++, position);
-        vertex->setKind(boundary
-                        ? VertexItem::Kind::BoundaryJunction : VertexItem::Kind::InteriorJunction);
+        if (detected.kind == ImageAnalysis::DetectedVertexKind::BoundaryJunction)
+            vertex->setKind(VertexItem::Kind::BoundaryJunction);
+        else if (detected.kind == ImageAnalysis::DetectedVertexKind::ContourSupport)
+            vertex->setKind(VertexItem::Kind::ContourSupport);
+        else
+            vertex->setKind(VertexItem::Kind::InteriorJunction);
         scene->addItem(vertex);
         vertex->setFlag(QGraphicsItem::ItemIsMovable, m_allowVertexManualMove);
         connect(vertex, &VertexItem::selected, this, &MainWindow::onVertexSelected);
@@ -1959,10 +1968,6 @@ void MainWindow::onVertexDetection()
         ++addedCount;
     }
 
-    const auto supports=ImageAnalysis::detectOuterContourSupport(m_currentImage);
-    for(const auto &point:supports){QPointF position(point.x,point.y);if(VertexItem::findVertexByPosition(scene,position,outerSpacing))continue;
-        auto *vertex=new VertexItem(m_nextVertexId++,position);vertex->setKind(VertexItem::Kind::ContourSupport);scene->addItem(vertex);
-        vertex->setFlag(QGraphicsItem::ItemIsMovable,m_allowVertexManualMove);connect(vertex,&VertexItem::selected,this,&MainWindow::onVertexSelected);connect(vertex,&VertexItem::moved,this,&MainWindow::onVertexMoved);++addedCount;}
     updateVertexCountLabel();
 
     //QMessageBox::information(this, "Vertex Detection", QString("Detected %1 vertices with more than three 8-neighbors.").arg(addedCount));

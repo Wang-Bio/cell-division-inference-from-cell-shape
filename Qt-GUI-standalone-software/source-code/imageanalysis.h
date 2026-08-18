@@ -7,12 +7,6 @@
 
 namespace ImageAnalysis {
 
-// Minimum separation used by both automatic boundary-junction and contour-
-// support placement.  The scale term is 0.08*S, where the no-face fallback
-// S is 0.05 of the image diagonal.
-constexpr double kMinimumOuterVertexSpacingPixels = 2.0;
-constexpr double kOuterVertexSpacingScaleFraction = 0.04;
-constexpr double kFallbackCharacteristicSizeDiagonalFraction = 0.05;
 // An enclosed background component is treated as a tissue void, rather than a
 // normal cell face, when it is at least this many times the median enclosed
 // face area. This lets internal void perimeters participate in outer-boundary
@@ -34,6 +28,38 @@ struct VertexGeometry {
 struct GraphEdge {
     int startId = -1;
     int endId = -1;
+};
+
+enum class DetectedVertexKind { InteriorJunction, BoundaryJunction, ContourSupport, Ambiguous };
+
+struct OuterDetectionParameters {
+    double contourSampleSpacing = 1.0;
+    int outerJunctionNeighborhood = 3;
+    int frameGuard = 2;
+    double junctionMergeRadius = 2.0;
+    double anchorContourTolerance = 4.0;
+    double curvatureSigma = 2.0;
+    int curvatureWindow = 2;
+    double curvatureThresholdDegrees = 5.0;
+    int curvatureNmsRadius = 8;
+    double fitSigma = 2.5;
+    double maximumFitError = 1.0;
+    double maxAreaErrorFraction = 0.02;
+    double consensusRadius = 2.5;
+    double junctionExclusion = 3.0;
+    int skeletonSnapRadius = 3;
+};
+
+struct VertexDetection {
+    cv::Point2d position;
+    DetectedVertexKind kind = DetectedVertexKind::InteriorJunction;
+    int contourId = -1;
+    int arcId = -1;
+};
+
+struct VertexDetectionResult {
+    std::vector<VertexDetection> vertices;
+    std::vector<std::string> diagnostics;
 };
 
 
@@ -64,13 +90,12 @@ cv::Mat segmentWithGuoHall(const cv::Mat &input, double threshold = -1.0, bool i
 // Returns zero-based pixel coordinates for each detected vertex.
 std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage);
 
-// Trace each disconnected foreground network and return simplified contour
-// supports for both its exterior and any unusually large enclosed background
-// components (tissue voids). Ordinary cell faces are excluded.
-std::vector<cv::Point2d> detectOuterContourSupport(const cv::Mat &skeletonImage,
-                                                   std::string *warning = nullptr);
+// Classify branch and region-topology junctions, then find geometric supports
+// by curvature/Imai-Iri consensus independently on each anchored outer-cell arc.
+// Ordinary cell faces are excluded; unusually large tissue voids are included.
+VertexDetectionResult detectCellArcVertices(const cv::Mat &skeletonImage,
+        const OuterDetectionParameters &parameters = OuterDetectionParameters());
 bool isOuterBoundaryPoint(const cv::Mat &skeletonImage, const cv::Point2d &point);
-double outerVertexSpacingThreshold(const cv::Size &imageSize, double characteristicSize = -1.0);
 
 // Detect neighboring vertices with a multi-source traversal of the skeleton. Vertex
 // labels act as barriers, while meeting wave fronts identify adjacent outline segments.
