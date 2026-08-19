@@ -45,6 +45,14 @@ struct OuterDetectionParameters {
     double fitSigma = 2.5;
     double maximumFitError = 1.0;
     double maxAreaErrorFraction = 0.02;
+    // Conservative post-refinement redundancy pruning.  These limits are
+    // deliberately independent of the detector/fitter parameters above.
+    double maxRedundantAreaContributionFraction = 0.0025;
+    double maxRedundantAreaErrorIncreaseFraction = 0.001;
+    double maxRedundantContourDeviationPixels = 1.5;
+    double nearlyStraightContourDeviationPixels = 0.75;
+    double tangentComparisonEpsilonDegrees = 1e-6;
+    int maxDeletedPerArc = 1;
     double consensusRadius = 2.5;
     double junctionExclusion = 3.0;
     int skeletonSnapRadius = 3;

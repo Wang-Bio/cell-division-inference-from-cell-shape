@@ -551,6 +551,39 @@ VertexDetectionResult detectCellArcVertices(const cv::Mat&s,const OuterDetection
       bool changed=true;while(changed){changed=false;for(auto&arc:screenArcs)if(arc.cellLabel==cell){std::vector<int> selected(arc.selected.begin(),arc.selected.end());for(int index:selected){auto it=std::lower_bound(selected.begin(),selected.end(),index);int pos=it-selected.begin(),previous=pos?selected[pos-1]:0,next=pos+1<(int)selected.size()?selected[pos+1]:int(arc.raw.size()-1);if(segmentError(arc.fitted,previous,next)>par.maximumFitError)continue;arc.selected.erase(index);double trial=areaError(cell);if(trial<=par.maxAreaErrorFraction){current=trial;changed=true;break;}arc.selected.insert(index);}if(changed)break;}}
       current=areaError(cell);result.diagnostics.push_back("outer cell "+std::to_string(cell)+" area error "+std::to_string(before)+" -> "+std::to_string(current)+(current>par.maxAreaErrorFraction?" (unresolved)":""));
     }
+    // Final, conservative redundancy screen.  This intentionally runs after
+    // the established CSS/Imai-Iri detection and area refinement above.  A
+    // rejected or numerically ambiguous candidate is simply retained.
+    auto cross=[](const cv::Point2d&a,const cv::Point2d&b,const cv::Point2d&c){return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);};
+    auto samePoint=[&](const cv::Point2d&a,const cv::Point2d&b){return distanceSquared(a,b)<=1e-12;};
+    auto intersects=[&](const cv::Point2d&a,const cv::Point2d&b,const cv::Point2d&c,const cv::Point2d&d){
+      if(samePoint(a,c)||samePoint(a,d)||samePoint(b,c)||samePoint(b,d))return false;
+      double ab1=cross(a,b,c),ab2=cross(a,b,d),cd1=cross(c,d,a),cd2=cross(c,d,b),eps=1e-9;
+      // Collinearity/endpoint contact is uncertain and is therefore rejected.
+      if(std::abs(ab1)<=eps||std::abs(ab2)<=eps||std::abs(cd1)<=eps||std::abs(cd2)<=eps)return true;
+      return (ab1<0)!=(ab2<0)&&(cd1<0)!=(cd2<0);
+    };
+    auto angle=[](const cv::Point2d&a,const cv::Point2d&b){double den=cv::norm(a)*cv::norm(b);if(den<=1e-12)return std::numeric_limits<double>::infinity();return std::acos(std::max(-1.,std::min(1.,a.dot(b)/den)))*180/CV_PI;};
+    std::map<std::pair<int,int>,int> deletedPerArc;
+    for(int cell:outerCells){double pruneBefore=areaError(cell),current=pruneBefore;bool accepted=true;
+      while(accepted){accepted=false;struct Redundant {double marginal;ScreenArc*arc;int index;};std::vector<Redundant> candidates;
+        for(auto&arc:screenArcs)if(arc.cellLabel==cell&&deletedPerArc[{arc.contourId,arc.arcId}]<par.maxDeletedPerArc){std::vector<int> chosen(arc.selected.begin(),arc.selected.end());for(int pos=0;pos<(int)chosen.size();++pos){int q=chosen[pos],p=pos?chosen[pos-1]:0,r=pos+1<(int)chosen.size()?chosen[pos+1]:int(arc.raw.size()-1);double contribution=std::abs(cross(arc.raw[p],arc.raw[q],arc.raw[r]))*.5/std::max(1,cellAreas[cell]);candidates.push_back({contribution,&arc,q});}}
+        std::stable_sort(candidates.begin(),candidates.end(),[](const Redundant&a,const Redundant&b){return a.marginal!=b.marginal?a.marginal<b.marginal:std::tie(a.arc->contourId,a.arc->arcId,a.index)<std::tie(b.arc->contourId,b.arc->arcId,b.index);});
+        for(auto candidate:candidates){ScreenArc&arc=*candidate.arc;if(!arc.selected.count(candidate.index)||!(candidate.marginal<par.maxRedundantAreaContributionFraction))continue;std::vector<int> chosen(arc.selected.begin(),arc.selected.end());auto found=std::lower_bound(chosen.begin(),chosen.end(),candidate.index);int pos=found-chosen.begin(),p=pos?chosen[pos-1]:0,r=pos+1<(int)chosen.size()?chosen[pos+1]:int(arc.raw.size()-1);
+          double deviation=segmentError(arc.raw,p,r);if(!std::isfinite(deviation)||deviation>par.maxRedundantContourDeviationPixels)continue;
+          if(chosen.size()==1&&deviation>par.nearlyStraightContourDeviationPixels)continue;
+          cv::Point2d pq=arc.raw[candidate.index]-arc.raw[p],qr=arc.raw[r]-arc.raw[candidate.index],pr=arc.raw[r]-arc.raw[p];double oldMismatch=0,newMismatch=0;bool certain=true;
+          for(int k=p;k<=r;++k){int lo=std::max(p,k-1),hi=std::min(r,k+1);cv::Point2d tangent=arc.raw[hi]-arc.raw[lo];double oldAngle=angle(tangent,k<=candidate.index?pq:qr),newAngle=angle(tangent,pr);if(!std::isfinite(oldAngle)||!std::isfinite(newAngle)){certain=false;break;}oldMismatch=std::max(oldMismatch,oldAngle);newMismatch=std::max(newMismatch,newAngle);}if(!certain||newMismatch>oldMismatch+par.tangentComparisonEpsilonDegrees)continue;
+          // P/R are junctions when they are arc endpoints; their raw tangent
+          // mismatch must strictly improve rather than merely tie.
+          bool junctionMismatchReduced=true;if(p==0){double oldJ=angle(arc.raw[1]-arc.raw[0],pq),newJ=angle(arc.raw[1]-arc.raw[0],pr);junctionMismatchReduced=std::isfinite(oldJ)&&std::isfinite(newJ)&&newJ+par.tangentComparisonEpsilonDegrees<oldJ;}if(junctionMismatchReduced&&r==(int)arc.raw.size()-1){double oldJ=angle(arc.raw[r]-arc.raw[r-1],qr),newJ=angle(arc.raw[r]-arc.raw[r-1],pr);junctionMismatchReduced=std::isfinite(oldJ)&&std::isfinite(newJ)&&newJ+par.tangentComparisonEpsilonDegrees<oldJ;}if(!junctionMismatchReduced)continue;
+          bool crossing=false;for(auto&other:screenArcs){std::vector<int> points{0};points.insert(points.end(),other.selected.begin(),other.selected.end());points.push_back(int(other.raw.size()-1));for(int i=1;i<(int)points.size();++i){if(&other==&arc&&((points[i-1]==p&&points[i]==candidate.index)||(points[i-1]==candidate.index&&points[i]==r)))continue;if(intersects(arc.raw[p],arc.raw[r],other.raw[points[i-1]],other.raw[points[i]])){crossing=true;break;}}if(crossing)break;}if(crossing||samePoint(arc.raw[p],arc.raw[r]))continue;
+          arc.selected.erase(candidate.index);double trial=areaError(cell);if(!std::isfinite(trial)||trial>=par.maxAreaErrorFraction||trial-current>par.maxRedundantAreaErrorIncreaseFraction+1e-12){arc.selected.insert(candidate.index);continue;}
+          ++deletedPerArc[{arc.contourId,arc.arcId}];cv::Point report(cvRound(arc.raw[candidate.index].x),cvRound(arc.raw[candidate.index].y));for(auto&valid:arc.valid)if(valid.index==candidate.index){report=valid.snap;break;}result.diagnostics.push_back("redundancy prune outer cell "+std::to_string(cell)+" deleted CONTOUR_SUPPORT ("+std::to_string(report.x)+","+std::to_string(report.y)+") area error "+std::to_string(current)+" -> "+std::to_string(trial));current=trial;accepted=true;break;
+        }
+      }
+      result.diagnostics.push_back("redundancy prune outer cell "+std::to_string(cell)+" summary "+std::to_string(pruneBefore)+" -> "+std::to_string(current));
+    }
     result.vertices.erase(std::remove_if(result.vertices.begin(),result.vertices.end(),[](const VertexDetection&v){return v.kind==DetectedVertexKind::ContourSupport;}),result.vertices.end());for(auto&arc:screenArcs)for(auto&candidate:arc.valid)if(arc.selected.count(candidate.index)){bool duplicate=false;for(auto&vertex:result.vertices)if(vertex.kind==DetectedVertexKind::ContourSupport&&distanceSquared(vertex.position,candidate.snap)<=1.0)duplicate=true;if(!duplicate)result.vertices.push_back({cv::Point2d(candidate.snap),DetectedVertexKind::ContourSupport,arc.contourId,arc.arcId});}
     return result;
 }

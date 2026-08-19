@@ -169,8 +169,13 @@ public class CellDivisionInference implements PlugIn {
         double contourSampleSpacing=1.0, junctionMergeRadius=2.0, anchorContourTolerance=4.0;
         double curvatureSigma=2.0, curvatureThresholdDegrees=5.0, fitSigma=2.5;
         double maximumFitError=1.0, maxAreaErrorFraction=0.02, consensusRadius=2.5, junctionExclusion=3.0;
+        // Conservative post-refinement redundancy-pruning limits.  Keep these
+        // separate from the established detector and area-refinement knobs.
+        double maxRedundantAreaContributionFraction=0.0025, maxRedundantAreaErrorIncreaseFraction=0.001;
+        double maxRedundantContourDeviationPixels=1.5, nearlyStraightContourDeviationPixels=0.75;
+        double tangentComparisonEpsilonDegrees=1e-6;
         int outerJunctionNeighborhood=3, frameGuard=2, curvatureWindow=2;
-        int curvatureNmsRadius=8, skeletonSnapRadius=3;
+        int curvatureNmsRadius=8, skeletonSnapRadius=3, maxDeletedPerArc=1;
     }
     private final OuterDetectionConfig outerDetectionConfig=new OuterDetectionConfig();
     private static final double INTERNAL_VOID_MEDIAN_AREA_FACTOR = 4.0;
@@ -3167,6 +3172,16 @@ public class CellDivisionInference implements PlugIn {
         ArrayList<Point2D.Double> out=new ArrayList<>();for(int i=0;i<n;i++){double x=0,y=0;for(int k=-r;k<=r;k++){Point2D.Double q=p.get((i+k+n)%n);x+=q.x*weights[k+r]/sum;y+=q.y*weights[k+r]/sum;}out.add(new Point2D.Double(x,y));}return out;
     }
     private static double shortcutError(List<Point2D.Double> p,int i,int j){double e=0;for(int k=i+1;k<j;k++)e=Math.max(e,pointSegmentDistance(p.get(k),p.get(i),p.get(j)));return e;}
+    private static double contourCross(Point2D.Double a,Point2D.Double b,Point2D.Double c){return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);}
+    private static double tangentAngle(double ax,double ay,double bx,double by){double den=Math.hypot(ax,ay)*Math.hypot(bx,by);if(den<=1e-12)return Double.POSITIVE_INFINITY;return Math.toDegrees(Math.acos(Math.max(-1,Math.min(1,(ax*bx+ay*by)/den))));}
+    private static boolean sameContourPoint(Point2D.Double a,Point2D.Double b){return a.distanceSq(b)<=1e-12;}
+    private static boolean contourSegmentsIntersect(Point2D.Double a,Point2D.Double b,Point2D.Double c,Point2D.Double d){
+        if(sameContourPoint(a,c)||sameContourPoint(a,d)||sameContourPoint(b,c)||sameContourPoint(b,d))return false;
+        double ab1=contourCross(a,b,c),ab2=contourCross(a,b,d),cd1=contourCross(c,d,a),cd2=contourCross(c,d,b),eps=1e-9;
+        // Treat collinearity and endpoint contact as uncertain and keep Q.
+        if(Math.abs(ab1)<=eps||Math.abs(ab2)<=eps||Math.abs(cd1)<=eps||Math.abs(cd2)<=eps)return true;
+        return (ab1<0)!=(ab2<0)&&(cd1<0)!=(cd2<0);
+    }
     private static int skeletonDegree(ByteProcessor bp,Point p){int[] dx={0,1,1,1,0,-1,-1,-1},dy={-1,-1,0,1,1,1,0,-1};boolean[] on=new boolean[8];for(int k=0;k<8;k++){int x=p.x+dx[k],y=p.y+dy[k];on[k]=x>=0&&y>=0&&x<bp.getWidth()&&y<bp.getHeight()&&(bp.get(x,y)&255)!=0;}int runs=0;for(int k=0;k<8;k++)if(on[k]&&!on[(k+7)%8])runs++;return runs;}
     private static class ArcCandidate {int index;double angle;ArcCandidate(int i,double a){index=i;angle=a;}}
     private static class AreaCandidate {int index;Point snap;AreaCandidate(int i,Point p){index=i;snap=p;}}
@@ -3198,6 +3213,23 @@ public class CellDivisionInference implements PlugIn {
         TreeSet<Integer> cells=new TreeSet<>();for(AreaArc arc:areaArcs)cells.add(arc.cellLabel);for(int cell:cells){double before=areaError.applyAsDouble(cell),current=before;while(current>cfg.maxAreaErrorFraction){AreaArc bestArc=null;int bestIndex=-1;double best=current;for(AreaArc arc:areaArcs)if(arc.cellLabel==cell)for(AreaCandidate candidate:arc.valid)if(!arc.selected.contains(candidate.index)){arc.selected.add(candidate.index);double trial=areaError.applyAsDouble(cell);arc.selected.remove(candidate.index);if(trial<best-1e-12){best=trial;bestArc=arc;bestIndex=candidate.index;}}if(bestArc==null)break;bestArc.selected.add(bestIndex);current=best;}
             boolean changed=true;while(changed){changed=false;for(AreaArc arc:areaArcs)if(arc.cellLabel==cell){ArrayList<Integer> selected=new ArrayList<>(arc.selected);for(int position=0;position<selected.size();position++){int index=selected.get(position),previous=position==0?0:selected.get(position-1),next=position+1==selected.size()?arc.raw.size()-1:selected.get(position+1);if(shortcutError(arc.fit,previous,next)>cfg.maximumFitError)continue;arc.selected.remove(index);double trial=areaError.applyAsDouble(cell);if(trial<=cfg.maxAreaErrorFraction){current=trial;changed=true;break;}arc.selected.add(index);}if(changed)break;}}
             current=areaError.applyAsDouble(cell);IJ.log("Outer cell "+cell+" area error "+before+" -> "+current+(current>cfg.maxAreaErrorFraction?" (unresolved)":""));}
+        // Post-refinement only: conservatively remove redundant degree-two
+        // contour supports before graph lines and polygons can be constructed.
+        IdentityHashMap<AreaArc,Integer> deletedPerArc=new IdentityHashMap<>();
+        for(int cell:cells){double pruneBefore=areaError.applyAsDouble(cell),current=pruneBefore;boolean accepted=true;
+            while(accepted){accepted=false;class Redundant {double marginal;AreaArc arc;int index,order;Redundant(double m,AreaArc a,int i,int o){marginal=m;arc=a;index=i;order=o;}}ArrayList<Redundant> candidates=new ArrayList<>();
+                for(int arcOrder=0;arcOrder<areaArcs.size();arcOrder++){AreaArc arc=areaArcs.get(arcOrder);if(arc.cellLabel!=cell||deletedPerArc.getOrDefault(arc,0)>=cfg.maxDeletedPerArc)continue;ArrayList<Integer> chosen=new ArrayList<>(arc.selected);for(int pos=0;pos<chosen.size();pos++){int q=chosen.get(pos),p=pos==0?0:chosen.get(pos-1),r=pos+1==chosen.size()?arc.raw.size()-1:chosen.get(pos+1);double marginal=Math.abs(contourCross(arc.raw.get(p),arc.raw.get(q),arc.raw.get(r)))*.5/Math.max(1,cellAreas[cell]);candidates.add(new Redundant(marginal,arc,q,arcOrder));}}
+                candidates.sort(Comparator.comparingDouble((Redundant x)->x.marginal).thenComparingInt(x->x.order).thenComparingInt(x->x.index));
+                for(Redundant candidate:candidates){AreaArc arc=candidate.arc;if(!arc.selected.contains(candidate.index)||!(candidate.marginal<cfg.maxRedundantAreaContributionFraction))continue;ArrayList<Integer> chosen=new ArrayList<>(arc.selected);int pos=Collections.binarySearch(chosen,candidate.index),p=pos==0?0:chosen.get(pos-1),r=pos+1==chosen.size()?arc.raw.size()-1:chosen.get(pos+1);double deviation=shortcutError(arc.raw,p,r);if(!Double.isFinite(deviation)||deviation>cfg.maxRedundantContourDeviationPixels)continue;if(chosen.size()==1&&deviation>cfg.nearlyStraightContourDeviationPixels)continue;
+                    Point2D.Double pp=arc.raw.get(p),qq=arc.raw.get(candidate.index),rr=arc.raw.get(r);double pqx=qq.x-pp.x,pqy=qq.y-pp.y,qrx=rr.x-qq.x,qry=rr.y-qq.y,prx=rr.x-pp.x,pry=rr.y-pp.y,oldMismatch=0,newMismatch=0;boolean certain=true;
+                    for(int k=p;k<=r;k++){int lo=Math.max(p,k-1),hi=Math.min(r,k+1);Point2D.Double low=arc.raw.get(lo),high=arc.raw.get(hi);double oldAngle=tangentAngle(high.x-low.x,high.y-low.y,k<=candidate.index?pqx:qrx,k<=candidate.index?pqy:qry),newAngle=tangentAngle(high.x-low.x,high.y-low.y,prx,pry);if(!Double.isFinite(oldAngle)||!Double.isFinite(newAngle)){certain=false;break;}oldMismatch=Math.max(oldMismatch,oldAngle);newMismatch=Math.max(newMismatch,newAngle);}if(!certain||newMismatch>oldMismatch+cfg.tangentComparisonEpsilonDegrees)continue;
+                    boolean junctionMismatchReduced=true;if(p==0){Point2D.Double t=arc.raw.get(1);double oldJ=tangentAngle(t.x-pp.x,t.y-pp.y,pqx,pqy),newJ=tangentAngle(t.x-pp.x,t.y-pp.y,prx,pry);junctionMismatchReduced=Double.isFinite(oldJ)&&Double.isFinite(newJ)&&newJ+cfg.tangentComparisonEpsilonDegrees<oldJ;}if(junctionMismatchReduced&&r==arc.raw.size()-1){Point2D.Double t=arc.raw.get(r-1);double oldJ=tangentAngle(rr.x-t.x,rr.y-t.y,qrx,qry),newJ=tangentAngle(rr.x-t.x,rr.y-t.y,prx,pry);junctionMismatchReduced=Double.isFinite(oldJ)&&Double.isFinite(newJ)&&newJ+cfg.tangentComparisonEpsilonDegrees<oldJ;}if(!junctionMismatchReduced)continue;
+                    boolean crossing=false;for(AreaArc other:areaArcs){ArrayList<Integer> points=new ArrayList<>();points.add(0);points.addAll(other.selected);points.add(other.raw.size()-1);for(int i=1;i<points.size();i++){if(other==arc&&points.get(i-1)==p&&(points.get(i)==candidate.index)||other==arc&&points.get(i-1)==candidate.index&&points.get(i)==r)continue;if(contourSegmentsIntersect(pp,rr,other.raw.get(points.get(i-1)),other.raw.get(points.get(i)))){crossing=true;break;}}if(crossing)break;}if(crossing||sameContourPoint(pp,rr))continue;
+                    arc.selected.remove(candidate.index);double trial=areaError.applyAsDouble(cell);if(!Double.isFinite(trial)||trial>=cfg.maxAreaErrorFraction||trial-current>cfg.maxRedundantAreaErrorIncreaseFraction+1e-12){arc.selected.add(candidate.index);continue;}deletedPerArc.put(arc,deletedPerArc.getOrDefault(arc,0)+1);AreaCandidate removed=null;for(AreaCandidate valid:arc.valid)if(valid.index==candidate.index){removed=valid;break;}Point report=removed==null?new Point((int)Math.round(qq.x),(int)Math.round(qq.y)):removed.snap;IJ.log("Redundancy prune outer cell "+cell+" deleted CONTOUR_SUPPORT ("+report.x+","+report.y+") area error "+current+" -> "+trial);current=trial;accepted=true;break;
+                }
+            }
+            IJ.log("Redundancy prune outer cell "+cell+" summary "+pruneBefore+" -> "+current);
+        }
         supports.clear();for(AreaArc arc:areaArcs)for(AreaCandidate candidate:arc.valid)if(arc.selected.contains(candidate.index)){boolean duplicate=false;for(Point prior:supports)if(prior.distance(candidate.snap)<=1.0)duplicate=true;if(!duplicate)supports.add(candidate.snap);}return supports;
     }
 
