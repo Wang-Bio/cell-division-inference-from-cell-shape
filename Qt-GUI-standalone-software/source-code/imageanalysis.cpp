@@ -491,6 +491,25 @@ bool isOuterBoundaryPoint(const cv::Mat&s,const cv::Point2d&p)
     auto t=backgroundTopology(s);int cx=cvRound(p.x),cy=cvRound(p.y);for(int y=std::max(0,cy-1);y<=std::min(s.rows-1,cy+1);++y)for(int x=std::max(0,cx-1);x<=std::min(s.cols-1,cx+1);++x){int l=t.labels.at<int>(y,x);if(l>0&&t.accepted[l])return true;}return false;
 }
 
+std::vector<cv::Point2d> detectInnerCellVertices(const cv::Mat &s)
+{
+    CV_Assert(s.type() == CV_8UC1);
+    std::vector<cv::Point2d> inner;
+    for (const cv::Point2d &point : detectVertices(s)) {
+        bool ok = false;
+        const cv::Point pixel = nearestSkeleton(s, point, 2, &ok);
+        const bool hasLocalNeighborhood = pixel.x >= 3 && pixel.y >= 3
+            && pixel.x < s.cols - 3 && pixel.y < s.rows - 3;
+        const int branchCount = hasLocalNeighborhood
+            ? countLocalBranches(s, pixel.y, pixel.x)
+            : skeletonDegree(s, pixel);
+        if (ok && branchCount == 3
+            && !isOuterBoundaryPoint(s, point))
+            inner.push_back(point);
+    }
+    return inner;
+}
+
 VertexDetectionResult detectCellArcVertices(const cv::Mat&s,const OuterDetectionParameters&par)
 {
     CV_Assert(s.type()==CV_8UC1); VertexDetectionResult result; auto topology=backgroundTopology(s);

@@ -152,6 +152,7 @@ MainWindow::MainWindow(QWidget *parent)
 //menuBar Detection function
     connect(ui->actionSkeletonization, &QAction::triggered, this, &MainWindow::onSkeletonization);
     connect(ui->actionVertex_Detection, &QAction::triggered, this, &MainWindow::onVertexDetection);
+    connect(ui->actionDevelopment_Vertex_Detection, &QAction::triggered, this, &MainWindow::onDevelopmentVertexDetection);
     connect(ui->actionLine_Detection, &QAction::triggered, this, &MainWindow::onLineDetection);
     connect(ui->actionPolygon_Detection, &QAction::triggered, this, &MainWindow::onPolygonDetection);
     connect(ui->actionDetect_Neighbor_Pairs, &QAction::triggered, this, &MainWindow::onDetectNeighborPairs);
@@ -181,7 +182,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionFind_Line, &QAction::triggered, this, &MainWindow::onFindLine);
     connect(ui->actionFind_Polygon, &QAction::triggered, this, &MainWindow::onFindPolygon);
 
-//menuBar Plot function
 
 //menuBar Debug function
     connect(ui->actionGenerate_Random_Network, &QAction::triggered, this, &MainWindow::onGenerateRandomNetwork);
@@ -1904,6 +1904,49 @@ void MainWindow::resetSelectedItemLabels()
 }
 
 void MainWindow::onVertexDetection()
+{
+    if (m_currentImage.empty()) {
+        QMessageBox::warning(this, "No Skeleton Image", "Please run skeletonization before detecting vertices.");
+        return;
+    }
+    auto *scene = ui->graphicsView->scene();
+    if (!scene || scene->sceneRect().isNull()) {
+        QMessageBox::warning(this, "No Canvas Loaded", "Please create a canvas or open an image before detecting vertices.");
+        return;
+    }
+    if (m_currentImage.type() != CV_8UC1) {
+        QMessageBox::warning(this, "Unsupported Image", "Vertex detection requires a skeletonized grayscale image.");
+        return;
+    }
+
+    // This production detector owns only automatic junctions. Remove boundary
+    // junctions left by the development detector so outermost-cell vertices do
+    // not survive when switching methods; manual vertices remain untouched.
+    for (QGraphicsItem *item : scene->items()) {
+        if (item && item->type() == VertexItem::Type) {
+            auto *vertex = static_cast<VertexItem*>(item);
+            if (vertex->kind() == VertexItem::Kind::BoundaryJunction) {
+                scene->removeItem(vertex);
+                delete vertex;
+            }
+        }
+    }
+
+    for (const cv::Point2d &point : ImageAnalysis::detectInnerCellVertices(m_currentImage)) {
+        const QPointF position(point.x, point.y);
+        if (VertexItem::findVertexByPosition(scene, position, 1.0))
+            continue;
+        auto *vertex = new VertexItem(m_nextVertexId++, position);
+        vertex->setKind(VertexItem::Kind::InteriorJunction);
+        scene->addItem(vertex);
+        vertex->setFlag(QGraphicsItem::ItemIsMovable, m_allowVertexManualMove);
+        connect(vertex, &VertexItem::selected, this, &MainWindow::onVertexSelected);
+        connect(vertex, &VertexItem::moved, this, &MainWindow::onVertexMoved);
+    }
+    updateVertexCountLabel();
+}
+
+void MainWindow::onDevelopmentVertexDetection()
 {
     if (m_currentImage.empty()) {
         QMessageBox::warning(this, "No Skeleton Image", "Please run skeletonization before detecting vertices.");

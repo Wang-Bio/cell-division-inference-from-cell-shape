@@ -101,6 +101,11 @@ cv::Mat segmentWithGuoHall(const cv::Mat &input, double threshold = -1.0, bool i
 // Returns zero-based pixel coordinates for each detected vertex.
 std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage);
 
+// Detect only biological three-way junctions between inner cells. Junctions
+// touching the exterior/outermost-cell boundary (or a large tissue void) are
+// excluded from the result.
+std::vector<cv::Point2d> detectInnerCellVertices(const cv::Mat &skeletonImage);
+
 // Classify branch and region-topology junctions, then find geometric supports
 // by curvature/Imai-Iri consensus independently on each anchored outer-cell arc.
 // Ordinary cell faces are excluded; unusually large tissue voids are included.

@@ -184,6 +184,7 @@ private slots:
 //menuBar Detection functions
     void onSkeletonization();
     void onVertexDetection();
+    void onDevelopmentVertexDetection();
     void onLineDetection();
     void onPolygonDetection();
     void onDetectNeighborPairs();
@@ -200,7 +201,6 @@ private slots:
     void onBatchEstimateDivisionByDesignatedGeometry();
     void onCompareWithRealDivision();
 
-//menuBar Plot functions
     void onPrecisionAndRecallCurveOverSingleGeometry();
 
 //menuBar Display functions

@@ -396,6 +396,12 @@
     <addaction name="actionPolygon_Detection"/>
     <addaction name="actionDetect_Neighbor_Pairs"/>
    </widget>
+   <widget class="QMenu" name="menuUnderDevelopment">
+    <property name="title">
+     <string>Under development</string>
+    </property>
+    <addaction name="actionDevelopment_Vertex_Detection"/>
+   </widget>
    <widget class="QMenu" name="menuGeometry">
     <property name="title">
      <string>Geometry</string>
@@ -443,14 +449,6 @@
     <addaction name="actionFind_Line"/>
     <addaction name="actionFind_Polygon"/>
    </widget>
-   <widget class="QMenu" name="menuPlot">
-    <property name="title">
-     <string>Analysis &amp;&amp; Plot</string>
-    </property>
-    <addaction name="actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot"/>
-    <addaction name="actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot"/>
-    <addaction name="actionTemporal_Analysis_Over_Single_Geometry_Box_Plot"/>
-   </widget>
    <widget class="QMenu" name="menuImport_Export">
    <property name="title">
     <string>Import &amp;&amp; Export</string>
@@ -462,12 +460,12 @@
    </widget>
    <addaction name="menuOpen"/>
    <addaction name="menuDetection"/>
+   <addaction name="menuUnderDevelopment"/>
    <addaction name="menuGeometry"/>
    <addaction name="menuEstimate"/>
    <addaction name="menuDisplay"/>
    <addaction name="menuEdit"/>
    <addaction name="menuFind"/>
-   <addaction name="menuPlot"/>
    <addaction name="menuImport_Export"/>
    <addaction name="menuDebug"/>
   </widget>
@@ -605,6 +603,11 @@
     <string>Vertex Detection</string>
    </property>
   </action>
+  <action name="actionDevelopment_Vertex_Detection">
+   <property name="text">
+    <string>Vertex Detection</string>
+   </property>
+  </action>
   <action name="actionLine_Detection">
    <property name="text">
     <string>Line Detection</string>
@@ -690,24 +693,9 @@
     <string>Check Geometry Calculation (Single Pair)</string>
    </property>
   </action>
-  <action name="actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot">
-   <property name="text">
-    <string>Comparing Daughter and Non-Daughter Group &amp;&amp; Box Plot</string>
-   </property>
-  </action>
   <action name="actionPrecision_and_Recall_Curve_Over_Single_Geometry">
    <property name="text">
     <string>Batch Estimate Division by ranging single geometry</string>
-   </property>
-  </action>
-  <action name="actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot">
-   <property name="text">
-    <string>Comparing Daughter and Non-Daughter Group &amp;&amp; Histogram Plot</string>
-   </property>
-  </action>
-  <action name="actionTemporal_Analysis_Over_Single_Geometry_Box_Plot">
-   <property name="text">
-    <string>Temporal Analysis Over Single Geometry &amp;&amp; Box Plot</string>
    </property>
   </action>
   <action name="actionComparing_Batch_Estimation">

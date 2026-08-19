@@ -54,6 +54,7 @@ public:
     QAction *actionDivision_Pair_Display_Setting;
     QAction *actionSkeletonization;
     QAction *actionVertex_Detection;
+    QAction *actionDevelopment_Vertex_Detection;
     QAction *actionLine_Detection;
     QAction *actionPolygon_Detection;
     QAction *actionEdit_Setting;
@@ -71,10 +72,7 @@ public:
     QAction *actionBatch_Estimate_Division_by_single_geometry;
     QAction *actionBatch_Estimate_Division_by_designated_geometry;
     QAction *actionCheck_Geometry_Calculation_Single_Pair;
-    QAction *actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot;
     QAction *actionPrecision_and_Recall_Curve_Over_Single_Geometry;
-    QAction *actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot;
-    QAction *actionTemporal_Analysis_Over_Single_Geometry_Box_Plot;
     QAction *actionComparing_Batch_Estimation;
     QAction *actionExport_Geometric_Feature_Names;
     QWidget *centralwidget;
@@ -132,12 +130,12 @@ public:
     QMenu *menuOpen;
     QMenu *menuEdit;
     QMenu *menuDetection;
+    QMenu *menuUnderDevelopment;
     QMenu *menuGeometry;
     QMenu *menuEstimate;
     QMenu *menuDisplay;
     QMenu *menuDebug;
     QMenu *menuFind;
-    QMenu *menuPlot;
     QMenu *menuImport_Export;
     QStatusBar *statusbar;
 
@@ -200,6 +198,8 @@ public:
         actionSkeletonization->setObjectName("actionSkeletonization");
         actionVertex_Detection = new QAction(MainWindow);
         actionVertex_Detection->setObjectName("actionVertex_Detection");
+        actionDevelopment_Vertex_Detection = new QAction(MainWindow);
+        actionDevelopment_Vertex_Detection->setObjectName("actionDevelopment_Vertex_Detection");
         actionLine_Detection = new QAction(MainWindow);
         actionLine_Detection->setObjectName("actionLine_Detection");
         actionPolygon_Detection = new QAction(MainWindow);
@@ -234,14 +234,8 @@ public:
         actionBatch_Estimate_Division_by_designated_geometry->setObjectName("actionBatch_Estimate_Division_by_designated_geometry");
         actionCheck_Geometry_Calculation_Single_Pair = new QAction(MainWindow);
         actionCheck_Geometry_Calculation_Single_Pair->setObjectName("actionCheck_Geometry_Calculation_Single_Pair");
-        actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot = new QAction(MainWindow);
-        actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot->setObjectName("actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot");
         actionPrecision_and_Recall_Curve_Over_Single_Geometry = new QAction(MainWindow);
         actionPrecision_and_Recall_Curve_Over_Single_Geometry->setObjectName("actionPrecision_and_Recall_Curve_Over_Single_Geometry");
-        actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot = new QAction(MainWindow);
-        actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot->setObjectName("actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot");
-        actionTemporal_Analysis_Over_Single_Geometry_Box_Plot = new QAction(MainWindow);
-        actionTemporal_Analysis_Over_Single_Geometry_Box_Plot->setObjectName("actionTemporal_Analysis_Over_Single_Geometry_Box_Plot");
         actionComparing_Batch_Estimation = new QAction(MainWindow);
         actionComparing_Batch_Estimation->setObjectName("actionComparing_Batch_Estimation");
         actionExport_Geometric_Feature_Names = new QAction(MainWindow);
@@ -503,6 +497,8 @@ public:
         menuEdit->setObjectName("menuEdit");
         menuDetection = new QMenu(menubar);
         menuDetection->setObjectName("menuDetection");
+        menuUnderDevelopment = new QMenu(menubar);
+        menuUnderDevelopment->setObjectName("menuUnderDevelopment");
         menuGeometry = new QMenu(menubar);
         menuGeometry->setObjectName("menuGeometry");
         menuEstimate = new QMenu(menubar);
@@ -513,8 +509,6 @@ public:
         menuDebug->setObjectName("menuDebug");
         menuFind = new QMenu(menubar);
         menuFind->setObjectName("menuFind");
-        menuPlot = new QMenu(menubar);
-        menuPlot->setObjectName("menuPlot");
         menuImport_Export = new QMenu(menubar);
         menuImport_Export->setObjectName("menuImport_Export");
         MainWindow->setMenuBar(menubar);
@@ -524,12 +518,12 @@ public:
 
         menubar->addAction(menuOpen->menuAction());
         menubar->addAction(menuDetection->menuAction());
+        menubar->addAction(menuUnderDevelopment->menuAction());
         menubar->addAction(menuGeometry->menuAction());
         menubar->addAction(menuEstimate->menuAction());
         menubar->addAction(menuDisplay->menuAction());
         menubar->addAction(menuEdit->menuAction());
         menubar->addAction(menuFind->menuAction());
-        menubar->addAction(menuPlot->menuAction());
         menubar->addAction(menuImport_Export->menuAction());
         menubar->addAction(menuDebug->menuAction());
         menuOpen->addAction(actionOpen_Raw_Image);
@@ -553,6 +547,7 @@ public:
         menuDetection->addAction(actionLine_Detection);
         menuDetection->addAction(actionPolygon_Detection);
         menuDetection->addAction(actionDetect_Neighbor_Pairs);
+        menuUnderDevelopment->addAction(actionDevelopment_Vertex_Detection);
         menuGeometry->addAction(actionGeometry_Calculation_Setting);
         menuGeometry->addAction(actionNeighbor_Pair_Geometry_Calculation);
         menuGeometry->addAction(actionBatch_Neighbor_Pair_Geometry_Calculation);
@@ -575,9 +570,6 @@ public:
         menuFind->addAction(actionFind_Vertex);
         menuFind->addAction(actionFind_Line);
         menuFind->addAction(actionFind_Polygon);
-        menuPlot->addAction(actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot);
-        menuPlot->addAction(actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot);
-        menuPlot->addAction(actionTemporal_Analysis_Over_Single_Geometry_Box_Plot);
         menuImport_Export->addAction(actionImport);
         menuImport_Export->addAction(actionImport_All_Data);
         menuImport_Export->addAction(actionExport);
@@ -618,6 +610,7 @@ public:
         actionDivision_Pair_Display_Setting->setText(QCoreApplication::translate("MainWindow", "Division Pair Display Setting", nullptr));
         actionSkeletonization->setText(QCoreApplication::translate("MainWindow", "Skeletonization", nullptr));
         actionVertex_Detection->setText(QCoreApplication::translate("MainWindow", "Vertex Detection", nullptr));
+        actionDevelopment_Vertex_Detection->setText(QCoreApplication::translate("MainWindow", "Vertex Detection", nullptr));
         actionLine_Detection->setText(QCoreApplication::translate("MainWindow", "Line Detection", nullptr));
         actionPolygon_Detection->setText(QCoreApplication::translate("MainWindow", "Polygon Detection", nullptr));
         actionEdit_Setting->setText(QCoreApplication::translate("MainWindow", "Edit Setting", nullptr));
@@ -635,10 +628,7 @@ public:
         actionBatch_Estimate_Division_by_single_geometry->setText(QCoreApplication::translate("MainWindow", "Batch Estimate Division by single geometry", nullptr));
         actionBatch_Estimate_Division_by_designated_geometry->setText(QCoreApplication::translate("MainWindow", "Batch Estimate Division by designated geometry", nullptr));
         actionCheck_Geometry_Calculation_Single_Pair->setText(QCoreApplication::translate("MainWindow", "Check Geometry Calculation (Single Pair)", nullptr));
-        actionComparing_Daughter_and_Non_Daughter_Group_Box_Plot->setText(QCoreApplication::translate("MainWindow", "Comparing Daughter and Non-Daughter Group && Box Plot", nullptr));
         actionPrecision_and_Recall_Curve_Over_Single_Geometry->setText(QCoreApplication::translate("MainWindow", "Batch Estimate Division by ranging single geometry", nullptr));
-        actionComparing_Daughter_and_Non_Daughter_Group_Histogram_Plot->setText(QCoreApplication::translate("MainWindow", "Comparing Daughter and Non-Daughter Group && Histogram Plot", nullptr));
-        actionTemporal_Analysis_Over_Single_Geometry_Box_Plot->setText(QCoreApplication::translate("MainWindow", "Temporal Analysis Over Single Geometry && Box Plot", nullptr));
         actionComparing_Batch_Estimation->setText(QCoreApplication::translate("MainWindow", "Comparing Batch Estimation", nullptr));
         actionExport_Geometric_Feature_Names->setText(QCoreApplication::translate("MainWindow", "Export Geometric Feature Names", nullptr));
         label_input_file_name->setText(QCoreApplication::translate("MainWindow", "Input File Name", nullptr));
@@ -690,12 +680,12 @@ public:
         menuOpen->setTitle(QCoreApplication::translate("MainWindow", "Open", nullptr));
         menuEdit->setTitle(QCoreApplication::translate("MainWindow", "Edit", nullptr));
         menuDetection->setTitle(QCoreApplication::translate("MainWindow", "Detect", nullptr));
+        menuUnderDevelopment->setTitle(QCoreApplication::translate("MainWindow", "Under development", nullptr));
         menuGeometry->setTitle(QCoreApplication::translate("MainWindow", "Geometry", nullptr));
         menuEstimate->setTitle(QCoreApplication::translate("MainWindow", "Estimate", nullptr));
         menuDisplay->setTitle(QCoreApplication::translate("MainWindow", "Display", nullptr));
         menuDebug->setTitle(QCoreApplication::translate("MainWindow", "Debug", nullptr));
         menuFind->setTitle(QCoreApplication::translate("MainWindow", "Find", nullptr));
-        menuPlot->setTitle(QCoreApplication::translate("MainWindow", "Analysis && Plot", nullptr));
         menuImport_Export->setTitle(QCoreApplication::translate("MainWindow", "Import && Export", nullptr));
     } // retranslateUi
 
