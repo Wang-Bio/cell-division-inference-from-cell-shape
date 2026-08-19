@@ -505,8 +505,14 @@ VertexDetectionResult detectCellArcVertices(const cv::Mat&s,const OuterDetection
     for(auto&p:region){bool duplicate=false;for(auto&q:anchors)if(distanceSquared(p,q)<=par.junctionMergeRadius*par.junctionMergeRadius){duplicate=true;break;}if(!duplicate)anchors.push_back(p);}
     for(auto&p:branches){int nearest=-1;double best=par.junctionMergeRadius*par.junctionMergeRadius;for(int i=0;i<(int)anchors.size();++i){double d=distanceSquared(p,anchors[i]);if(d<=best){best=d;nearest=i;}}if(nearest<0){if(isOuterBoundaryPoint(s,p))anchors.push_back(p);else result.vertices.push_back({p,DetectedVertexKind::InteriorJunction});}}
     for(auto&p:anchors)result.vertices.push_back({p,DetectedVertexKind::BoundaryJunction});
-    std::vector<std::vector<cv::Point>> rawContours;cv::findContours(topology.acceptedMask,rawContours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE);int contourId=0;
-    for(auto&raw:rawContours){bool frame=false;for(auto&p:raw)frame|=p.x==0||p.y==0||p.x==s.cols-1||p.y==s.rows-1;if(frame||raw.size()<3)continue;auto contour=resampleClosed(raw,par.contourSampleSpacing);if(contour.size()<3)continue;
+    // A temporary white border closes tissues that meet the source frame.  All
+    // contour coordinates are returned to the source coordinate system before
+    // any anchors, skeleton pixels, or output vertices are considered.
+    constexpr int contourPadding=8;cv::Mat padded;
+    cv::copyMakeBorder(s,padded,contourPadding,contourPadding,contourPadding,contourPadding,cv::BORDER_CONSTANT,cv::Scalar(255));
+    auto paddedTopology=backgroundTopology(padded);std::vector<std::vector<cv::Point>> rawContours;
+    cv::findContours(paddedTopology.acceptedMask,rawContours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE);int contourId=0;
+    for(auto raw:rawContours){bool frame=false;for(auto&p:raw)frame|=p.x==0||p.y==0||p.x==padded.cols-1||p.y==padded.rows-1;if(frame||raw.size()<3)continue;for(auto&p:raw)p-=cv::Point(contourPadding,contourPadding);auto contour=resampleClosed(raw,par.contourSampleSpacing);if(contour.size()<3)continue;
       struct A{int index;cv::Point2d point;double distance;};std::map<int,A> mapped;for(auto&a:anchors){int bi=-1;double bd=std::numeric_limits<double>::infinity();for(int i=0;i<(int)contour.size();++i){double d=distanceSquared(a,contour[i]);if(d<bd){bd=d;bi=i;}}if(std::sqrt(bd)<=par.anchorContourTolerance){auto it=mapped.find(bi);if(it==mapped.end()||bd<it->second.distance)mapped[bi]={bi,a,bd};else result.vertices.push_back({a,DetectedVertexKind::Ambiguous,contourId,-1});}}
       std::vector<A> ma;for(auto&v:mapped)ma.push_back(v.second);if(ma.size()<2){result.diagnostics.push_back("outer contour "+std::to_string(contourId)+" has fewer than two reliable anchors");++contourId;continue;}
       auto curvSmooth=circularSmooth(contour,par.curvatureSigma),fitSmooth=circularSmooth(contour,par.fitSigma);int N=contour.size();
@@ -528,8 +534,8 @@ VertexDetectionResult detectCellArcVertices(const cv::Mat&s,const OuterDetection
         std::set<int> selected;
     };
     std::vector<ScreenArc> screenArcs;
-    rawContours.clear(); cv::findContours(topology.acceptedMask,rawContours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE); contourId=0;
-    for(auto&rawContour:rawContours){bool frame=false;for(auto&p:rawContour)frame|=p.x==0||p.y==0||p.x==s.cols-1||p.y==s.rows-1;if(frame||rawContour.size()<3)continue;
+    contourId=0;
+    for(auto rawContour:rawContours){bool frame=false;for(auto&p:rawContour)frame|=p.x==0||p.y==0||p.x==padded.cols-1||p.y==padded.rows-1;if(frame||rawContour.size()<3)continue;for(auto&p:rawContour)p-=cv::Point(contourPadding,contourPadding);
       auto contour=resampleClosed(rawContour,par.contourSampleSpacing);if(contour.size()<3)continue;auto smooth=circularSmooth(contour,par.curvatureSigma),fit=circularSmooth(contour,par.fitSigma);int count=contour.size();
       std::map<int,cv::Point2d> mapped;for(auto&a:anchors){int best=-1;double bd=std::numeric_limits<double>::infinity();for(int i=0;i<count;++i){double d=distanceSquared(a,contour[i]);if(d<bd){bd=d;best=i;}}if(std::sqrt(bd)<=par.anchorContourTolerance&&(!mapped.count(best)||distanceSquared(a,contour[best])<distanceSquared(mapped[best],contour[best])))mapped[best]=a;}
       std::vector<int> indices;for(auto&m:mapped)indices.push_back(m.first);if(indices.size()<2){++contourId;continue;}

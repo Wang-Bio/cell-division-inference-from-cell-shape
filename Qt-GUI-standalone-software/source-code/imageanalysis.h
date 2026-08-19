@@ -38,12 +38,12 @@ struct OuterDetectionParameters {
     int frameGuard = 2;
     double junctionMergeRadius = 2.0;
     double anchorContourTolerance = 4.0;
-    double curvatureSigma = 2.0;
-    int curvatureWindow = 2;
-    double curvatureThresholdDegrees = 5.0;
-    int curvatureNmsRadius = 8;
-    double fitSigma = 2.5;
-    double maximumFitError = 1.0;
+    double curvatureSigma = 1.0;
+    int curvatureWindow = 3;
+    double curvatureThresholdDegrees = 14.0;
+    int curvatureNmsRadius = 11;
+    double fitSigma = 2.0;
+    double maximumFitError = 1.25;
     double maxAreaErrorFraction = 0.02;
     // Conservative post-refinement redundancy pruning.  These limits are
     // deliberately independent of the detector/fitter parameters above.
@@ -53,7 +53,7 @@ struct OuterDetectionParameters {
     double nearlyStraightContourDeviationPixels = 0.75;
     double tangentComparisonEpsilonDegrees = 1e-6;
     int maxDeletedPerArc = 1;
-    double consensusRadius = 2.5;
+    double consensusRadius = 4.0;
     double junctionExclusion = 3.0;
     int skeletonSnapRadius = 3;
 };

@@ -167,15 +167,15 @@ public class CellDivisionInference implements PlugIn {
     private List<VertexKind> vertexKinds = new ArrayList<>();
     private static class OuterDetectionConfig {
         double contourSampleSpacing=1.0, junctionMergeRadius=2.0, anchorContourTolerance=4.0;
-        double curvatureSigma=2.0, curvatureThresholdDegrees=5.0, fitSigma=2.5;
-        double maximumFitError=1.0, maxAreaErrorFraction=0.02, consensusRadius=2.5, junctionExclusion=3.0;
+        double curvatureSigma=1.0, curvatureThresholdDegrees=14.0, fitSigma=2.0;
+        double maximumFitError=1.25, maxAreaErrorFraction=0.02, consensusRadius=4.0, junctionExclusion=3.0;
         // Conservative post-refinement redundancy-pruning limits.  Keep these
         // separate from the established detector and area-refinement knobs.
         double maxRedundantAreaContributionFraction=0.0025, maxRedundantAreaErrorIncreaseFraction=0.001;
         double maxRedundantContourDeviationPixels=1.5, nearlyStraightContourDeviationPixels=0.75;
         double tangentComparisonEpsilonDegrees=1e-6;
-        int outerJunctionNeighborhood=3, frameGuard=2, curvatureWindow=2;
-        int curvatureNmsRadius=8, skeletonSnapRadius=3, maxDeletedPerArc=1;
+        int outerJunctionNeighborhood=3, frameGuard=2, curvatureWindow=3;
+        int curvatureNmsRadius=11, skeletonSnapRadius=3, maxDeletedPerArc=1;
     }
     private final OuterDetectionConfig outerDetectionConfig=new OuterDetectionConfig();
     private static final double INTERNAL_VOID_MEDIAN_AREA_FACTOR = 4.0;
@@ -3187,9 +3187,19 @@ public class CellDivisionInference implements PlugIn {
     private static class AreaCandidate {int index;Point snap;AreaCandidate(int i,Point p){index=i;snap=p;}}
     private static class AreaArc {int cellLabel;List<Point2D.Double> raw,fit;List<AreaCandidate> valid=new ArrayList<>();TreeSet<Integer> selected=new TreeSet<>();}
     private static List<Point> detectOuterContourSupport(ByteProcessor bp,List<Point> anchors,OuterDetectionConfig cfg){
-        int w=bp.getWidth(),h=bp.getHeight(),contourId=0;BackgroundInfo background=backgroundInfo4(bp);boolean[] accepted=background.acceptedPixels;ArrayList<Point> supports=new ArrayList<>();ArrayList<AreaArc> areaArcs=new ArrayList<>();
-        for(List<Point2D.Double> traced:traceAcceptedBackgroundContours(accepted,w,h)){
-            boolean frame=false;for(Point2D.Double p:traced)frame|=p.x==0||p.y==0||p.x==w||p.y==h;if(frame||traced.size()<3)continue;
+        int w=bp.getWidth(),h=bp.getHeight(),contourId=0;BackgroundInfo background=backgroundInfo4(bp);ArrayList<Point> supports=new ArrayList<>();ArrayList<AreaArc> areaArcs=new ArrayList<>();
+        // Close contours that meet the source frame with a temporary white
+        // border, then immediately restore source-image coordinates.
+        final int contourPadding=8,paddedWidth=w+2*contourPadding,paddedHeight=h+2*contourPadding;
+        ByteProcessor padded=new ByteProcessor(paddedWidth,paddedHeight);padded.setValue(255);padded.fill();
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++)padded.set(x+contourPadding,y+contourPadding,bp.get(x,y));
+        BackgroundInfo paddedBackground=backgroundInfo4(padded);
+        ArrayList<List<Point2D.Double>> outerContours=new ArrayList<>();
+        for(List<Point2D.Double> paddedContour:traceAcceptedBackgroundContours(paddedBackground.acceptedPixels,paddedWidth,paddedHeight)){
+            boolean frame=false;for(Point2D.Double p:paddedContour)frame|=p.x==0||p.y==0||p.x==paddedWidth||p.y==paddedHeight;if(frame||paddedContour.size()<3)continue;
+            ArrayList<Point2D.Double> traced=new ArrayList<>(paddedContour.size());for(Point2D.Double p:paddedContour)traced.add(new Point2D.Double(p.x-contourPadding,p.y-contourPadding));outerContours.add(traced);
+        }
+        for(List<Point2D.Double> traced:outerContours){
             List<Point2D.Double> contour=resampleClosedContour(traced,cfg.contourSampleSpacing),curved=circularSmooth(contour,cfg.curvatureSigma),fitted=circularSmooth(contour,cfg.fitSigma);int n=contour.size();
             TreeMap<Integer,Point> mapped=new TreeMap<>();HashMap<Integer,Double> distances=new HashMap<>();
             for(Point anchor:anchors){int best=-1;double bd=Double.MAX_VALUE;for(int i=0;i<n;i++){double d=contour.get(i).distanceSq(anchor.x,anchor.y);if(d<bd){bd=d;best=i;}}if(Math.sqrt(bd)<=cfg.anchorContourTolerance){if(!mapped.containsKey(best)||bd<distances.get(best)){mapped.put(best,anchor);distances.put(best,bd);}}}
