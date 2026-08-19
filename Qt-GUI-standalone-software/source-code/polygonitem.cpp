@@ -548,6 +548,10 @@ int PolygonItem::deleteAllPolygons(QGraphicsScene *scene, QWidget *parent)
         delete poly;
     }
 
+    // A bulk delete starts a new polygon sequence.  Keep this reset here so
+    // polygons created manually or by detection both resume at index zero.
+    s_nextId = 0;
+
     return polys.size();
 }
 
