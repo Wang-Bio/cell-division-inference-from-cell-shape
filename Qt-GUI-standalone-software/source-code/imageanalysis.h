@@ -101,9 +101,9 @@ cv::Mat segmentWithGuoHall(const cv::Mat &input, double threshold = -1.0, bool i
 // Returns zero-based pixel coordinates for each detected vertex.
 std::vector<cv::Point2d> detectVertices(const cv::Mat &skeletonImage);
 
-// Detect only biological three-way junctions between inner cells. Junctions
-// touching the exterior/outermost-cell boundary (or a large tissue void) are
-// excluded from the result.
+// Detect biological three- or four-way junctions that belong to at least one
+// inner cell. Junctions shared by inner and outermost cells are retained;
+// junctions belonging exclusively to outermost cells are excluded.
 std::vector<cv::Point2d> detectInnerCellVertices(const cv::Mat &skeletonImage);
 
 // Classify branch and region-topology junctions, then find geometric supports
@@ -117,6 +117,13 @@ bool isOuterBoundaryPoint(const cv::Mat &skeletonImage, const cv::Point2d &point
 // labels act as barriers, while meeting wave fronts identify adjacent outline segments.
 // Each undirected connection is reported once with its ordered skeleton path.
 std::vector<LineConnection> detectLines(const cv::Mat &skeletonImage, const std::vector<cv::Point> &vertices, int tolerance = 1);
+
+// Detect walls that belong to at least one inner cell. Walls shared by inner
+// and outermost cells are retained; tissue-outline walls and walls shared only
+// by outermost cells are omitted.
+std::vector<LineConnection> detectInnerCellLines(const cv::Mat &skeletonImage,
+                                                 const std::vector<cv::Point> &vertices,
+                                                 int tolerance = 1);
 
 // Detect polygons by walking connected edges counterclockwise. Vertices are
 // identified by their integer ids, and edges describe the graph connectivity.

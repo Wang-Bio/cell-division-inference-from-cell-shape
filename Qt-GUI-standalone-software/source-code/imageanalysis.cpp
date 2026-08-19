@@ -457,6 +457,58 @@ BackgroundTopology backgroundTopology(const cv::Mat &s)
     return topology;
 }
 cv::Mat boundaryBackgroundMask(const cv::Mat&s){return backgroundTopology(s).acceptedMask;}
+std::set<int> epidermalCellLabels(const cv::Mat &s, const BackgroundTopology &topology)
+{
+    std::map<int, int> boundarySupport;
+    static const int cardinal[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    for (int y = 0; y < s.rows; ++y) {
+        for (int x = 0; x < s.cols; ++x) {
+            if (s.at<uchar>(y, x) == 0)
+                continue;
+            bool touchesOutside = false;
+            std::set<int> cells;
+            for (const auto &offset : cardinal) {
+                const int nx = x + offset[0], ny = y + offset[1];
+                if (nx < 0 || ny < 0 || nx >= s.cols || ny >= s.rows)
+                    continue;
+                const int label = topology.labels.at<int>(ny, nx);
+                if (label <= 0)
+                    continue;
+                if (topology.accepted[label]) touchesOutside = true;
+                else cells.insert(label);
+            }
+            if (touchesOutside)
+                for (int cell : cells) ++boundarySupport[cell];
+        }
+    }
+
+    std::set<int> epidermal;
+    // Sharing a boundary segment produces support at multiple skeleton pixels.
+    // Requiring two prevents a cell that merely meets the outline at a single
+    // junction pixel from being incorrectly classified as epidermal.
+    for (const auto &support : boundarySupport)
+        if (support.second >= 2) epidermal.insert(support.first);
+    return epidermal;
+}
+
+std::map<int, int> adjacentCellVotes(const BackgroundTopology &topology,
+                                     const std::vector<cv::Point> &points,
+                                     int radius)
+{
+    std::map<int, int> votes;
+    for (const cv::Point &point : points) {
+        for (int dy = -radius; dy <= radius; ++dy) {
+            for (int dx = -radius; dx <= radius; ++dx) {
+                const int x = point.x + dx, y = point.y + dy;
+                if (x < 0 || y < 0 || x >= topology.labels.cols || y >= topology.labels.rows)
+                    continue;
+                const int label = topology.labels.at<int>(y, x);
+                if (label > 0 && !topology.accepted[label]) ++votes[label];
+            }
+        }
+    }
+    return votes;
+}
 double distanceSquared(const cv::Point2d&a,const cv::Point2d&b){cv::Point2d d=a-b;return d.dot(d);}
 cv::Point nearestSkeleton(const cv::Mat&s,const cv::Point2d&p,int radius,bool *ok=nullptr){
     cv::Point best; double bd=std::numeric_limits<double>::infinity(); bool found=false;
@@ -494,20 +546,18 @@ bool isOuterBoundaryPoint(const cv::Mat&s,const cv::Point2d&p)
 std::vector<cv::Point2d> detectInnerCellVertices(const cv::Mat &s)
 {
     CV_Assert(s.type() == CV_8UC1);
-    std::vector<cv::Point2d> inner;
+    const BackgroundTopology topology = backgroundTopology(s);
+    const std::set<int> epidermal = epidermalCellLabels(s, topology);
+    std::vector<cv::Point2d> innerAssociated;
     for (const cv::Point2d &point : detectVertices(s)) {
-        bool ok = false;
-        const cv::Point pixel = nearestSkeleton(s, point, 2, &ok);
-        const bool hasLocalNeighborhood = pixel.x >= 3 && pixel.y >= 3
-            && pixel.x < s.cols - 3 && pixel.y < s.rows - 3;
-        const int branchCount = hasLocalNeighborhood
-            ? countLocalBranches(s, pixel.y, pixel.x)
-            : skeletonDegree(s, pixel);
-        if (ok && branchCount == 3
-            && !isOuterBoundaryPoint(s, point))
-            inner.push_back(point);
+        const cv::Point center(cvRound(point.x), cvRound(point.y));
+        const auto adjacent = adjacentCellVotes(topology, {center}, 3);
+        const bool belongsToInnerCell = std::any_of(adjacent.begin(), adjacent.end(),
+            [&epidermal](const auto &entry) { return !epidermal.count(entry.first); });
+        if (belongsToInnerCell)
+            innerAssociated.push_back(point);
     }
-    return inner;
+    return innerAssociated;
 }
 
 VertexDetectionResult detectCellArcVertices(const cv::Mat&s,const OuterDetectionParameters&par)
@@ -729,6 +779,46 @@ std::vector<LineConnection> detectLines(const cv::Mat &skeletonImage,
         connections.push_back({first, second, std::move(path)});
     }
     return connections;
+}
+
+std::vector<LineConnection> detectInnerCellLines(const cv::Mat &skeletonImage,
+                                                 const std::vector<cv::Point> &vertices,
+                                                 int tolerance) {
+    const std::vector<LineConnection> connections =
+        detectLines(skeletonImage, vertices, tolerance);
+    if (connections.empty())
+        return {};
+
+    const BackgroundTopology topology = backgroundTopology(skeletonImage);
+    const std::set<int> epidermalCells = epidermalCellLabels(skeletonImage, topology);
+
+    std::vector<LineConnection> innerConnections;
+    innerConnections.reserve(connections.size());
+    for (const LineConnection &connection : connections) {
+        const std::map<int, int> faceVotes =
+            adjacentCellVotes(topology, connection.path, 1);
+
+        std::vector<std::pair<int, int>> rankedFaces;
+        rankedFaces.reserve(faceVotes.size());
+        for (const auto &vote : faceVotes)
+            rankedFaces.emplace_back(vote.second, vote.first);
+        std::sort(rankedFaces.begin(), rankedFaces.end(),
+                  [](const auto &a, const auto &b) {
+                      return a.first != b.first ? a.first > b.first : a.second < b.second;
+                  });
+
+        // A proper cell wall has a face on each side. Endpoint junctions can
+        // introduce low-count third faces, so classify the wall by the two
+        // labels receiving the most support along its full path. Keep types 1
+        // (inner/inner) and 3 (inner/outermost), and reject type 2
+        // (outermost/outermost).
+        if (rankedFaces.size() < 2
+            || (epidermalCells.count(rankedFaces[0].second)
+                && epidermalCells.count(rankedFaces[1].second)))
+            continue;
+        innerConnections.push_back(connection);
+    }
+    return innerConnections;
 }
 
 double normalizedAngle(const cv::Point2d &origin, const cv::Point2d &dest) {

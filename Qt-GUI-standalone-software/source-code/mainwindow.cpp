@@ -2059,7 +2059,7 @@ void MainWindow::onLineDetection()
     }
 
     const std::vector<ImageAnalysis::LineConnection> connections =
-        ImageAnalysis::detectLines(m_currentImage, vertices, 1);
+        ImageAnalysis::detectInnerCellLines(m_currentImage, vertices, 1);
 
     int addedCount = 0;
     for (const auto &connection : connections) {

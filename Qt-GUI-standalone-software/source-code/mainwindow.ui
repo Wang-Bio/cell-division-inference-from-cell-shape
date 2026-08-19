@@ -460,7 +460,6 @@
    </widget>
    <addaction name="menuOpen"/>
    <addaction name="menuDetection"/>
-   <addaction name="menuUnderDevelopment"/>
    <addaction name="menuGeometry"/>
    <addaction name="menuEstimate"/>
    <addaction name="menuDisplay"/>
@@ -468,6 +467,7 @@
    <addaction name="menuFind"/>
    <addaction name="menuImport_Export"/>
    <addaction name="menuDebug"/>
+   <addaction name="menuUnderDevelopment"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionDebug_All">

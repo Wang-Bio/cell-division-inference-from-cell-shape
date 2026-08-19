@@ -518,7 +518,6 @@ public:
 
         menubar->addAction(menuOpen->menuAction());
         menubar->addAction(menuDetection->menuAction());
-        menubar->addAction(menuUnderDevelopment->menuAction());
         menubar->addAction(menuGeometry->menuAction());
         menubar->addAction(menuEstimate->menuAction());
         menubar->addAction(menuDisplay->menuAction());
@@ -526,6 +525,7 @@ public:
         menubar->addAction(menuFind->menuAction());
         menubar->addAction(menuImport_Export->menuAction());
         menubar->addAction(menuDebug->menuAction());
+        menubar->addAction(menuUnderDevelopment->menuAction());
         menuOpen->addAction(actionOpen_Raw_Image);
         menuOpen->addAction(actionOpen_Background);
         menuOpen->addAction(actionCreate_Canvas);
