@@ -44,7 +44,10 @@ struct OuterDetectionParameters {
     int curvatureNmsRadius = 11;
     double fitSigma = 2.0;
     double maximumFitError = 1.25;
-    double maxAreaErrorFraction = 0.02;
+    // Optional legacy refinement.  The consensus detector is authoritative by
+    // default; area error is still used by the conservative redundancy screen.
+    bool enableAreaBasedVertexAddition = false;
+    double maxAreaErrorFraction = 0.16;
     // Conservative post-refinement redundancy pruning.  These limits are
     // deliberately independent of the detector/fitter parameters above.
     double maxRedundantAreaContributionFraction = 0.0025;
