@@ -18,7 +18,7 @@ struct GeometryExportOptions
     bool exportVertices = true;
     bool exportLines = true;
     bool exportPolygons = true;
-    bool exportNeighborPairs = true;
+    bool exportNeighborPairs = false;
 
     bool exportRealDivisionPairs = false;
     bool exportEstimatedDivisionPairs = false;

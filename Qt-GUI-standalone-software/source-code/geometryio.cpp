@@ -752,7 +752,7 @@ QVector<QPair<int, int>> GeometryIO::neighborPairsFromScene(QGraphicsScene *scen
 }
 
 namespace {
-QJsonArray serializeVertices(QGraphicsScene *scene)
+QJsonArray serializeVertices(QGraphicsScene *scene, bool includeInternalData = false)
 {
     std::vector<VertexItem*> vertices;
     vertices.reserve(scene->items().size());
@@ -773,14 +773,15 @@ QJsonArray serializeVertices(QGraphicsScene *scene)
         obj.insert("id", vertex->id());
         obj.insert("x", pos.x());
         obj.insert("y", pos.y());
-        obj.insert("kind", VertexItem::kindName(vertex->kind()));
+        if (includeInternalData)
+            obj.insert("kind", VertexItem::kindName(vertex->kind()));
         array.append(obj);
     }
 
     return array;
 }
 
-QJsonArray serializeLines(QGraphicsScene *scene)
+QJsonArray serializeLines(QGraphicsScene *scene, bool includeInternalData = false)
 {
     std::vector<LineItem*> lines;
     lines.reserve(scene->items().size());
@@ -800,8 +801,9 @@ QJsonArray serializeLines(QGraphicsScene *scene)
         obj.insert("id", line->id());
         obj.insert("startVertexId", line->v1Id());
         obj.insert("endVertexId", line->v2Id());
-        obj.insert("pathValid", line->hasValidPath());
-        if (line->hasValidPath()) {
+        if (includeInternalData)
+            obj.insert("pathValid", line->hasValidPath());
+        if (includeInternalData && line->hasValidPath()) {
             QJsonArray path;
             for (const QPointF &p : line->centerlinePath()) {
                 QJsonArray point; point.append(p.x()); point.append(p.y()); path.append(point);
@@ -837,6 +839,19 @@ QJsonArray serializePolygons(QGraphicsScene *scene)
             vertexIdsArray.append(vId);
         }
         obj.insert("vertexIds", vertexIdsArray);
+
+        // Keep edge connectivity explicit in the portable geometry export.  The
+        // order matches vertexIds: each line joins a vertex to the next one,
+        // with the last line closing the polygon.
+        QJsonArray lineIdsArray;
+        const QVector<int> vertexIds = polygon->vertexIds();
+        for (int i = 0; i < vertexIds.size(); ++i) {
+            LineItem *line = LineItem::findLineByVertexIds(
+                scene, vertexIds.at(i), vertexIds.at((i + 1) % vertexIds.size()));
+            if (line)
+                lineIdsArray.append(line->id());
+        }
+        obj.insert("lineIds", lineIdsArray);
         array.append(obj);
     }
 
@@ -1363,8 +1378,8 @@ bool GeometryIO::exportComprehensiveJson(const QString &filePath,
     }
 
     QJsonObject root;
-    root.insert("vertices", serializeVertices(scene));
-    root.insert("lines", serializeLines(scene));
+    root.insert("vertices", serializeVertices(scene, true));
+    root.insert("lines", serializeLines(scene, true));
     root.insert("polygons", serializePolygons(scene));
 
     QJsonArray neighborPairArray = data.neighborPairs.isEmpty()
