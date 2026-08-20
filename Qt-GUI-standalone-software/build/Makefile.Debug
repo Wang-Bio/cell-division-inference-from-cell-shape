@@ -4858,7 +4858,8 @@ debug/mainwindow.o: ../source-code/mainwindow.cpp ../source-code/mainwindow.h \
 		C:/Qt/6.4.1/mingw_64/include/QtCore/q20algorithm.h \
 		C:/Qt/6.4.1/mingw_64/include/QtCore/q20functional.h \
 		C:/Qt/6.4.1/mingw_64/include/QtCore/qfactoryinterface.h \
-		C:/Qt/6.4.1/mingw_64/include/QtGui/QPainter
+		C:/Qt/6.4.1/mingw_64/include/QtGui/QPainter \
+		C:/Qt/6.4.1/mingw_64/include/QtCore/QDebug
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o debug\mainwindow.o ..\source-code\mainwindow.cpp
 
 debug/batchdivisionestimator.o: ../source-code/batchdivisionestimator.cpp ../source-code/batchdivisionestimator.h \
