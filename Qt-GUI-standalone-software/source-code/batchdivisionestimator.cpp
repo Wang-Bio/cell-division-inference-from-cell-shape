@@ -174,16 +174,15 @@ QVector<BatchDivisionEstimator::GeometryEntry> sortedNormalizedGeometryEntries(c
     }
 
     std::stable_sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b) {
+        const int fileComparison = QString::compare(a.fileName, b.fileName, Qt::CaseInsensitive);
+        if (fileComparison != 0)
+            return fileComparison < 0;
+        if (a.pairIndex != b.pairIndex)
+            return a.pairIndex < b.pairIndex;
         if (a.firstId != b.firstId)
             return a.firstId < b.firstId;
-        if (a.secondId != b.secondId)
-            return a.secondId < b.secondId;
-        return a.fileName < b.fileName;
+        return a.secondId < b.secondId;
     });
-
-    int pairIndex = 0;
-    for (auto &entry : sorted)
-        entry.pairIndex = ++pairIndex;
 
     return sorted;
 }
@@ -779,12 +778,21 @@ double solidityForPolygon(const PolygonItem *item)
 } // namespace
 
 BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborGeometryDirectory(
-        const QString &directoryPath, const NeighborPairGeometrySettings &settings)
+        const QString &directoryPath,
+        const QString &realDivisionDirectoryPath,
+        const NeighborPairGeometrySettings &settings,
+        const GeometryProgressCallback &progressCallback)
 {
     GeometrySummary summary;
     QDir dir(directoryPath);
     if (!dir.exists()) {
         summary.errors << QString("Directory does not exist: %1").arg(directoryPath);
+        return summary;
+    }
+
+    const QDir realDivisionDir(realDivisionDirectoryPath);
+    if (!realDivisionDir.exists()) {
+        summary.errors << QString("Real division pair directory does not exist: %1").arg(realDivisionDirectoryPath);
         return summary;
     }
 
@@ -794,7 +802,12 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
         return summary;
     }
 
+    if (progressCallback)
+        progressCallback(0, files.size(), QString(), 0, 0);
+
     for (const QFileInfo &info : files) {
+        if (progressCallback)
+            progressCallback(summary.filesProcessed, files.size(), info.fileName(), 0, 0);
         ++summary.filesProcessed;
         GeometryImportResult importResult = GeometryIO::importFromJson(info.absoluteFilePath(), false);
         if (!importResult.success || !importResult.scene) {
@@ -817,9 +830,10 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
         QStringList parseWarnings;
         QHash<QString, int> realPairTimes;
         QSet<QString> realPairKeys;
-        const QString realDivisionFile = findRealDivisionFile(dir, info);
+        const QString realDivisionFile = findRealDivisionFile(realDivisionDir, info);
         if (realDivisionFile.isEmpty()) {
-            summary.warnings << QString("%1: no matching *_real_division_pairs.csv file found.").arg(info.fileName());
+            summary.warnings << QString("%1: no matching real division pair file found in %2.")
+                                .arg(info.fileName(), realDivisionDir.absolutePath());
         } else {
             const QVector<RealDivisionEntry> realPairs = readDivisionPairs(realDivisionFile, parseWarnings);
             for (const RealDivisionEntry &pair : realPairs) {
@@ -839,8 +853,12 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
             continue;
         }
 
+        if (progressCallback)
+            progressCallback(summary.filesProcessed, files.size(), info.fileName(), 0, pairs.size());
+
         int pairIndex = 0;
-        for (const auto &pair : pairs) {
+        for (int pairPosition = 0; pairPosition < pairs.size(); ++pairPosition) {
+            const auto &pair = pairs.at(pairPosition);
             PolygonItem *first = polygonsById.value(pair.first, nullptr);
             PolygonItem *second = polygonsById.value(pair.second, nullptr);
             if (!first || !second) {
@@ -848,6 +866,8 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
                                     .arg(info.fileName())
                                     .arg(pair.first)
                                     .arg(pair.second);
+                if (progressCallback)
+                    progressCallback(summary.filesProcessed, files.size(), info.fileName(), pairPosition + 1, pairs.size());
                 continue;
             }
 
@@ -866,6 +886,9 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
             entry.geometry = result;
 
             summary.entries.append(entry);
+
+            if (progressCallback)
+                progressCallback(summary.filesProcessed, files.size(), info.fileName(), pairPosition + 1, pairs.size());
         }
 
         if (pairIndex > 0)
@@ -873,7 +896,11 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
 
         for (const QString &warn : std::as_const(parseWarnings))
             summary.warnings << QString("%1: %2").arg(info.fileName(), warn);
+
     }
+
+    if (progressCallback)
+        progressCallback(summary.filesProcessed, files.size(), QString(), 0, 0);
 
     return summary;
 }

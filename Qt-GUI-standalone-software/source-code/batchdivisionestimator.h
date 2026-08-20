@@ -10,6 +10,8 @@
 #include <QVector>
 #include <QSet>
 
+#include <functional>
+
 #include "divisionestimator.h"
 #include "neighborgeometrycalculator.h"
 
@@ -117,7 +119,16 @@ public:
         DivisionMetrics totals;
     };
 
-    static GeometrySummary processNeighborGeometryDirectory(const QString &directoryPath, const NeighborPairGeometrySettings &settings);
+    using GeometryProgressCallback = std::function<void(int processedFiles,
+                                                        int totalFiles,
+                                                        const QString &fileName,
+                                                        int processedPairs,
+                                                        int totalPairs)>;
+
+    static GeometrySummary processNeighborGeometryDirectory(const QString &directoryPath,
+                                                             const QString &realDivisionDirectoryPath,
+                                                             const NeighborPairGeometrySettings &settings,
+                                                             const GeometryProgressCallback &progressCallback = {});
     static bool exportNeighborGeometryToCsv(const QString &filePath,
                                             const QVector<GeometryEntry> &entries,
                                             const NeighborPairGeometrySettings &settings,

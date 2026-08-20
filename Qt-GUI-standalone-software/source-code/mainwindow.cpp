@@ -38,6 +38,9 @@
 #include <QImageReader>
 #include <QPainter>
 #include <QDebug>
+#include <QEventLoop>
+#include <QProgressDialog>
+#include <QThread>
 
 #include <opencv2/core.hpp>
 
@@ -2438,11 +2441,71 @@ void MainWindow::onBatchNeighborPairGeometryCalculation()
         return;
     }
 
-    const QString directory = QFileDialog::getExistingDirectory(this, "Select Directory with Geometry JSON Files");
-    if (directory.isEmpty())
+    const QString geometryDirectory = QFileDialog::getExistingDirectory(this, "Select Folder with Polygonal Network JSON Files");
+    if (geometryDirectory.isEmpty())
         return;
 
-    const BatchDivisionEstimator::GeometrySummary summary = BatchDivisionEstimator::processNeighborGeometryDirectory(directory, settings);
+    const QString realDivisionDirectory = QFileDialog::getExistingDirectory(
+            this,
+            "Select Folder with Real Division Pair Files",
+            geometryDirectory);
+    if (realDivisionDirectory.isEmpty())
+        return;
+
+    QProgressDialog progress("Preparing geometry calculations...", QString(), 0, 0, this);
+    progress.setWindowTitle("Batch Neighbor Pair Geometry");
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setCancelButton(nullptr);
+    progress.setMinimumDuration(0);
+    progress.show();
+
+    const auto updateProgress = [&progress](int processedFiles,
+                                             int totalFiles,
+                                             const QString &fileName,
+                                             int processedPairs,
+                                             int totalPairs) {
+        QMetaObject::invokeMethod(&progress,
+                                  [&progress, processedFiles, totalFiles, fileName, processedPairs, totalPairs]() {
+            if (totalPairs > 0) {
+                progress.setRange(0, totalPairs);
+                progress.setValue(processedPairs);
+                progress.setLabelText(QString("Calculating geometry for %1 (file %2/%3, pair %4/%5)")
+                                      .arg(fileName)
+                                      .arg(processedFiles)
+                                      .arg(totalFiles)
+                                      .arg(processedPairs)
+                                      .arg(totalPairs));
+            } else {
+                progress.setRange(0, totalFiles);
+                progress.setValue(processedFiles);
+                progress.setLabelText(fileName.isEmpty()
+                                      ? QString("Preparing geometry calculations... (%1/%2 files)")
+                                            .arg(processedFiles).arg(totalFiles)
+                                      : QString("Importing %1 (file %2/%3)...")
+                                            .arg(fileName).arg(processedFiles + 1).arg(totalFiles));
+            }
+        }, Qt::QueuedConnection);
+    };
+
+    BatchDivisionEstimator::GeometrySummary summary;
+    QEventLoop calculationLoop;
+    QThread *calculationThread = QThread::create([&summary,
+                                                   geometryDirectory,
+                                                   realDivisionDirectory,
+                                                   settings,
+                                                   updateProgress]() {
+        summary = BatchDivisionEstimator::processNeighborGeometryDirectory(geometryDirectory,
+                                                                            realDivisionDirectory,
+                                                                            settings,
+                                                                            updateProgress);
+    });
+    connect(calculationThread, &QThread::finished, &calculationLoop, &QEventLoop::quit);
+    connect(calculationThread, &QThread::finished, calculationThread, &QObject::deleteLater);
+    calculationThread->start();
+    calculationLoop.exec();
+
+    progress.setValue(progress.maximum());
+    progress.close();
 
     if (summary.entries.isEmpty()) {
         QString message = QString("Processed %1 file(s) but no neighbor pair geometries were produced.").arg(summary.filesProcessed);
@@ -2456,7 +2519,7 @@ void MainWindow::onBatchNeighborPairGeometryCalculation()
         return;
     }
 
-    const QString defaultPath = QDir(directory).filePath("batch_neighbor_pair_geometry.csv");
+    const QString defaultPath = QDir(geometryDirectory).filePath("batch_neighbor_pair_geometry.csv");
     const QString savePath = QFileDialog::getSaveFileName(this,
                                                           "Export Neighbor Pair Geometry",
                                                           defaultPath,
