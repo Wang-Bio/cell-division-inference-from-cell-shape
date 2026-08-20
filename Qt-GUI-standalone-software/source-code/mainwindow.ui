@@ -454,9 +454,7 @@
     <string>Import &amp;&amp; Export</string>
    </property>
     <addaction name="actionImport"/>
-    <addaction name="actionImport_All_Data"/>
     <addaction name="actionExport"/>
-    <addaction name="actionExport_All_Data"/>
    </widget>
    <addaction name="menuOpen"/>
    <addaction name="menuDetection"/>

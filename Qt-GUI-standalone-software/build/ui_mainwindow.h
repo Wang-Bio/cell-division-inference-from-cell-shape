@@ -571,9 +571,7 @@ public:
         menuFind->addAction(actionFind_Line);
         menuFind->addAction(actionFind_Polygon);
         menuImport_Export->addAction(actionImport);
-        menuImport_Export->addAction(actionImport_All_Data);
         menuImport_Export->addAction(actionExport);
-        menuImport_Export->addAction(actionExport_All_Data);
 
         retranslateUi(MainWindow);
 

@@ -434,9 +434,9 @@ void MainWindow::onExport()
     };
 
     if (options.exportRawImage && !hasBackgroundPixmap() && !m_sourceImageItem) {
-        warningMessages << "No visible base image available for base-image export.";
+        warningMessages << "No background raw image available for export.";
     } else {
-        exportImageIfRequested(options.exportRawImage, "_visible_base", false, false, false, false, false, false, options.imageScaleFactor);
+        exportImageIfRequested(options.exportRawImage, "_background", false, false, false, false, false, false, options.imageScaleFactor);
     }
     exportImageIfRequested(options.exportImageWithGeometry, "_geometry", true, true, true, false, false, false, options.imageScaleFactor);
     exportImageIfRequested(options.exportImageWithRealDivisions, "_real_divisions", true, true, true, true, false, false, options.imageScaleFactor);
