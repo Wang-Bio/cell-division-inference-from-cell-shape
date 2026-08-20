@@ -3,6 +3,7 @@
 #include "geometryio.h"
 #include "neighborpair.h"
 #include "polygonitem.h"
+#include "weightedmatching.h"
 
 #include <QDir>
 #include <QFile>
@@ -10,6 +11,8 @@
 #include <QGraphicsItem>
 #include <QGraphicsScene>
 #include <QHash>
+#include <QImage>
+#include <QPainter>
 #include <QRegularExpression>
 #include <QSet>
 #include <QTextStream>
@@ -777,6 +780,37 @@ double solidityForPolygon(const PolygonItem *item)
         return -1.0;
     return area / hullArea;
 }
+
+NeighborPairGeometryCalculator::Result geometryFromCsv(const QStringList &fields,
+                                                        const QHash<QString, int> &columns)
+{
+    NeighborPairGeometryCalculator::Result result;
+    const auto value = [&fields, &columns](const char *name) {
+        const int index = columns.value(QString::fromLatin1(name).toLower(), -1);
+        bool ok = false;
+        const double parsed = index >= 0 && index < fields.size() ? fields.at(index).trimmed().toDouble(&ok) : 0.0;
+        return ok ? parsed : std::numeric_limits<double>::quiet_NaN();
+    };
+#define READ_GEOMETRY(member) result.member = value(#member)
+    READ_GEOMETRY(areaRatio); READ_GEOMETRY(areaMean); READ_GEOMETRY(areaMin); READ_GEOMETRY(areaMax); READ_GEOMETRY(areaDiff);
+    READ_GEOMETRY(perimeterRatio); READ_GEOMETRY(perimeterMean); READ_GEOMETRY(perimeterMin); READ_GEOMETRY(perimeterMax); READ_GEOMETRY(perimeterDiff);
+    READ_GEOMETRY(aspectRatio); READ_GEOMETRY(aspectMean); READ_GEOMETRY(aspectMin); READ_GEOMETRY(aspectMax); READ_GEOMETRY(aspectDiff);
+    READ_GEOMETRY(circularityRatio); READ_GEOMETRY(circularityMean); READ_GEOMETRY(circularityMin); READ_GEOMETRY(circularityMax); READ_GEOMETRY(circularityDiff);
+    READ_GEOMETRY(solidityRatio); READ_GEOMETRY(solidityMean); READ_GEOMETRY(solidityMin); READ_GEOMETRY(solidityMax); READ_GEOMETRY(solidityDiff);
+    READ_GEOMETRY(vertexCountRatio); READ_GEOMETRY(vertexCountMean); READ_GEOMETRY(vertexCountMin); READ_GEOMETRY(vertexCountMax); READ_GEOMETRY(vertexCountDiff);
+    READ_GEOMETRY(centroidDistance); READ_GEOMETRY(centroidDistanceNormalized);
+    READ_GEOMETRY(unionAspectRatio); READ_GEOMETRY(unionCircularity); READ_GEOMETRY(unionConvexDeficiency);
+    READ_GEOMETRY(normalizedSharedEdgeLength); READ_GEOMETRY(sharedEdgeLength);
+    READ_GEOMETRY(sharedEdgeUnsharedVerticesDistance); READ_GEOMETRY(sharedEdgeUnsharedVerticesDistanceNormalized);
+    READ_GEOMETRY(centroidSharedEdgeDistance); READ_GEOMETRY(centroidSharedEdgeDistanceNormalized);
+    READ_GEOMETRY(sharedEdgeUnionCentroidDistance); READ_GEOMETRY(sharedEdgeUnionCentroidDistanceNormalized);
+    READ_GEOMETRY(sharedEdgeUnionAxisAngleDegrees);
+    READ_GEOMETRY(junctionAngleAverageDegrees); READ_GEOMETRY(junctionAngleMaxDegrees);
+    READ_GEOMETRY(junctionAngleMinDegrees); READ_GEOMETRY(junctionAngleDifferenceDegrees); READ_GEOMETRY(junctionAngleRatio);
+#undef READ_GEOMETRY
+    return result;
+}
+
 } // namespace
 
 BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborGeometryDirectory(
@@ -1074,6 +1108,98 @@ bool BatchDivisionEstimator::exportDivisionEstimatesToCsv(const QString &filePat
     return true;
 }
 
+bool BatchDivisionEstimator::exportPerformanceMatrixFigure(const QString &filePath,
+                                                               const DivisionMetrics &metrics,
+                                                               QString *errorMessage)
+{
+    constexpr int width = 847;
+    constexpr int height = 612;
+    constexpr int lineWidth = 5;
+    QImage image(width, height, QImage::Format_RGB32);
+    image.fill(Qt::white);
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    const QPen borderPen(Qt::black, lineWidth);
+
+    const QColor peach(251, 227, 214);
+    const QColor red(218, 103, 82);
+    const QColor blue(76, 121, 162);
+    const QColor tpFill(252, 220, 214);
+    const QColor fpFill(234, 242, 228);
+    const QColor fnFill(225, 233, 241);
+    const QColor tnFill(218, 212, 235);
+    const QColor grey(232, 232, 232);
+
+    const QRect observedBox(350, 15, 490, 83);
+    const QRect colDaughterBox(350, 96, 245, 109);
+    const QRect colNonDaughterBox(595, 96, 245, 109);
+    const QRect estimatedBox(15, 203, 95, 282);
+    const QRect rowDaughterBox(110, 203, 240, 142);
+    const QRect rowNonDaughterBox(110, 345, 240, 140);
+    const QRect tpBox(350, 203, 245, 142);
+    const QRect fpBox(595, 203, 245, 142);
+    const QRect fnBox(350, 345, 245, 140);
+    const QRect tnBox(595, 345, 245, 140);
+    const QRect precisionBox(15, 518, 275, 82);
+    const QRect recallBox(290, 518, 275, 82);
+    const QRect f1Box(565, 518, 275, 82);
+
+    const auto drawBox = [&painter, &borderPen](const QRect &box, const QColor &fill) {
+        painter.setPen(borderPen);
+        painter.setBrush(fill);
+        painter.drawRect(box);
+    };
+    drawBox(observedBox, peach); drawBox(colDaughterBox, red); drawBox(colNonDaughterBox, blue);
+    drawBox(estimatedBox, peach); drawBox(rowDaughterBox, red); drawBox(rowNonDaughterBox, blue);
+    drawBox(tpBox, tpFill); drawBox(fpBox, fpFill); drawBox(fnBox, fnFill); drawBox(tnBox, tnFill);
+    drawBox(precisionBox, grey); drawBox(recallBox, grey); drawBox(f1Box, grey);
+
+    QFont font(QStringLiteral("Arial"));
+    font.setStyleHint(QFont::SansSerif);
+    font.setPixelSize(31);
+    painter.setFont(font);
+    const auto drawText = [&painter](const QRect &box, const QString &text, const QColor &color) {
+        painter.setPen(color);
+        painter.drawText(box.adjusted(8, 5, -8, -5), Qt::AlignCenter | Qt::TextWordWrap, text);
+    };
+    drawText(observedBox, QStringLiteral("Observed"), Qt::black);
+    drawText(colDaughterBox, QStringLiteral("Daughter Pair"), Qt::white);
+    drawText(colNonDaughterBox, QStringLiteral("Non-Daughter\nPair"), Qt::white);
+    drawText(rowDaughterBox, QStringLiteral("Daughter Pair"), Qt::white);
+    drawText(rowNonDaughterBox, QStringLiteral("Non-Daughter\nPair"), Qt::white);
+
+    painter.save();
+    painter.translate(estimatedBox.center());
+    painter.rotate(-90.0);
+    drawText(QRect(-estimatedBox.height() / 2, -estimatedBox.width() / 2,
+                   estimatedBox.height(), estimatedBox.width()), QStringLiteral("Estimated"), Qt::black);
+    painter.restore();
+
+    drawText(tpBox, QString("True Positive\n(TP): %1").arg(metrics.truePositives), Qt::black);
+    drawText(fpBox, QString("False Positive\n(FP): %1").arg(metrics.falsePositives), Qt::black);
+    drawText(fnBox, QString("False Negative\n(FN): %1").arg(metrics.falseNegatives), Qt::black);
+    drawText(tnBox, QString("True Negative\n(TN): %1").arg(metrics.trueNegatives), Qt::black);
+
+    const auto percentage = [](double value) {
+        return value >= 0.0 && std::isfinite(value)
+                ? QString::number(value * 100.0, 'f', 1) + "%"
+                : QStringLiteral("-");
+    };
+    drawText(precisionBox, QString("Precision: %1").arg(percentage(metrics.precision)), Qt::black);
+    drawText(recallBox, QString("Recall: %1").arg(percentage(metrics.recall)), Qt::black);
+    drawText(f1Box, QString("F1 score: %1").arg(percentage(metrics.f1)), Qt::black);
+    painter.end();
+
+    if (!image.save(filePath, "PNG", 100)) {
+        if (errorMessage)
+            *errorMessage = QString("Unable to save performance matrix PNG to %1").arg(filePath);
+        return false;
+    }
+    return true;
+}
+
 BatchDivisionEstimator::DivisionMetrics BatchDivisionEstimator::metricsFromCounts(int neighborCount,
                                                                                   int truePositives,
                                                                                   int falsePositives,
@@ -1321,6 +1447,143 @@ BatchDivisionEstimator::BatchResult BatchDivisionEstimator::estimateDirectory(co
                                        totalEstimatedPairs,
                                        totalRealPairs);
 
+    return summary;
+}
+
+BatchDivisionEstimator::BatchResult BatchDivisionEstimator::estimateGeometryCsv(
+        const QString &filePath, const DivisionEstimator::Criterion &criterion)
+{
+    BatchResult summary;
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        summary.errors << QString("Unable to open %1: %2").arg(filePath, file.errorString());
+        return summary;
+    }
+
+    QTextStream stream(&file);
+    if (stream.atEnd()) {
+        summary.errors << QString("Geometry CSV is empty: %1").arg(filePath);
+        return summary;
+    }
+
+    const QStringList headers = parseCsvLine(stream.readLine());
+    QHash<QString, int> columns;
+    for (int i = 0; i < headers.size(); ++i)
+        columns.insert(headers.at(i).trimmed().toLower(), i);
+    const auto column = [&columns](const QString &name) { return columns.value(name.toLower(), -1); };
+    const int fileColumn = column("fileName");
+    const int firstColumn = column("firstPolygonId");
+    const int secondColumn = column("secondPolygonId");
+    const int observedColumn = column("observed_division");
+    const int exceptionColumn = column("exception_label");
+    const int timingColumn = column("division_timing");
+    const int featureColumn = column(criterion.featureKey);
+    if (fileColumn < 0 || firstColumn < 0 || secondColumn < 0 || observedColumn < 0
+            || exceptionColumn < 0 || featureColumn < 0) {
+        summary.errors << QString("CSV must contain fileName, firstPolygonId, secondPolygonId, "
+                                  "observed_division, exception_label, and the selected feature column '%1'.")
+                              .arg(criterion.featureKey);
+        return summary;
+    }
+
+    struct CsvPair { DivisionPairRow row; double value = 0.0; double score = 0.0; };
+    QHash<QString, QVector<CsvPair>> rowsByFile;
+    int lineNumber = 1;
+    while (!stream.atEnd()) {
+        ++lineNumber;
+        const QString line = stream.readLine();
+        if (line.trimmed().isEmpty())
+            continue;
+        const QStringList fields = parseCsvLine(line);
+        const auto field = [&fields](int index) { return index >= 0 && index < fields.size() ? fields.at(index).trimmed() : QString(); };
+        bool firstOk = false, secondOk = false, valueOk = false;
+        const int first = field(firstColumn).toInt(&firstOk);
+        const int second = field(secondColumn).toInt(&secondOk);
+        const double value = field(featureColumn).toDouble(&valueOk);
+        if (!firstOk || !secondOk || !valueOk || !std::isfinite(value)) {
+            summary.warnings << QString("Line %1: invalid cell IDs or selected feature value; row ignored.").arg(lineNumber);
+            continue;
+        }
+        const QString fileName = field(fileColumn);
+        if (fileName.isEmpty()) {
+            summary.warnings << QString("Line %1: empty fileName; row ignored.").arg(lineNumber);
+            continue;
+        }
+        // Exception-labelled pairs are excluded before matching as well as from every metric.
+        if (field(exceptionColumn).toInt() != 0)
+            continue;
+
+        CsvPair pair;
+        pair.row.fileName = fileName;
+        pair.row.firstId = first;
+        pair.row.secondId = second;
+        pair.row.observedDivision = field(observedColumn).toInt() != 0;
+        pair.row.divisionTime = timingColumn >= 0 ? field(timingColumn).toInt() : -1;
+        pair.row.geometry = geometryFromCsv(fields, columns);
+        pair.value = value;
+        pair.score = criterion.requireAbove ? value - criterion.threshold : criterion.threshold - value;
+        rowsByFile[fileName].append(pair);
+    }
+
+    for (auto fileIt = rowsByFile.begin(); fileIt != rowsByFile.end(); ++fileIt) {
+        QVector<CsvPair> &pairs = fileIt.value();
+        ++summary.filesProcessed;
+        if (pairs.isEmpty())
+            continue;
+
+        QSet<int> idSet;
+        for (const CsvPair &pair : std::as_const(pairs)) { idSet.insert(pair.row.firstId); idSet.insert(pair.row.secondId); }
+        QList<int> ids = idSet.values();
+        std::sort(ids.begin(), ids.end());
+        QHash<int, int> indexById;
+        for (int i = 0; i < ids.size(); ++i) indexById.insert(ids.at(i), i);
+
+        QVector<int> candidates;
+        for (int i = 0; i < pairs.size(); ++i) {
+            if ((criterion.requireAbove && pairs[i].value >= criterion.threshold)
+                    || (!criterion.requireAbove && pairs[i].value <= criterion.threshold))
+                candidates.append(i);
+        }
+        QSet<int> selected;
+        if (criterion.matchingMode == DivisionEstimator::Criterion::MatchingMode::Unconstrained) {
+            for (int i : std::as_const(candidates)) selected.insert(i);
+        } else if (criterion.matchingMode == DivisionEstimator::Criterion::MatchingMode::GlobalMaximumWeight) {
+            QVector<WeightedMatching::Edge> edges;
+            for (int i : std::as_const(candidates))
+                edges.append({indexById.value(pairs[i].row.firstId), indexById.value(pairs[i].row.secondId), pairs[i].score, i});
+            for (const auto &edge : WeightedMatching::solve(ids.size(), edges)) selected.insert(edge.sourceIndex);
+        } else {
+            std::sort(candidates.begin(), candidates.end(), [&pairs](int a, int b) { return pairs[a].score > pairs[b].score; });
+            QSet<int> used;
+            for (int i : std::as_const(candidates)) {
+                if (used.contains(pairs[i].row.firstId) || used.contains(pairs[i].row.secondId)) continue;
+                selected.insert(i); used.insert(pairs[i].row.firstId); used.insert(pairs[i].row.secondId);
+            }
+        }
+
+        QVector<QPair<int, int>> neighbors, estimated, real;
+        for (int i = 0; i < pairs.size(); ++i) {
+            CsvPair &pair = pairs[i];
+            pair.row.estimatedDivision = selected.contains(i);
+            neighbors.append({pair.row.firstId, pair.row.secondId});
+            if (pair.row.estimatedDivision) estimated.append(neighbors.last());
+            if (pair.row.observedDivision) real.append(neighbors.last());
+            summary.pairRows.append(pair.row);
+        }
+        FileDivisionResult result;
+        result.fileName = fileIt.key(); result.neighborPairCount = neighbors.size();
+        result.estimatedPairs = estimated; result.realPairs = real;
+        result.metrics = calculateMetrics(neighbors, estimated, real);
+        summary.files.append(result); ++summary.filesWithResults;
+    }
+
+    int neighbors = 0, tp = 0, fp = 0, fn = 0, estimated = 0, real = 0;
+    for (const FileDivisionResult &result : std::as_const(summary.files)) {
+        neighbors += result.metrics.neighborPairs; tp += result.metrics.truePositives;
+        fp += result.metrics.falsePositives; fn += result.metrics.falseNegatives;
+        estimated += result.metrics.estimatedPairs; real += result.metrics.realPairs;
+    }
+    summary.totals = metricsFromCounts(neighbors, tp, fp, fn, estimated, real);
     return summary;
 }
 

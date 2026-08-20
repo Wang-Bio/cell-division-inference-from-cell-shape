@@ -143,9 +143,13 @@ public:
     static QSet<QString> exceptionPairsForFile(const QFileInfo &fileInfo, const QHash<QString, QSet<QString>> &exceptionMap);
 
     static BatchResult estimateDirectory(const QString &directoryPath, const DivisionEstimator::Criterion &criterion);
+    static BatchResult estimateGeometryCsv(const QString &filePath, const DivisionEstimator::Criterion &criterion);
     static bool exportDivisionEstimatesToCsv(const QString &filePath,
                                              const QVector<DivisionPairRow> &rows,
                                              QString *errorMessage = nullptr);
+    static bool exportPerformanceMatrixFigure(const QString &filePath,
+                                              const DivisionMetrics &metrics,
+                                              QString *errorMessage = nullptr);
     static QVector<DesignatedGeometryConfig> loadDesignatedGeometryConfigCsv(const QString &filePath,
                                                                              QStringList *warnings = nullptr,
                                                                              QStringList *errors = nullptr);

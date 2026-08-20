@@ -2827,25 +2827,31 @@ void MainWindow::onEstimateDivisionBySingleGeometry(){
 
 void MainWindow::onBatchEstimateDivisionBySingleGeometry()
 {
-    QString defaultDir = ui->label_input_directory_value->text();
-    if (defaultDir.isEmpty() || defaultDir == "-")
-        defaultDir = QDir::homePath();
+    QString defaultPath = ui->label_input_directory_value->text();
+    if (defaultPath.isEmpty() || defaultPath == "-")
+        defaultPath = QDir::homePath();
 
-    const QString directory = QFileDialog::getExistingDirectory(this,
-                                                                "Select Directory with Geometry JSON Files",
-                                                                defaultDir);
-    if (directory.isEmpty())
+    const QString geometryCsv = QFileDialog::getOpenFileName(this,
+                                                              "Select Batch Neighbor Pair Geometry CSV",
+                                                              defaultPath,
+                                                              "CSV Files (*.csv)");
+    if (geometryCsv.isEmpty())
         return;
 
     DivisionEstimator::Criterion criterion;
     if (!DivisionEstimator::showSingleFeatureDialog(this, criterion))
         return;
 
-    const BatchDivisionEstimator::BatchResult summary = BatchDivisionEstimator::estimateDirectory(directory, criterion);
+    const BatchDivisionEstimator::BatchResult summary = BatchDivisionEstimator::estimateGeometryCsv(geometryCsv, criterion);
 
     if (summary.filesProcessed == 0 && summary.files.isEmpty()) {
         resetDivisionComparisonLabels();
-        QMessageBox::information(this, "Batch Estimate Division", "No geometry files were processed.");
+        QString message = QStringLiteral("No geometry records were processed.");
+        if (!summary.errors.isEmpty())
+            message += "\n\nErrors:\n- " + summary.errors.join("\n- ");
+        if (!summary.warnings.isEmpty())
+            message += "\n\nWarnings:\n- " + summary.warnings.join("\n- ");
+        QMessageBox::information(this, "Batch Estimate Division", message);
         return;
     }
 
@@ -2878,7 +2884,7 @@ void MainWindow::onBatchEstimateDivisionBySingleGeometry()
 
     QString exportMessage;
     if (!summary.pairRows.isEmpty()) {
-        const QString defaultPath = QDir(directory).filePath("batch_single_geometry_estimation.csv");
+        const QString defaultPath = QFileInfo(geometryCsv).dir().filePath("batch_single_geometry_estimation.csv");
         const QString savePath = QFileDialog::getSaveFileName(this,
                                                               "Export Batch Division Estimation",
                                                               defaultPath,
@@ -2891,6 +2897,24 @@ void MainWindow::onBatchEstimateDivisionBySingleGeometry()
             }
             exportMessage = QString("\n\nExported %1 neighbor pairs to:\n%2").arg(summary.pairRows.size()).arg(savePath);
         }
+    }
+
+    const QString defaultFigurePath = QFileInfo(geometryCsv).dir().filePath("performance_matrix.png");
+    const QString figurePath = QFileDialog::getSaveFileName(this,
+                                                            "Export Performance Matrix Figure",
+                                                            defaultFigurePath,
+                                                            "PNG Images (*.png)");
+    if (!figurePath.isEmpty()) {
+        QString errorMessage;
+        if (!BatchDivisionEstimator::exportPerformanceMatrixFigure(figurePath, summary.totals, &errorMessage)) {
+            QMessageBox::critical(this,
+                                  "Batch Estimate Division",
+                                  errorMessage.isEmpty()
+                                      ? QString("Failed to export performance matrix to %1").arg(figurePath)
+                                      : errorMessage);
+            return;
+        }
+        exportMessage += QString("\n\nExported performance matrix to:\n%1").arg(figurePath);
     }
 
     QMessageBox::information(this, "Batch Estimate Division", message + exportMessage);
