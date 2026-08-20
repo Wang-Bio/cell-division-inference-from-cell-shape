@@ -23,6 +23,9 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QPalette>
+#include <QPainter>
+#include <QPainterPath>
+#include <QImage>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QSpinBox>
@@ -522,20 +525,20 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
     QDialog dialog(parent);
     dialog.setWindowTitle(dialogTitle);
 
-    auto *directoryEdit = new QLineEdit(defaultDir, &dialog);
+    auto *geometryCsvEdit = new QLineEdit(&dialog);
     auto *browseButton = new QPushButton("Browse...", &dialog);
     auto *dirContainer = new QWidget(&dialog);
     auto *dirLayout = new QHBoxLayout(dirContainer);
     dirLayout->setContentsMargins(0, 0, 0, 0);
-    dirLayout->addWidget(directoryEdit);
+    dirLayout->addWidget(geometryCsvEdit);
     dirLayout->addWidget(browseButton);
-    QObject::connect(browseButton, &QPushButton::clicked, &dialog, [parent, directoryEdit]() {
-        QString startDir = directoryEdit->text().trimmed();
+    QObject::connect(browseButton, &QPushButton::clicked, &dialog, [parent, geometryCsvEdit, defaultDir]() {
+        QString startDir = geometryCsvEdit->text().trimmed();
         if (startDir.isEmpty() || startDir == "-")
             startDir = QDir::homePath();
-        const QString chosenDir = QFileDialog::getExistingDirectory(parent, "Select Directory with Geometry JSON Files", startDir);
-        if (!chosenDir.isEmpty())
-            directoryEdit->setText(chosenDir);
+        const QString chosenFile = QFileDialog::getOpenFileName(parent, "Select Batch Neighbor Pair Geometry CSV", startDir, "CSV Files (*.csv)");
+        if (!chosenFile.isEmpty())
+            geometryCsvEdit->setText(chosenFile);
     });
 
     const QVector<DivisionEstimator::FeatureOption> options = DivisionEstimator::featureOptions();
@@ -601,7 +604,7 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
                      updateDescription);
 
     auto *form = new QFormLayout;
-    form->addRow("Input directory", dirContainer);
+    form->addRow("Geometry CSV", dirContainer);
     form->addRow("Geometry feature", featureCombo);
     form->addRow("Comparison", directionCombo);
     form->addRow("Threshold start", thresholdStartSpin);
@@ -621,15 +624,15 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
     if (dialog.exec() != QDialog::Accepted)
         return false;
 
-    const QString directory = directoryEdit->text().trimmed();
-    if (directory.isEmpty()) {
-        QMessageBox::warning(parent, dialogTitle, "Please choose an input directory.");
+    const QString geometryCsv = geometryCsvEdit->text().trimmed();
+    if (geometryCsv.isEmpty()) {
+        QMessageBox::warning(parent, dialogTitle, "Please choose a batch neighbor pair geometry CSV.");
         return false;
     }
 
-    QDir dir(directory);
-    if (!dir.exists()) {
-        QMessageBox::warning(parent, dialogTitle, QString("Directory does not exist: %1").arg(directory));
+    QFileInfo geometryCsvInfo(geometryCsv);
+    if (!geometryCsvInfo.exists() || !geometryCsvInfo.isFile()) {
+        QMessageBox::warning(parent, dialogTitle, QString("Geometry CSV does not exist: %1").arg(geometryCsv));
         return false;
     }
 
@@ -667,7 +670,7 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
     const int totalSteps = static_cast<int>(std::floor((thresholdEnd - thresholdStart) / thresholdStep + 1.0 + 1e-9));
 
     PrecisionRecallSweepWorker::Request request;
-    request.directory = directory;
+    request.geometryCsv = geometryCsv;
     request.baseCriterion = criterion;
     request.thresholdStart = thresholdStart;
     request.thresholdEnd = thresholdEnd;
@@ -730,7 +733,7 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
 
     if (!success || results.isEmpty() || pairsByThreshold.isEmpty()) {
         const QString message = errors.isEmpty()
-                ? QString("No geometry files were processed in %1.").arg(directory)
+                ? QString("No geometry records were processed in %1.").arg(geometryCsv)
                 : errors.join("\n");
         QMessageBox::warning(parent, dialogTitle, message);
         return false;
@@ -816,8 +819,9 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
         return escaped;
     };
 
-    const QString defaultCsv = dir.filePath("batch_single_geometry_threshold_sweep.csv");
-    const QString defaultPerformanceCsv = dir.filePath("batch_single_geometry_threshold_performance.csv");
+    const QDir outputDir = geometryCsvInfo.dir();
+    const QString defaultCsv = outputDir.filePath("batch_single_geometry_threshold_sweep.csv");
+    const QString defaultPerformanceCsv = outputDir.filePath("batch_single_geometry_threshold_performance.csv");
     const QString savePath = QFileDialog::getSaveFileName(parent,
                                                           "Export Batch Estimation Threshold Sweep",
                                                           defaultCsv,
@@ -930,11 +934,140 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
         });
     }
 
+    const QString defaultPlotPath = outputDir.filePath("batch_single_geometry_precision_recall.png");
+    const QString plotPath = QFileDialog::getSaveFileName(parent,
+                                                           "Export Precision and Recall Curve",
+                                                           defaultPlotPath,
+                                                           "PNG Images (*.png)");
+    if (plotPath.isEmpty())
+        return false;
+
+    // A 7.79 x 4.35 inch, 600 dpi canvas mirrors the publication-style
+    // proportions of the reference plot while reserving room for its legend.
+    constexpr int imageWidth = 4674;
+    constexpr int imageHeight = 2610;
+    QImage plot(imageWidth, imageHeight, QImage::Format_RGB32);
+    plot.fill(Qt::white);
+    plot.setDotsPerMeterX(23622);
+    plot.setDotsPerMeterY(23622);
+    QPainter painter(&plot);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+
+    const QRectF panel(350.0, 150.0, 3120.0, 2070.0);
+    const QColor precisionColor("#6A3D9A");
+    const QColor recallColor("#1B9E77");
+    const QColor bestColor("#6E6E6E");
+    QFont font(QStringLiteral("Arial"));
+    font.setStyleHint(QFont::SansSerif);
+    font.setPixelSize(48);
+    painter.setFont(font);
+
+    const double xMin = results.first().threshold;
+    const double xMax = results.last().threshold;
+    const double xSpan = std::max(1.0, xMax - xMin);
+    const double xPad = std::max(0.5, xSpan * 0.025);
+    const auto pointFor = [&](double threshold, double score) {
+        const double x = panel.left() + (threshold - (xMin - xPad))
+                / (xSpan + 2.0 * xPad) * panel.width();
+        const double y = panel.bottom() - std::clamp(score, 0.0, 1.02) / 1.02 * panel.height();
+        return QPointF(x, y);
+    };
+
+    // Light horizontal major/minor guides and outward-facing tick labels.
+    for (int tenth = 0; tenth <= 10; ++tenth) {
+        const double value = tenth / 10.0;
+        const double y = pointFor(xMin, value).y();
+        painter.setPen(QPen(tenth % 2 == 0 ? QColor("#E6E6E6") : QColor("#F2F2F2"),
+                            tenth % 2 == 0 ? 4.0 : 2.5));
+        painter.drawLine(QPointF(panel.left(), y), QPointF(panel.right(), y));
+        if (tenth % 2 == 0) {
+            painter.setPen(Qt::black);
+            painter.drawText(QRectF(80, y - 35, 220, 70), Qt::AlignRight | Qt::AlignVCenter,
+                             QString::number(value, 'f', 1));
+        }
+    }
+    painter.setPen(QPen(Qt::black, 6));
+    painter.drawLine(panel.bottomLeft(), panel.topLeft());
+    painter.drawLine(panel.bottomLeft(), panel.bottomRight());
+
+    const auto drawCurve = [&](const QColor &color, bool precision) {
+        QPainterPath path;
+        bool hasPoint = false;
+        for (int i = 0; i < results.size(); ++i) {
+            const double score = precision ? results.at(i).metrics.precision : results.at(i).metrics.recall;
+            if (!std::isfinite(score))
+                continue;
+            const QPointF point = pointFor(results.at(i).threshold, score);
+            if (!hasPoint) {
+                path.moveTo(point);
+                hasPoint = true;
+            } else {
+                path.lineTo(point);
+            }
+        }
+        painter.setPen(QPen(color, 13, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawPath(path);
+        const int markerEvery = std::max(1, static_cast<int>(results.size() / 12));
+        for (int i = 0; i < results.size(); i += markerEvery) {
+            const double score = precision ? results.at(i).metrics.precision : results.at(i).metrics.recall;
+            if (!std::isfinite(score)) continue;
+            painter.setBrush(Qt::white);
+            painter.setPen(QPen(color, 7));
+            const QPointF point = pointFor(results.at(i).threshold, score);
+            if (precision)
+                painter.drawEllipse(point, 18, 18);
+            else
+                painter.drawRect(QRectF(point.x() - 17, point.y() - 17, 34, 34));
+        }
+    };
+    drawCurve(precisionColor, true);
+    drawCurve(recallColor, false);
+
+    const auto bestIt = std::max_element(results.cbegin(), results.cend(), [](const auto &a, const auto &b) {
+        if (a.metrics.f1 != b.metrics.f1) return a.metrics.f1 < b.metrics.f1;
+        if (a.metrics.precision != b.metrics.precision) return a.metrics.precision < b.metrics.precision;
+        return a.metrics.recall < b.metrics.recall;
+    });
+    const double bestX = pointFor(bestIt->threshold, 0.0).x();
+    painter.setPen(QPen(bestColor, 6, Qt::DashLine));
+    painter.drawLine(QPointF(bestX, panel.top()), QPointF(bestX, panel.bottom()));
+
+    painter.setPen(Qt::black);
+    painter.drawText(QRectF(panel.left(), panel.bottom() + 100, panel.width(), 100), Qt::AlignCenter,
+                     QString("%1 threshold").arg(criterion.featureLabel));
+    painter.save();
+    painter.translate(75, panel.center().y());
+    painter.rotate(-90);
+    painter.drawText(QRectF(-panel.height() / 2, -60, panel.height(), 100), Qt::AlignCenter, "Score");
+    painter.restore();
+
+    const double legendX = 3650.0;
+    const auto legendLine = [&](double y, const QColor &color, const QString &label, Qt::PenStyle style) {
+        painter.setPen(QPen(color, style == Qt::SolidLine ? 13 : 6, style, Qt::RoundCap));
+        painter.drawLine(QPointF(legendX, y), QPointF(legendX + 180, y));
+        painter.setPen(Qt::black);
+        painter.drawText(QRectF(legendX + 220, y - 45, 760, 90), Qt::AlignVCenter, label);
+    };
+    legendLine(900, precisionColor, "Precision", Qt::SolidLine);
+    legendLine(1040, recallColor, "Recall", Qt::SolidLine);
+    legendLine(1180, bestColor,
+               QString("Best F1 = %1 (%2)").arg(bestIt->metrics.f1, 0, 'f', 3)
+                                            .arg(bestIt->threshold, 0, 'g', 8),
+               Qt::DashLine);
+    painter.end();
+    if (!plot.save(plotPath, "PNG", 100)) {
+        QMessageBox::critical(parent, dialogTitle, QString("Unable to save precision/recall PNG to %1").arg(plotPath));
+        return false;
+    }
+
     QString message = QString("Evaluated %1 threshold values for %2 neighbor pairs and exported the sweep to:\n- %3\n- %4")
                           .arg(results.size())
                           .arg(aggregateRows.size())
                           .arg(savePath)
                           .arg(performanceSavePath);
+    message += QString("\n- %1").arg(plotPath);
 
     if (!warnings.isEmpty())
         message += "\n\nWarnings:\n- " + warnings.join("\n- ");

@@ -54,7 +54,7 @@ void PrecisionRecallSweepWorker::run()
         DivisionEstimator::Criterion runCriterion = m_request.baseCriterion;
         runCriterion.threshold = threshold;
 
-        const BatchDivisionEstimator::BatchResult summary = BatchDivisionEstimator::estimateDirectory(m_request.directory, runCriterion);
+        const BatchDivisionEstimator::BatchResult summary = BatchDivisionEstimator::estimateGeometryCsv(m_request.geometryCsv, runCriterion);
         results.append({threshold, summary.totals});
         pairsByThreshold.append({threshold, summary.pairRows});
         anyProcessed = anyProcessed || summary.filesProcessed > 0 || summary.filesWithResults > 0;
@@ -66,7 +66,7 @@ void PrecisionRecallSweepWorker::run()
     }
 
     if (!anyProcessed) {
-        errors << QString("No geometry files were processed in %1.").arg(m_request.directory);
+        errors << QString("No geometry records were processed in %1.").arg(m_request.geometryCsv);
     }
 
     emit finished(anyProcessed, results, pairsByThreshold, warnings, errors, false);

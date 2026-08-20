@@ -418,7 +418,6 @@
     <addaction name="actionEstimate_division_by_single_geometry"/>
     <addaction name="actionCompare_with_real_division"/>
     <addaction name="actionBatch_Estimate_Division_by_single_geometry"/>
-    <addaction name="actionBatch_Estimate_Division_by_designated_geometry"/>
     <addaction name="actionPrecision_and_Recall_Curve_Over_Single_Geometry"/>
    </widget>
    <widget class="QMenu" name="menuDisplay">
@@ -679,11 +678,6 @@
   <action name="actionBatch_Estimate_Division_by_single_geometry">
    <property name="text">
     <string>Batch Estimate Division by single geometry</string>
-   </property>
-  </action>
-  <action name="actionBatch_Estimate_Division_by_designated_geometry">
-   <property name="text">
-    <string>Batch Estimate Division by designated geometry</string>
    </property>
   </action>
   <action name="actionCheck_Geometry_Calculation_Single_Pair">

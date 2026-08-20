@@ -198,7 +198,6 @@ private slots:
 //menuBar Estimation functions
     void onEstimateDivisionBySingleGeometry();
     void onBatchEstimateDivisionBySingleGeometry();
-    void onBatchEstimateDivisionByDesignatedGeometry();
     void onCompareWithRealDivision();
 
     void onPrecisionAndRecallCurveOverSingleGeometry();

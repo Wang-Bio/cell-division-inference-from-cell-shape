@@ -184,7 +184,6 @@ MainWindow::MainWindow(QWidget *parent)
 //menuBar Estimate function
     connect(ui->actionEstimate_division_by_single_geometry, &QAction::triggered, this, &MainWindow::onEstimateDivisionBySingleGeometry);
     connect(ui->actionBatch_Estimate_Division_by_single_geometry, &QAction::triggered, this, &MainWindow::onBatchEstimateDivisionBySingleGeometry);
-    connect(ui->actionBatch_Estimate_Division_by_designated_geometry, &QAction::triggered, this, &MainWindow::onBatchEstimateDivisionByDesignatedGeometry);
     connect(ui->actionCompare_with_real_division, &QAction::triggered, this, &MainWindow::onCompareWithRealDivision);
     connect(ui->actionPrecision_and_Recall_Curve_Over_Single_Geometry, &QAction::triggered, this, &MainWindow::onPrecisionAndRecallCurveOverSingleGeometry);
 
@@ -2920,129 +2919,7 @@ void MainWindow::onBatchEstimateDivisionBySingleGeometry()
     QMessageBox::information(this, "Batch Estimate Division", message + exportMessage);
 }
 
-void MainWindow::onBatchEstimateDivisionByDesignatedGeometry()
-{
-    QString defaultDir = ui->label_input_directory_value->text();
-    if (defaultDir.isEmpty() || defaultDir == "-")
-        defaultDir = QDir::homePath();
 
-    const QString directory = QFileDialog::getExistingDirectory(this,
-                                                                "Select Directory with Geometry JSON Files",
-                                                                defaultDir);
-    if (directory.isEmpty())
-        return;
-
-    const QString classifierPath = QFileDialog::getOpenFileName(this,
-                                                                "Select CSV with Designated Geometry Criteria",
-                                                                directory,
-                                                                "CSV Files (*.csv)");
-    if (classifierPath.isEmpty())
-        return;
-
-    QStringList parseWarnings;
-    QStringList parseErrors;
-    const QVector<BatchDivisionEstimator::DesignatedGeometryConfig> configs =
-            BatchDivisionEstimator::loadDesignatedGeometryConfigCsv(classifierPath, &parseWarnings, &parseErrors);
-
-    if (!parseErrors.isEmpty()) {
-        QMessageBox::critical(this,
-                              "Batch Estimate Division (Designated)",
-                              QString("Unable to load classifier CSV:\n- %1").arg(parseErrors.join("\n- ")));
-        return;
-    }
-
-    if (configs.isEmpty()) {
-        QString message = "No valid classifier rows were found.";
-        if (!parseWarnings.isEmpty())
-            message += "\n\nWarnings:\n- " + parseWarnings.join("\n- ");
-        QMessageBox::information(this, "Batch Estimate Division (Designated)", message);
-        return;
-    }
-
-    const QVector<BatchDivisionEstimator::DesignatedGeometryResult> results =
-            BatchDivisionEstimator::estimateDesignatedGeometry(directory, configs);
-
-    if (results.isEmpty()) {
-        QMessageBox::information(this, "Batch Estimate Division (Designated)", "No estimations were performed.");
-        return;
-    }
-
-    applyDivisionMetricsToLabels(results.constLast().metrics);
-
-    const auto formatMetric = [](double value) {
-        if (value < 0.0 || std::isnan(value))
-            return QStringLiteral("-");
-        return QString::number(value, 'f', 3);
-    };
-
-    QString message = QString("Processed %1 configuration(s) from %2.\nDirectory: %3")
-            .arg(results.size())
-            .arg(QFileInfo(classifierPath).fileName())
-            .arg(directory);
-
-    QStringList allWarnings = parseWarnings;
-    QStringList allErrors;
-
-    for (const auto &res : results) {
-        message += QString("\n\nFeature: %1 (%2)").arg(res.featureLabel.isEmpty() ? res.config.featureName : res.featureLabel,
-                                                      res.featureKey.isEmpty() ? "-" : res.featureKey);
-        message += QString("\nThreshold: %1 (%2)")
-                .arg(QString::number(res.config.cutoffValue, 'f', 4))
-                .arg(res.config.requireAbove ? ">= cutoff" : "<= cutoff");
-        message += QString("\nFiles: %1 processed, %2 with results")
-                .arg(res.filesProcessed)
-                .arg(res.filesWithResults);
-        message += QString("\nEstimated pairs: %1").arg(res.metrics.estimatedPairs < 0 ? 0 : res.metrics.estimatedPairs);
-        message += QString("\nReal pairs: %1").arg(res.metrics.realPairs < 0 ? 0 : res.metrics.realPairs);
-        message += QString("\nTP: %1  FP: %2  FN: %3  TN: %4")
-                .arg(res.metrics.truePositives)
-                .arg(res.metrics.falsePositives)
-                .arg(res.metrics.falseNegatives)
-                .arg(res.metrics.trueNegatives);
-        message += QString("\nPrecision: %1  Recall: %2  F1: %3  Specificity: %4  Accuracy: %5")
-                .arg(formatMetric(res.metrics.precision))
-                .arg(formatMetric(res.metrics.recall))
-                .arg(formatMetric(res.metrics.f1))
-                .arg(formatMetric(res.metrics.specificity))
-                .arg(formatMetric(res.metrics.accuracy));
-
-        if (!res.config.direction.isEmpty())
-            message += QString("\nDirection: %1").arg(res.config.direction);
-        if (!res.config.note.isEmpty())
-            message += QString("\nNote: %1").arg(res.config.note);
-
-        if (!res.warnings.isEmpty()) {
-            allWarnings.append(res.warnings);
-        }
-        if (!res.errors.isEmpty()) {
-            allErrors.append(res.errors);
-        }
-    }
-
-    QString exportMessage;
-    const QString defaultSavePath = QDir(directory).filePath("designated_geometry_performance.csv");
-    const QString savePath = QFileDialog::getSaveFileName(this,
-                                                          "Export Designated Geometry Performance",
-                                                          defaultSavePath,
-                                                          "CSV Files (*.csv)");
-    if (!savePath.isEmpty()) {
-        QString errorMessage;
-        if (!BatchDivisionEstimator::exportDesignatedGeometryMetricsToCsv(savePath, results, &errorMessage)) {
-            QMessageBox::critical(this,
-                                  "Batch Estimate Division (Designated)",
-                                  errorMessage.isEmpty() ? QString("Failed to export CSV to %1").arg(savePath) : errorMessage);
-            return;
-        }
-        exportMessage = QString("\n\nExported performance matrix to:\n%1").arg(savePath);
-    }
-
-    if (!allErrors.isEmpty())
-        message += "\n\nErrors:\n- " + allErrors.join("\n- ");
-    if (!allWarnings.isEmpty())
-        message += "\n\nWarnings:\n- " + allWarnings.join("\n- ");
-
-    QMessageBox::information(this, "Batch Estimate Division (Designated)", message + exportMessage);
-}
 
 void MainWindow::onPrecisionAndRecallCurveOverSingleGeometry()
 {

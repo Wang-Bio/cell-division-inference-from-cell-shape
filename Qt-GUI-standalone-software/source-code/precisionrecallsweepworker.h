@@ -27,7 +27,7 @@ class PrecisionRecallSweepWorker : public QObject
     Q_OBJECT
 public:
     struct Request {
-        QString directory;
+        QString geometryCsv;
         DivisionEstimator::Criterion baseCriterion;
         double thresholdStart = 0.0;
         double thresholdEnd = 0.0;
