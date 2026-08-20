@@ -90,6 +90,10 @@ public:
                                     const QString &fileName,
                                     const QVector<QPair<int, int>> &pairs,
                                     QString *errorMessage = nullptr);
+    static bool exportRealDivisionPairs(const QString &filePath,
+                                        const QString &fileName,
+                                        const QVector<DivisionPairRecord> &pairs,
+                                        QString *errorMessage = nullptr);
     static bool showExportDialog(QWidget *parent, const QString &directoryHint, const QString &fileNameHint, GeometryExportOptions *options);
     static void setNeighborPairsOnScene(QGraphicsScene *scene, const QVector<QPair<int, int>> &pairs);
     static QVector<QPair<int, int>> neighborPairsFromScene(QGraphicsScene *scene);

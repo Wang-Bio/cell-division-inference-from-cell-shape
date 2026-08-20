@@ -1114,6 +1114,32 @@ bool GeometryIO::exportDivisionPairs(const QString &filePath,
     return true;
 }
 
+bool GeometryIO::exportRealDivisionPairs(const QString &filePath,
+                                         const QString &fileName,
+                                         const QVector<DivisionPairRecord> &pairs,
+                                         QString *errorMessage)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (errorMessage)
+            *errorMessage = QString("Failed to open %1 for writing.").arg(filePath);
+        return false;
+    }
+
+    QTextStream stream(&file);
+    stream << "file_name,first_cell_id,second_cell_id,hours_ago,divided\n";
+    for (const DivisionPairRecord &pair : pairs) {
+        stream << fileName << ','
+               << pair.firstId << ','
+               << pair.secondId << ',';
+        if (pair.time >= 0)
+            stream << pair.time;
+        stream << ',' << 1 << '\n';
+    }
+
+    return true;
+}
+
 QVector<BatchDivisionEstimator::GeometryEntry> GeometryIO::updateGeometryEntryFileNames(const QVector<BatchDivisionEstimator::GeometryEntry> &entries,
                                                                                        const QString &fileName)
 {

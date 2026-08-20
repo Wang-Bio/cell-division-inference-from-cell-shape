@@ -357,8 +357,20 @@ void MainWindow::onExport()
         if (m_realDivisionPairs.isEmpty()) {
             warningMessages << "No real division pairs available to export.";
         } else {
+            QVector<DivisionPairRecord> records;
+            records.reserve(m_realDivisionPairs.size());
+            for (const auto &pair : std::as_const(m_realDivisionPairs)) {
+                DivisionPairRecord record;
+                record.firstId = pair.first;
+                record.secondId = pair.second;
+                const QString key = QString("%1-%2")
+                        .arg(std::min(pair.first, pair.second))
+                        .arg(std::max(pair.first, pair.second));
+                record.time = m_realDivisionTimingByPairKey.value(key, -1);
+                records.append(record);
+            }
             const QString realPath = exportDir.filePath(baseName + "_real_division_pairs.csv");
-            if (GeometryIO::exportDivisionPairs(realPath, exportFileName, m_realDivisionPairs, &errorMessage)) {
+            if (GeometryIO::exportRealDivisionPairs(realPath, exportFileName, records, &errorMessage)) {
                 successMessages << QString("Real division pairs: %1").arg(realPath);
             } else {
                 warningMessages << errorMessage;
@@ -380,13 +392,52 @@ void MainWindow::onExport()
     }
 
     if (options.exportNeighborGeometryCsv) {
-        if (!m_hasGeometryCalculationResults || m_lastGeometryEntries.isEmpty()) {
-            warningMessages << "No neighbor pair geometry calculations available to export.";
+        QVector<BatchDivisionEstimator::GeometryEntry> geometryEntries = m_lastGeometryEntries;
+        NeighborPairGeometrySettings geometrySettings = m_hasGeometryCalculationResults
+                ? m_lastGeometrySettings
+                : NeighborPairGeometryCalculator::currentSettings();
+
+        if (!m_hasGeometryCalculationResults || geometryEntries.isEmpty()) {
+            const QVector<QPair<int, int>> neighborPairs = GeometryIO::neighborPairsFromScene(scene);
+            QHash<int, PolygonItem*> polygonById;
+            for (QGraphicsItem *item : scene->items()) {
+                if (item && item->type() == PolygonItem::Type) {
+                    auto *polygon = static_cast<PolygonItem*>(item);
+                    polygonById.insert(polygon->id(), polygon);
+                }
+            }
+
+            geometryEntries.clear();
+            geometryEntries.reserve(neighborPairs.size());
+            int pairIndex = 0;
+            for (const auto &pair : neighborPairs) {
+                PolygonItem *first = polygonById.value(pair.first, nullptr);
+                PolygonItem *second = polygonById.value(pair.second, nullptr);
+                if (!first || !second) {
+                    warningMessages << QString("Neighbor pair (%1, %2) references missing polygons and was skipped during geometry export.")
+                                       .arg(pair.first)
+                                       .arg(pair.second);
+                    continue;
+                }
+
+                BatchDivisionEstimator::GeometryEntry entry;
+                entry.geometry = NeighborPairGeometryCalculator::calculateForPair(first, second, geometrySettings);
+                entry.geometry.first = nullptr;
+                entry.geometry.second = nullptr;
+                entry.pairIndex = ++pairIndex;
+                entry.firstId = std::min(pair.first, pair.second);
+                entry.secondId = std::max(pair.first, pair.second);
+                geometryEntries.append(entry);
+            }
+        }
+
+        if (geometryEntries.isEmpty()) {
+            warningMessages << "No neighbor pairs available for geometry export.";
         } else {
             const QString geometryCsvPath = exportDir.filePath(baseName + "_neighbor_geometry.csv");
             const QVector<BatchDivisionEstimator::GeometryEntry> entries = geometryEntriesWithDivisionLabels(
-                    GeometryIO::updateGeometryEntryFileNames(m_lastGeometryEntries, exportFileName));
-            if (BatchDivisionEstimator::exportNeighborGeometryToCsv(geometryCsvPath, entries, m_lastGeometrySettings, &errorMessage)) {
+                    GeometryIO::updateGeometryEntryFileNames(geometryEntries, exportFileName));
+            if (BatchDivisionEstimator::exportNeighborGeometryToCsv(geometryCsvPath, entries, geometrySettings, &errorMessage)) {
                 successMessages << QString("Neighbor pair geometry: %1").arg(geometryCsvPath);
             } else {
                 warningMessages << errorMessage;
