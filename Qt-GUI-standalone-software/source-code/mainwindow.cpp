@@ -47,6 +47,21 @@
 
 namespace {
 constexpr qreal BaseRasterZ = -1000.0;
+
+bool isRealDivisionHeader(const QString &line)
+{
+    const QStringList fields = line.toLower().split(QRegularExpression("[,;\\s]+"),
+                                                    Qt::SkipEmptyParts);
+    const QString joinedFields = fields.join(QStringLiteral("_"));
+    if (joinedFields == QStringLiteral("real_division_pair")
+            || joinedFields == QStringLiteral("realdivisionpair")) {
+        return true;
+    }
+
+    return fields.contains(QStringLiteral("first_cell_index"))
+            && fields.contains(QStringLiteral("second_cell_index"));
+}
+
 bool anyGeometryCalculationEnabled(const NeighborPairGeometrySettings &settings)
 {
     return settings.computeAreaRatio
@@ -2994,6 +3009,11 @@ void MainWindow::onCompareWithRealDivision(){
         ++lineNumber;
 
         if (line.isEmpty())
+            continue;
+
+        // Exported ground-truth files may start with both a format marker and a
+        // column-name row.  Neither row is malformed pair data.
+        if (isRealDivisionHeader(line))
             continue;
 
         const QStringList parts = line.split(QRegularExpression("[,;\\s]+"), Qt::SkipEmptyParts);

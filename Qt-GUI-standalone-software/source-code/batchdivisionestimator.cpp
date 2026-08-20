@@ -20,6 +20,20 @@
 #include <utility>
 
 namespace {
+bool isRealDivisionHeader(const QString &line)
+{
+    const QStringList fields = line.toLower().split(QRegularExpression("[,;\\s]+"),
+                                                    Qt::SkipEmptyParts);
+    const QString joinedFields = fields.join(QStringLiteral("_"));
+    if (joinedFields == QStringLiteral("real_division_pair")
+            || joinedFields == QStringLiteral("realdivisionpair")) {
+        return true;
+    }
+
+    return fields.contains(QStringLiteral("first_cell_index"))
+            && fields.contains(QStringLiteral("second_cell_index"));
+}
+
 QVector<PolygonItem*> collectPolygons(QGraphicsScene *scene)
 {
     QVector<PolygonItem*> polygons;
@@ -629,8 +643,8 @@ QVector<RealDivisionEntry> readDivisionPairs(const QString &filePath, QStringLis
         if (line.isEmpty())
             continue;
 
-        if (lineNumber == 1 && !line.at(0).isDigit() && line.at(0) != '-') {
-            // Treat non-numeric first line as header
+        if (isRealDivisionHeader(line)) {
+            // Files may contain a format marker followed by a column-name row.
             continue;
         }
 
