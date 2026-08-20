@@ -79,7 +79,8 @@ QStringList buildHeaders(const NeighborPairGeometrySettings &settings)
         "firstPolygonId",
         "secondPolygonId",
         "observed_division",
-        "division_timing"
+        "division_timing",
+        "exception_label"
     };
 
     if (settings.computeAreaRatio)
@@ -196,7 +197,8 @@ QStringList buildRow(const BatchDivisionEstimator::GeometryEntry &entry,
         QString::number(entry.firstId),
         QString::number(entry.secondId),
         entry.observedDivision ? QStringLiteral("1") : QStringLiteral("0"),
-        QString::number(entry.observedDivision ? entry.divisionTime : -1)
+        QString::number(entry.observedDivision ? entry.divisionTime : -1),
+        entry.exceptionLabel ? QStringLiteral("1") : QStringLiteral("0")
     };
 
     const auto &res = entry.geometry;
@@ -805,6 +807,10 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
     if (progressCallback)
         progressCallback(0, files.size(), QString(), 0, 0);
 
+    QStringList exceptionWarnings;
+    const QHash<QString, QSet<QString>> exceptions = loadExceptionPairs(realDivisionDir, &exceptionWarnings);
+    summary.warnings.append(exceptionWarnings);
+
     for (const QFileInfo &info : files) {
         if (progressCallback)
             progressCallback(summary.filesProcessed, files.size(), info.fileName(), 0, 0);
@@ -830,6 +836,7 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
         QStringList parseWarnings;
         QHash<QString, int> realPairTimes;
         QSet<QString> realPairKeys;
+        const QSet<QString> exceptionKeys = exceptionPairsForFile(info, exceptions);
         const QString realDivisionFile = findRealDivisionFile(realDivisionDir, info);
         if (realDivisionFile.isEmpty()) {
             summary.warnings << QString("%1: no matching real division pair file found in %2.")
@@ -883,6 +890,7 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
             const QString neighborKey = normalizedPairKey(entry.firstId, entry.secondId);
             entry.observedDivision = realPairKeys.contains(neighborKey);
             entry.divisionTime = entry.observedDivision ? realPairTimes.value(neighborKey, -1) : -1;
+            entry.exceptionLabel = exceptionKeys.contains(neighborKey);
             entry.geometry = result;
 
             summary.entries.append(entry);

@@ -24,6 +24,7 @@ public:
         int firstId = -1;
         int secondId = -1;
         bool observedDivision = false;
+        bool exceptionLabel = false;
         int divisionTime = -1;
         NeighborPairGeometryCalculator::Result geometry;
     };
