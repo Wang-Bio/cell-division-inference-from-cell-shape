@@ -2606,7 +2606,7 @@ void MainWindow::onMixtureModelingForSingleGeometryFeature()
     auto *thread = new QThread(this);
     auto *worker = new SingleFeatureMixtureWorker(options);
     auto *progress = new QProgressDialog("Preparing mixture analysis…", "Cancel",
-                                         0, options.bootstrapCount, this);
+                                         0, 1, this);
     progress->setWindowTitle("Mixture modeling for single geometry feature");
     progress->setWindowModality(Qt::WindowModal);
     progress->setMinimumDuration(0);

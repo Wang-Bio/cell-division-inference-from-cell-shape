@@ -174,12 +174,6 @@ QVector<double> ecdf(const QVector<QPair<double,double>> &values)
     return result;
 }
 
-double quantile(QVector<double> x,double p)
-{
-    std::sort(x.begin(),x.end()); const double at=(x.size()-1)*p; const int lo=int(std::floor(at)),hi=int(std::ceil(at));
-    return x[lo]+(at-lo)*(x[hi]-x[lo]);
-}
-
 QFont plotFont(double pt)
 {
     QFontDatabase db; QString family=QStringLiteral("DejaVu Sans");
@@ -188,7 +182,7 @@ QFont plotFont(double pt)
 }
 
 void drawPlot(const QString &path,const QVector<double> &angles,const QVector<int> &labels,
-              const QVector<std::array<double,2>> &r,const std::array<double,2> &point,const std::array<double,2> &upper)
+              const QVector<std::array<double,2>> &r,const std::array<double,2> &point)
 {
     QImage image(5520,2280,QImage::Format_RGBA8888);image.fill(Qt::white);image.setDotsPerMeterX(23622);image.setDotsPerMeterY(23622);
     QPainter p(&image);p.setRenderHints(QPainter::Antialiasing|QPainter::TextAntialiasing);
@@ -207,12 +201,38 @@ void drawPlot(const QString &path,const QVector<double> &angles,const QVector<in
         for(int k=0;k<=5;++k){QPointF q=map(ar,60,k*.2);p.drawLine(q,q-QPointF(29.1667,0));if(panel==0)p.drawText(QRectF(q.x()-190,q.y()-35,145,70),Qt::AlignRight|Qt::AlignVCenter,QString::number(k*.2,'f',1));}
         p.setFont(plotFont(9));p.drawText(QRectF(ar.left(),2130,ar.width(),90),Qt::AlignHCenter|Qt::AlignTop,QStringLiteral("Mean junction angle (°)"));p.drawText(QRectF(ar.left(),72,ar.width(),78),Qt::AlignCenter,titles[panel]);
         if(panel==0){p.save();p.translate(111,1080.17);p.rotate(-90);p.drawText(QRectF(-400,-50,800,100),Qt::AlignCenter,QStringLiteral("Cumulative proportion"));p.restore();}
-        p.setFont(plotFont(7.5));const QString annotation=QStringLiteral("W₁ point estimate = %1°\nOne-sided 95% upper bound\n= %2°").arg(point[panel],0,'f',2).arg(upper[panel],0,'f',2);
+        p.setFont(plotFont(7.5));const QString annotation=QStringLiteral("W₁ point estimate = %1°").arg(point[panel],0,'f',2);
         const QPointF textOrigin(ar.left()+72.88,ar.top()+53.89);
         QRectF box(textOrigin.x()-29,textOrigin.y()-20,955,250);p.setPen(QPen(QColor("#D0D0D0"),5));p.setBrush(Qt::white);p.drawRoundedRect(box,25,25);p.setPen(Qt::black);p.drawText(QRectF(textOrigin,QSizeF(897,199.2)),Qt::AlignLeft|Qt::AlignTop,annotation);
         const QRectF legend=panel==0?QRectF(1573.96,1739.58,1166.25,201.25):QRectF(4180.87,1739.58,1166.25,201.25);const double y1=legend.top()+48,y2=legend.top()+148,x1=legend.left()+20,x2=x1+106;
         p.setPen(op);p.drawLine(QPointF(x1,y1),QPointF(x2,y1));p.setPen(Qt::black);p.drawText(QRectF(x2+35,y1-45,900,90),Qt::AlignVCenter,QStringLiteral("Observed label"));p.setPen(cp);p.drawLine(QPointF(x1,y2),QPointF(x2,y2));p.setPen(Qt::black);p.drawText(QRectF(x2+35,y2-45,900,90),Qt::AlignVCenter,QStringLiteral("Posterior-weighted component"));
     }p.end();image.save(path,"PNG");
+}
+
+double componentDensity(double angle, const Model &model, int component)
+{
+    const double theta=2*angle*Pi/180;
+    return model.weight[component]*std::exp(model.kappa[component]*std::cos(theta-model.mu[component])
+           -std::log(2*Pi)-logI0(model.kappa[component]));
+}
+
+double modelCutoff(const Model &model)
+{
+    const double low=angleMean(model.mu[0]), high=angleMean(model.mu[1]);
+    double best=low, difference=INFINITY;
+    for(int i=0;i<=10000;++i){const double x=low+(high-low)*i/10000.;const double d=std::abs(componentDensity(x,model,0)-componentDensity(x,model,1));if(d<difference){difference=d;best=x;}}
+    return best;
+}
+
+void drawPooledPlot(const QString &path,const QVector<double> &angles,const Model &model,double cutoff)
+{
+    QImage image(2400,1600,QImage::Format_RGBA8888);image.fill(Qt::white);QPainter p(&image);p.setRenderHints(QPainter::Antialiasing|QPainter::TextAntialiasing);
+    const QRectF area(220,150,2000,1200);QVector<int> bins(36);for(double a:angles)++bins[std::min(35,int(a/5))];const int maximum=*std::max_element(bins.begin(),bins.end());
+    auto map=[&](double x,double y){return QPointF(area.left()+x/180*area.width(),area.bottom()-y*area.height());};
+    p.setPen(Qt::NoPen);p.setBrush(QColor("#C8CDD3"));for(int i=0;i<bins.size();++i){const QPointF a=map(i*5,double(bins[i])/maximum),b=map((i+1)*5,0);p.drawRect(QRectF(a,b).normalized());}
+    double peak=0;for(int i=0;i<=1800;++i)peak=std::max(peak,componentDensity(i/10.,model,0)+componentDensity(i/10.,model,1));
+    const QColor colors[2]={QColor("#4C79A2"),QColor("#DA6752")};for(int j=0;j<2;++j){QPainterPath curve;for(int i=0;i<=1800;++i){const double x=i/10.,y=componentDensity(x,model,j)/peak; if(i==0)curve.moveTo(map(x,y));else curve.lineTo(map(x,y));}p.setPen(QPen(colors[j],8));p.drawPath(curve);}
+    p.setPen(QPen(Qt::black,5));p.drawLine(area.bottomLeft(),area.bottomRight());p.drawLine(area.topLeft(),area.bottomLeft());p.setPen(QPen(QColor("#333333"),6,Qt::DashLine));p.drawLine(map(cutoff,0),map(cutoff,1));p.setFont(plotFont(18));p.setPen(Qt::black);p.drawText(QRectF(0,30,image.width(),90),Qt::AlignCenter,QStringLiteral("Pooled angular distribution and fitted mixture"));p.drawText(QRectF(area.left(),1380,area.width(),80),Qt::AlignCenter,QStringLiteral("Angle (degrees); model cutoff = %1°").arg(cutoff,0,'f',2));p.end();image.save(path,"PNG");
 }
 }
 
@@ -222,10 +242,7 @@ void SingleFeatureMixtureWorker::cancel(){m_cancelled=true;}
 void SingleFeatureMixtureWorker::run()
 {
     QFile file(m_options.csvPath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        emit finished(false, "Cannot open input CSV.");
-        return;
-    }
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) { emit finished(false, "Cannot open input CSV."); return; }
     QTextStream in(&file);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     in.setEncoding(QStringConverter::Utf8);
@@ -233,23 +250,42 @@ void SingleFeatureMixtureWorker::run()
     in.setCodec("UTF-8");
 #endif
     const QStringList headers=csvFields(in.readLine());QHash<QString,int> columns;for(int i=0;i<headers.size();++i)columns.insert(headers[i].trimmed().toLower(),i);
-    auto index=[&](const QString &n){return columns.value(n.trimmed().toLower(),-1);};const int fi=index(m_options.feature),oi=index(m_options.observedColumn),ei=index(m_options.exceptionColumn),gi=index(m_options.groupColumn);
-    if(fi<0||oi<0||ei<0||gi<0){emit finished(false,QStringLiteral("Missing required CSV column(s). Column matching is case-insensitive."));return;}
-    QVector<QStringList> raw;QVector<double> angles;QVector<int> labels;QVector<QString> groups;int inputRows=0,exceptions=0;QRegularExpression re(m_options.groupRegex);
-    while(!in.atEnd()){QString line=in.readLine();if(line.isEmpty())continue;++inputRows;QStringList f=csvFields(line);if(f.size()<headers.size())f.resize(headers.size());bool ok=false;double ex=f[ei].trimmed().toDouble(&ok);if(ok&&ex==1){++exceptions;continue;}double a=f[fi].trimmed().toDouble(&ok);if(!ok||!std::isfinite(a))continue;double labelValue=f[oi].trimmed().toDouble(&ok);if(!ok||(labelValue!=0&&labelValue!=1))continue;QRegularExpressionMatch match=re.match(f[gi]);if(!match.hasMatch()){emit finished(false,QStringLiteral("Group regex did not match '%1'.").arg(f[gi]));return;}raw<<f;angles<<a;labels<<int(labelValue);groups<<(match.lastCapturedIndex()>=1?match.captured(1):match.captured(0));}
-    if(angles.isEmpty()||!labels.contains(0)||!labels.contains(1)){emit finished(false,"Insufficient finite observations for both observed labels 0 and 1.");return;}for(double a:angles)if(a<0||a>180){emit finished(false,"The axial von Mises feature must be angular degrees in [0,180].");return;}
-    emit progress(0,m_options.bootstrapCount,QStringLiteral("Fitting %1 analyzed rows").arg(angles.size()));Model model=fullFit(angles,m_options.seed);QVector<std::array<double,2>> post(angles.size());
-    std::array<double,2> point;for(int i=0;i<angles.size();++i)post[i]=responsibility(2*angles[i]*Pi/180,model);for(int j=0;j<2;++j){QVector<QPair<double,double>> obs,comp;for(int i=0;i<angles.size();++i){if(labels[i]==j)obs<<qMakePair(angles[i],1.0);comp<<qMakePair(angles[i],post[i][j]);}point[j]=wasserstein(obs,comp);}
-    QStringList unique;QHash<QString,QVector<int>> rows;for(int i=0;i<groups.size();++i){if(!rows.contains(groups[i]))unique<<groups[i];rows[groups[i]]<<i;}if(unique.size()<2){emit finished(false,"At least two extracted primordium IDs are required for bootstrap resampling.");return;}
-    std::mt19937 rng(m_options.seed);std::uniform_int_distribution<int> pick(0,unique.size()-1);QVector<double> boot0,boot1;QStringList bootLines;bootLines<<"replicate,wasserstein_observed_0_vs_component_0_degrees,wasserstein_observed_1_vs_component_1_degrees";
-    for(int b=0;b<m_options.bootstrapCount;++b){if(m_cancelled){emit finished(false,"Mixture analysis cancelled.");return;}QVector<double> ba;QVector<int> bl;for(int k=0;k<unique.size();++k)for(int idx:rows[unique[pick(rng)]]){ba<<angles[idx];bl<<labels[idx];}Model bm=fit(ba,model,200);QVector<std::array<double,2>> bp(ba.size());for(int i=0;i<ba.size();++i)bp[i]=responsibility(2*ba[i]*Pi/180,bm);double d[2];for(int j=0;j<2;++j){QVector<QPair<double,double>> o,c;for(int i=0;i<ba.size();++i){if(bl[i]==j)o<<qMakePair(ba[i],1.);c<<qMakePair(ba[i],bp[i][j]);}d[j]=wasserstein(o,c);}boot0<<d[0];boot1<<d[1];bootLines<<QStringLiteral("%1,%2,%3").arg(b+1).arg(d[0],0,'g',17).arg(d[1],0,'g',17);emit progress(b+1,m_options.bootstrapCount,QStringLiteral("Bootstrap %1 of %2").arg(b+1).arg(m_options.bootstrapCount));}
+    auto index=[&](const QString &n){return columns.value(n.trimmed().toLower(),-1);};
+    const int fi=index(m_options.feature),oi=index(m_options.observedColumn),ei=index(m_options.exceptionColumn);
+    if(fi<0||ei<0){emit finished(false,QStringLiteral("Missing feature or exception-label CSV column. Column matching is case-insensitive."));return;}
+    QVector<QStringList> pooledRaw,labeledRaw;QVector<double> pooledAngles,labeledAngles;QVector<int> labels;int inputRows=0,exceptions=0;
+    while(!in.atEnd()){
+        QString line=in.readLine();if(line.isEmpty())continue;++inputRows;QStringList f=csvFields(line);if(f.size()<headers.size())f.resize(headers.size());
+        bool ok=false;const double ex=f[ei].trimmed().toDouble(&ok);if(ok&&ex!=0){++exceptions;continue;}
+        const double angle=f[fi].trimmed().toDouble(&ok);if(!ok||!std::isfinite(angle))continue;
+        pooledRaw<<f;pooledAngles<<angle;
+        if(oi>=0){const double label=f[oi].trimmed().toDouble(&ok);if(ok&&(label==0||label==1)){labeledRaw<<f;labeledAngles<<angle;labels<<int(label);}}
+    }
+    const bool labeled=!labels.isEmpty();QVector<double> angles=labeled?labeledAngles:pooledAngles;QVector<QStringList> raw=labeled?labeledRaw:pooledRaw;
+    if(angles.isEmpty()){emit finished(false,"No finite, non-exception observations are available.");return;}
+    for(double a:angles)if(a<0||a>180){emit finished(false,"The axial von Mises feature must be angular degrees in [0,180].");return;}
+    emit progress(0,1,QStringLiteral("Fitting %1 analyzed rows").arg(angles.size()));if(m_cancelled){emit finished(false,"Mixture analysis cancelled.");return;}
+    const Model model=fullFit(angles,m_options.seed);const double cutoff=modelCutoff(model);QVector<std::array<double,2>> post(angles.size());for(int i=0;i<angles.size();++i)post[i]=responsibility(2*angles[i]*Pi/180,model);
     QDir().mkpath(m_options.outputDirectory);auto write=[&](QString name,const QStringList &lines){QFile f(QDir(m_options.outputDirectory).filePath(name));if(!f.open(QIODevice::WriteOnly|QIODevice::Text))return false;f.write("\xEF\xBB\xBF");f.write(lines.join('\n').toUtf8());f.write("\n");return true;};
-    QStringList posterior;QStringList ph=headers;ph<<"posterior_component_0"<<"posterior_component_1";posterior<<ph.join(',');for(int i=0;i<raw.size();++i){QStringList q;for(QString s:raw[i])q<<csvQuote(s);q<<QString::number(post[i][0],'g',17)<<QString::number(post[i][1],'g',17);posterior<<q.join(',');}
-    const double lo0=quantile(boot0,.025),hi0=quantile(boot0,.975),up0=quantile(boot0,.95),lo1=quantile(boot1,.025),hi1=quantile(boot1,.975),up1=quantile(boot1,.95);QStringList summary;summary<<"comparison,point_estimate_degrees,ci_2_5_degrees,ci_97_5_degrees,one_sided_95_upper_bound_degrees"<<QStringLiteral("observed_0_vs_component_0,%1,%2,%3,%4").arg(point[0],0,'g',17).arg(lo0,0,'g',17).arg(hi0,0,'g',17).arg(up0,0,'g',17)<<QStringLiteral("observed_1_vs_component_1,%1,%2,%3,%4").arg(point[1],0,'g',17).arg(lo1,0,'g',17).arg(hi1,0,'g',17).arg(up1,0,'g',17);
-    QStringList params;params<<"component,weight,mean_angle_degrees,kappa,log_likelihood";for(int j=0;j<2;++j)params<<QStringLiteral("%1,%2,%3,%4,%5").arg(j).arg(model.weight[j],0,'g',17).arg(angleMean(model.mu[j]),0,'g',17).arg(model.kappa[j],0,'g',17).arg(model.ll,0,'g',17);
-    if(!write("vonmises2_posteriors_realdata.csv",posterior)||!write("component_label_distribution_closeness_summary.csv",summary)||!write("component_label_distribution_closeness_bootstrap.csv",bootLines)||!write("vonmises2_parameters_realdata.csv",params)){emit finished(false,"Could not write one or more output CSV files.");return;}
-    drawPlot(QDir(m_options.outputDirectory).filePath("component_label_distribution_closeness_ecdf.png"),angles,labels,post,point,{{up0,up1}});
-    emit finished(true,QStringLiteral("Mixture analysis complete. %1 input rows; %2 excluded exceptions; %3 analyzed rows. The fitted components and observed labels come from the same dataset.").arg(inputRows).arg(exceptions).arg(angles.size()));
+    QStringList posterior;QStringList ph=headers;ph<<"posterior_component_0"<<"posterior_component_1";posterior<<ph.join(',');for(int i=0;i<raw.size();++i){QStringList q;for(QString value:raw[i])q<<csvQuote(value);q<<QString::number(post[i][0],'g',17)<<QString::number(post[i][1],'g',17);posterior<<q.join(',');}
+    QStringList params;params<<"component,weight,mean_angle_degrees,kappa,log_likelihood,model_cutoff_degrees";for(int j=0;j<2;++j)params<<QStringLiteral("%1,%2,%3,%4,%5,%6").arg(j).arg(model.weight[j],0,'g',17).arg(angleMean(model.mu[j]),0,'g',17).arg(model.kappa[j],0,'g',17).arg(model.ll,0,'g',17).arg(cutoff,0,'g',17);
+    QStringList summary;summary<<"analysis_mode,input_rows,excluded_exception_rows,analyzed_rows,model_cutoff_degrees"<<QStringLiteral("%1,%2,%3,%4,%5").arg(labeled?"labeled":"unlabeled pooled-distribution").arg(inputRows).arg(exceptions).arg(angles.size()).arg(cutoff,0,'g',17);
+    if(!write("vonmises2_posteriors_realdata.csv",posterior)||!write("vonmises2_parameters_realdata.csv",params)||!write("mixture_analysis_summary.csv",summary)){emit finished(false,"Could not write one or more output CSV files.");return;}
+    drawPooledPlot(QDir(m_options.outputDirectory).filePath("pooled_distribution_mixture.png"),angles,model,cutoff);
+    QDir(m_options.outputDirectory).remove("component_label_distribution_closeness_bootstrap.csv");
+    // Do not leave label-dependent artifacts in an unlabeled result directory.
+    if(!labeled){
+        QDir output(m_options.outputDirectory);
+        output.remove("component_label_distribution_closeness_summary.csv");
+        output.remove("component_label_distribution_closeness_ecdf.png");
+    }
+    if(labeled){
+        std::array<double,2> point{{NAN,NAN}};for(int j=0;j<2;++j){QVector<QPair<double,double>> observed,component;for(int i=0;i<angles.size();++i){if(labels[i]==j)observed<<qMakePair(angles[i],1.);component<<qMakePair(angles[i],post[i][j]);}if(!observed.isEmpty())point[j]=wasserstein(observed,component);}
+        QStringList closeness;closeness<<"comparison,point_estimate_degrees";for(int j=0;j<2;++j)if(std::isfinite(point[j]))closeness<<QStringLiteral("observed_%1_vs_component_%1,%2").arg(j).arg(point[j],0,'g',17);
+        if(!write("component_label_distribution_closeness_summary.csv",closeness)){emit finished(false,"Could not write label-comparison summary CSV.");return;}
+        if(labels.contains(0)&&labels.contains(1))drawPlot(QDir(m_options.outputDirectory).filePath("component_label_distribution_closeness_ecdf.png"),angles,labels,post,point);
+    }
+    emit progress(1,1,"Complete");emit finished(true,QStringLiteral("Mixture analysis complete in %1 mode. %2 input rows; %3 rows with nonzero exception labels excluded; %4 analyzed rows.").arg(labeled?"labeled":"unlabeled pooled-distribution").arg(inputRows).arg(exceptions).arg(angles.size()));
 }
 
 bool SingleFeatureMixtureAnalysis::getOptions(QWidget *parent,SingleFeatureMixtureOptions *o)
@@ -279,8 +315,8 @@ bool SingleFeatureMixtureAnalysis::getOptions(QWidget *parent,SingleFeatureMixtu
         });
     };
     QLineEdit *csv,*out;pathRow("Batch geometry CSV",&csv,false);pathRow("Output directory",&out,true);auto *feature=new QComboBox;feature->setEditable(true);feature->addItems({"junctionAngleAverageDegrees","junctionAngleMaxDegrees","junctionAngleMinDegrees","junctionAngleDifferenceDegrees","sharedEdgeUnionAxisAngleDegrees"});form->addRow("Angular feature",feature);
-    auto *observed=new QLineEdit(o->observedColumn),*exception=new QLineEdit(o->exceptionColumn),*group=new QLineEdit(o->groupColumn),*regex=new QLineEdit(o->groupRegex);auto *count=new QSpinBox;count->setRange(1,100000);count->setValue(o->bootstrapCount);auto *seed=new QSpinBox;seed->setRange(0,INT_MAX);seed->setValue(int(o->seed));form->addRow("Observed-label column",observed);form->addRow("Exception column",exception);form->addRow("Bootstrap count",count);form->addRow("Group column",group);form->addRow("Group regex",regex);form->addRow("Seed",seed);auto *note=new QLabel("Only degree-valued angular features in [0,180] are accepted. Fitted components and observed labels are taken from the same dataset.");note->setWordWrap(true);layout->addWidget(note);auto *buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);layout->addWidget(buttons);QObject::connect(buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);QObject::connect(buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return false;
+    auto *observed=new QLineEdit(o->observedColumn),*exception=new QLineEdit(o->exceptionColumn);auto *seed=new QSpinBox;seed->setRange(0,INT_MAX);seed->setValue(int(o->seed));form->addRow("Observed-label column (optional)",observed);form->addRow("Exception column",exception);form->addRow("Seed",seed);auto *note=new QLabel("Only degree-valued angular features in [0,180] are accepted. Rows with nonzero exception labels are excluded. If no valid 0/1 division labels are available, a pooled unsupervised analysis is run.");note->setWordWrap(true);layout->addWidget(note);auto *buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);layout->addWidget(buttons);QObject::connect(buttons,&QDialogButtonBox::accepted,&d,&QDialog::accept);QObject::connect(buttons,&QDialogButtonBox::rejected,&d,&QDialog::reject);if(d.exec()!=QDialog::Accepted)return false;
     const QRegularExpression angularDegrees(QStringLiteral("angle.*degrees|degrees.*angle"),
                                              QRegularExpression::CaseInsensitiveOption);
-    if(csv->text().isEmpty()||out->text().isEmpty()||!feature->currentText().contains(angularDegrees)){QMessageBox::critical(parent,"Mixture modeling","Choose an input CSV, output directory, and an angular degree feature.");return false;}o->csvPath=csv->text();o->outputDirectory=out->text();o->feature=feature->currentText();o->observedColumn=observed->text();o->exceptionColumn=exception->text();o->bootstrapCount=count->value();o->groupColumn=group->text();o->groupRegex=regex->text();o->seed=quint32(seed->value());return true;
+    if(csv->text().isEmpty()||out->text().isEmpty()||!feature->currentText().contains(angularDegrees)){QMessageBox::critical(parent,"Mixture modeling","Choose an input CSV, output directory, and an angular degree feature.");return false;}o->csvPath=csv->text();o->outputDirectory=out->text();o->feature=feature->currentText();o->observedColumn=observed->text();o->exceptionColumn=exception->text();o->seed=quint32(seed->value());return true;
 }

@@ -12,9 +12,6 @@ struct SingleFeatureMixtureOptions {
     QString outputDirectory;
     QString observedColumn = QStringLiteral("observed_division");
     QString exceptionColumn = QStringLiteral("exception_label");
-    int bootstrapCount = 1000;
-    QString groupColumn = QStringLiteral("fileName");
-    QString groupRegex = QStringLiteral("^(sample\\d+)");
     quint32 seed = 0;
 };
 
