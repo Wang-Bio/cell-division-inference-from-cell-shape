@@ -43,7 +43,8 @@ SOURCES += \
     polygonitem.cpp \
     vertexitem.cpp \
     precisionrecallsweepworker.cpp \
-    singlefeaturemixtureanalysis.cpp
+    singlefeaturemixtureanalysis.cpp \
+    overlapindexanalysis.cpp
 
 HEADERS += \
     canvasmanager.h \
@@ -62,7 +63,8 @@ HEADERS += \
     polygonitem.h \
     vertexitem.h \
     precisionrecallsweepworker.h \
-    singlefeaturemixtureanalysis.h
+    singlefeaturemixtureanalysis.h \
+    overlapindexanalysis.h
 
 FORMS += \
     mainwindow.ui

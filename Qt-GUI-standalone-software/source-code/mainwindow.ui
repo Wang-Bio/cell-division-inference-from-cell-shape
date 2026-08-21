@@ -411,6 +411,7 @@
     <addaction name="actionBatch_Neighbor_Pair_Geometry_Calculation"/>
     <addaction name="actionBatch_Single_Cell_Geometry_Calculation"/>
     <addaction name="actionMixture_Modeling_for_Single_Geometry_Feature"/>
+    <addaction name="actionOverlap_Index_for_All_Features"/>
    </widget>
    <widget class="QMenu" name="menuEstimate">
     <property name="title">
@@ -679,6 +680,11 @@
   <action name="actionMixture_Modeling_for_Single_Geometry_Feature">
    <property name="text">
     <string>Mixture modeling for single geometry feature</string>
+   </property>
+  </action>
+  <action name="actionOverlap_Index_for_All_Features">
+   <property name="text">
+    <string>Overlap Index for all features</string>
    </property>
   </action>
   <action name="actionBatch_Estimate_Division_by_single_geometry">

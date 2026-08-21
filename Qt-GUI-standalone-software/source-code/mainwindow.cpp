@@ -12,6 +12,7 @@
 #include "batchdivisionestimator.h"
 #include "geometryio.h"
 #include "singlefeaturemixtureanalysis.h"
+#include "overlapindexanalysis.h"
 
 #include <QtMath>
 #include <QSplitter>
@@ -182,6 +183,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionBatch_Neighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchNeighborPairGeometryCalculation);
     connect(ui->actionBatch_Single_Cell_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchSingleCellGeometryCalculation);
     connect(ui->actionMixture_Modeling_for_Single_Geometry_Feature, &QAction::triggered, this, &MainWindow::onMixtureModelingForSingleGeometryFeature);
+    connect(ui->actionOverlap_Index_for_All_Features, &QAction::triggered, this, &MainWindow::onOverlapIndexForAllFeatures);
 
 //menuBar Estimate function
     connect(ui->actionEstimate_division_by_single_geometry, &QAction::triggered, this, &MainWindow::onEstimateDivisionBySingleGeometry);
@@ -2631,6 +2633,19 @@ void MainWindow::onMixtureModelingForSingleGeometryFeature()
     connect(thread, &QThread::finished, progress, &QObject::deleteLater);
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
     thread->start();
+}
+
+void MainWindow::onOverlapIndexForAllFeatures()
+{
+    OverlapIndexOptions options;
+    if (!OverlapIndexAnalysis::getOptions(this, &options)) return;
+    auto *thread=new QThread(this);auto *worker=new OverlapIndexWorker(options);
+    auto *progress=new QProgressDialog(QStringLiteral("Loading CSV…"),QStringLiteral("Cancel"),0,100,this);
+    progress->setWindowTitle(QStringLiteral("Overlap Index for all features"));progress->setWindowModality(Qt::WindowModal);progress->setMinimumDuration(0);worker->moveToThread(thread);
+    connect(thread,&QThread::started,worker,&OverlapIndexWorker::run);connect(progress,&QProgressDialog::canceled,worker,&OverlapIndexWorker::cancel,Qt::DirectConnection);
+    connect(worker,&OverlapIndexWorker::progress,this,[progress](int value,int maximum,const QString&message){progress->setMaximum(maximum);progress->setValue(value);progress->setLabelText(message);});
+    connect(worker,&OverlapIndexWorker::finished,this,[this,progress](bool success,const QString&message){progress->close();if(success)QMessageBox::information(this,QStringLiteral("Overlap Index for all features"),message);else if(message!=QStringLiteral("Overlap-index analysis cancelled."))QMessageBox::critical(this,QStringLiteral("Overlap Index for all features"),message);});
+    connect(worker,&OverlapIndexWorker::finished,thread,&QThread::quit);connect(worker,&OverlapIndexWorker::finished,worker,&QObject::deleteLater);connect(thread,&QThread::finished,progress,&QObject::deleteLater);connect(thread,&QThread::finished,thread,&QObject::deleteLater);thread->start();
 }
 
 void MainWindow::clearDivisionArrowVector(QVector<QGraphicsPathItem*> &arrows)
