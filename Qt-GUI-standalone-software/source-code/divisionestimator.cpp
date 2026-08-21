@@ -1057,7 +1057,10 @@ bool DivisionEstimator::showPrecisionRecallSweepDialog(QWidget *parent, const QS
                                             .arg(bestIt->threshold, 0, 'g', 8),
                Qt::DashLine);
     painter.end();
-    if (!plot.save(plotPath, "PNG", 100)) {
+    QImage scaledPlot = plot.scaled(1800, 1005, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    scaledPlot.setDotsPerMeterX(11811);
+    scaledPlot.setDotsPerMeterY(11811);
+    if (!scaledPlot.save(plotPath, "PNG", 100)) {
         QMessageBox::critical(parent, dialogTitle, QString("Unable to save precision/recall PNG to %1").arg(plotPath));
         return false;
     }
