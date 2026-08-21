@@ -15,6 +15,7 @@ release/geometryio.o
 release/polygonitem.o
 release/vertexitem.o
 release/precisionrecallsweepworker.o
+release/singlefeaturemixtureanalysis.o
 release/moc_canvasmanager.o
 release/moc_interactivegraphicsview.o
 release/moc_lineitem.o
@@ -22,3 +23,4 @@ release/moc_mainwindow.o
 release/moc_polygonitem.o
 release/moc_vertexitem.o
 release/moc_precisionrecallsweepworker.o
+release/moc_singlefeaturemixtureanalysis.o

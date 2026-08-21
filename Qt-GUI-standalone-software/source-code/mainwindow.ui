@@ -410,6 +410,7 @@
     <addaction name="actionNeighbor_Pair_Geometry_Calculation"/>
     <addaction name="actionBatch_Neighbor_Pair_Geometry_Calculation"/>
     <addaction name="actionBatch_Single_Cell_Geometry_Calculation"/>
+    <addaction name="actionMixture_Modeling_for_Single_Geometry_Feature"/>
    </widget>
    <widget class="QMenu" name="menuEstimate">
     <property name="title">
@@ -673,6 +674,11 @@
   <action name="actionBatch_Single_Cell_Geometry_Calculation">
    <property name="text">
     <string>Batch Single Cell Geometry Calculation</string>
+   </property>
+  </action>
+  <action name="actionMixture_Modeling_for_Single_Geometry_Feature">
+   <property name="text">
+    <string>Mixture modeling for single geometry feature</string>
    </property>
   </action>
   <action name="actionBatch_Estimate_Division_by_single_geometry">

@@ -194,6 +194,7 @@ private slots:
     void onNeighborPairGeometryCalculation();
     void onBatchNeighborPairGeometryCalculation();
     void onBatchSingleCellGeometryCalculation();
+    void onMixtureModelingForSingleGeometryFeature();
 
 //menuBar Estimation functions
     void onEstimateDivisionBySingleGeometry();

@@ -26,7 +26,7 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 namespace {
 struct qt_meta_stringdata_MainWindow_t {
-    uint offsetsAndSizes[136];
+    uint offsetsAndSizes[138];
     char stringdata0[11];
     char stringdata1[14];
     char stringdata2[1];
@@ -79,22 +79,23 @@ struct qt_meta_stringdata_MainWindow_t {
     char stringdata49[34];
     char stringdata50[39];
     char stringdata51[37];
-    char stringdata52[35];
-    char stringdata53[40];
-    char stringdata54[26];
-    char stringdata55[44];
-    char stringdata56[23];
-    char stringdata57[21];
-    char stringdata58[24];
-    char stringdata59[29];
+    char stringdata52[42];
+    char stringdata53[35];
+    char stringdata54[40];
+    char stringdata55[26];
+    char stringdata56[44];
+    char stringdata57[23];
+    char stringdata58[21];
+    char stringdata59[24];
     char stringdata60[29];
-    char stringdata61[13];
-    char stringdata62[11];
-    char stringdata63[14];
-    char stringdata64[24];
-    char stringdata65[26];
-    char stringdata66[21];
-    char stringdata67[11];
+    char stringdata61[29];
+    char stringdata62[13];
+    char stringdata63[11];
+    char stringdata64[14];
+    char stringdata65[24];
+    char stringdata66[26];
+    char stringdata67[21];
+    char stringdata68[11];
 };
 #define QT_MOC_LITERAL(ofs, len) \
     uint(sizeof(qt_meta_stringdata_MainWindow_t::offsetsAndSizes) + ofs), len 
@@ -152,22 +153,23 @@ Q_CONSTINIT static const qt_meta_stringdata_MainWindow_t qt_meta_stringdata_Main
         QT_MOC_LITERAL(738, 33),  // "onNeighborPairGeometryCalcula..."
         QT_MOC_LITERAL(772, 38),  // "onBatchNeighborPairGeometryCa..."
         QT_MOC_LITERAL(811, 36),  // "onBatchSingleCellGeometryCalc..."
-        QT_MOC_LITERAL(848, 34),  // "onEstimateDivisionBySingleGeo..."
-        QT_MOC_LITERAL(883, 39),  // "onBatchEstimateDivisionBySing..."
-        QT_MOC_LITERAL(923, 25),  // "onCompareWithRealDivision"
-        QT_MOC_LITERAL(949, 43),  // "onPrecisionAndRecallCurveOver..."
-        QT_MOC_LITERAL(993, 22),  // "onVertexDisplaySetting"
-        QT_MOC_LITERAL(1016, 20),  // "onLineDisplaySetting"
-        QT_MOC_LITERAL(1037, 23),  // "onPolygonDisplaySetting"
-        QT_MOC_LITERAL(1061, 28),  // "onNeighborPairDisplaySetting"
-        QT_MOC_LITERAL(1090, 28),  // "onDivisionPairDisplaySetting"
-        QT_MOC_LITERAL(1119, 12),  // "onFindVertex"
-        QT_MOC_LITERAL(1132, 10),  // "onFindLine"
-        QT_MOC_LITERAL(1143, 13),  // "onFindPolygon"
-        QT_MOC_LITERAL(1157, 23),  // "onGenerateRandomNetwork"
-        QT_MOC_LITERAL(1181, 25),  // "onCompareBatchEstimations"
-        QT_MOC_LITERAL(1207, 20),  // "onExportFeatureNames"
-        QT_MOC_LITERAL(1228, 10)   // "onDebugAll"
+        QT_MOC_LITERAL(848, 41),  // "onMixtureModelingForSingleGeo..."
+        QT_MOC_LITERAL(890, 34),  // "onEstimateDivisionBySingleGeo..."
+        QT_MOC_LITERAL(925, 39),  // "onBatchEstimateDivisionBySing..."
+        QT_MOC_LITERAL(965, 25),  // "onCompareWithRealDivision"
+        QT_MOC_LITERAL(991, 43),  // "onPrecisionAndRecallCurveOver..."
+        QT_MOC_LITERAL(1035, 22),  // "onVertexDisplaySetting"
+        QT_MOC_LITERAL(1058, 20),  // "onLineDisplaySetting"
+        QT_MOC_LITERAL(1079, 23),  // "onPolygonDisplaySetting"
+        QT_MOC_LITERAL(1103, 28),  // "onNeighborPairDisplaySetting"
+        QT_MOC_LITERAL(1132, 28),  // "onDivisionPairDisplaySetting"
+        QT_MOC_LITERAL(1161, 12),  // "onFindVertex"
+        QT_MOC_LITERAL(1174, 10),  // "onFindLine"
+        QT_MOC_LITERAL(1185, 13),  // "onFindPolygon"
+        QT_MOC_LITERAL(1199, 23),  // "onGenerateRandomNetwork"
+        QT_MOC_LITERAL(1223, 25),  // "onCompareBatchEstimations"
+        QT_MOC_LITERAL(1249, 20),  // "onExportFeatureNames"
+        QT_MOC_LITERAL(1270, 10)   // "onDebugAll"
     },
     "MainWindow",
     "onZoomChanged",
@@ -221,6 +223,7 @@ Q_CONSTINIT static const qt_meta_stringdata_MainWindow_t qt_meta_stringdata_Main
     "onNeighborPairGeometryCalculation",
     "onBatchNeighborPairGeometryCalculation",
     "onBatchSingleCellGeometryCalculation",
+    "onMixtureModelingForSingleGeometryFeature",
     "onEstimateDivisionBySingleGeometry",
     "onBatchEstimateDivisionBySingleGeometry",
     "onCompareWithRealDivision",
@@ -247,7 +250,7 @@ Q_CONSTINIT static const uint qt_meta_data_MainWindow[] = {
       10,       // revision
        0,       // classname
        0,    0, // classinfo
-      57,   14, // methods
+      58,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
@@ -255,63 +258,64 @@ Q_CONSTINIT static const uint qt_meta_data_MainWindow[] = {
        0,       // signalCount
 
  // slots: name, argc, parameters, tag, flags, initial metatype offsets
-       1,    1,  356,    2, 0x08,    1 /* Private */,
-       4,    1,  359,    2, 0x08,    3 /* Private */,
-       6,    0,  362,    2, 0x08,    5 /* Private */,
-       7,    0,  363,    2, 0x08,    6 /* Private */,
-       8,    0,  364,    2, 0x08,    7 /* Private */,
-       9,    1,  365,    2, 0x08,    8 /* Private */,
-      12,    2,  368,    2, 0x08,   10 /* Private */,
-      14,    1,  373,    2, 0x08,   13 /* Private */,
-      17,    1,  376,    2, 0x08,   15 /* Private */,
-      18,    1,  379,    2, 0x08,   17 /* Private */,
-      21,    1,  382,    2, 0x08,   19 /* Private */,
-      22,    0,  385,    2, 0x08,   21 /* Private */,
-      23,    0,  386,    2, 0x08,   22 /* Private */,
-      24,    0,  387,    2, 0x08,   23 /* Private */,
-      25,    0,  388,    2, 0x08,   24 /* Private */,
-      26,    0,  389,    2, 0x08,   25 /* Private */,
-      27,    0,  390,    2, 0x08,   26 /* Private */,
-      28,    0,  391,    2, 0x08,   27 /* Private */,
-      29,    0,  392,    2, 0x08,   28 /* Private */,
-      30,    0,  393,    2, 0x08,   29 /* Private */,
-      31,    0,  394,    2, 0x08,   30 /* Private */,
-      32,    0,  395,    2, 0x08,   31 /* Private */,
-      33,    0,  396,    2, 0x08,   32 /* Private */,
-      34,    0,  397,    2, 0x08,   33 /* Private */,
-      35,    0,  398,    2, 0x08,   34 /* Private */,
-      36,    0,  399,    2, 0x08,   35 /* Private */,
-      37,    0,  400,    2, 0x08,   36 /* Private */,
-      38,    0,  401,    2, 0x08,   37 /* Private */,
-      39,    0,  402,    2, 0x08,   38 /* Private */,
-      40,    0,  403,    2, 0x08,   39 /* Private */,
-      41,    0,  404,    2, 0x08,   40 /* Private */,
-      42,    0,  405,    2, 0x08,   41 /* Private */,
-      43,    0,  406,    2, 0x08,   42 /* Private */,
-      44,    0,  407,    2, 0x08,   43 /* Private */,
-      45,    0,  408,    2, 0x08,   44 /* Private */,
-      46,    0,  409,    2, 0x08,   45 /* Private */,
-      47,    0,  410,    2, 0x08,   46 /* Private */,
-      48,    0,  411,    2, 0x08,   47 /* Private */,
-      49,    0,  412,    2, 0x08,   48 /* Private */,
-      50,    0,  413,    2, 0x08,   49 /* Private */,
-      51,    0,  414,    2, 0x08,   50 /* Private */,
-      52,    0,  415,    2, 0x08,   51 /* Private */,
-      53,    0,  416,    2, 0x08,   52 /* Private */,
-      54,    0,  417,    2, 0x08,   53 /* Private */,
-      55,    0,  418,    2, 0x08,   54 /* Private */,
-      56,    0,  419,    2, 0x08,   55 /* Private */,
-      57,    0,  420,    2, 0x08,   56 /* Private */,
-      58,    0,  421,    2, 0x08,   57 /* Private */,
-      59,    0,  422,    2, 0x08,   58 /* Private */,
-      60,    0,  423,    2, 0x08,   59 /* Private */,
-      61,    0,  424,    2, 0x08,   60 /* Private */,
-      62,    0,  425,    2, 0x08,   61 /* Private */,
-      63,    0,  426,    2, 0x08,   62 /* Private */,
-      64,    0,  427,    2, 0x08,   63 /* Private */,
-      65,    0,  428,    2, 0x08,   64 /* Private */,
-      66,    0,  429,    2, 0x08,   65 /* Private */,
-      67,    0,  430,    2, 0x08,   66 /* Private */,
+       1,    1,  362,    2, 0x08,    1 /* Private */,
+       4,    1,  365,    2, 0x08,    3 /* Private */,
+       6,    0,  368,    2, 0x08,    5 /* Private */,
+       7,    0,  369,    2, 0x08,    6 /* Private */,
+       8,    0,  370,    2, 0x08,    7 /* Private */,
+       9,    1,  371,    2, 0x08,    8 /* Private */,
+      12,    2,  374,    2, 0x08,   10 /* Private */,
+      14,    1,  379,    2, 0x08,   13 /* Private */,
+      17,    1,  382,    2, 0x08,   15 /* Private */,
+      18,    1,  385,    2, 0x08,   17 /* Private */,
+      21,    1,  388,    2, 0x08,   19 /* Private */,
+      22,    0,  391,    2, 0x08,   21 /* Private */,
+      23,    0,  392,    2, 0x08,   22 /* Private */,
+      24,    0,  393,    2, 0x08,   23 /* Private */,
+      25,    0,  394,    2, 0x08,   24 /* Private */,
+      26,    0,  395,    2, 0x08,   25 /* Private */,
+      27,    0,  396,    2, 0x08,   26 /* Private */,
+      28,    0,  397,    2, 0x08,   27 /* Private */,
+      29,    0,  398,    2, 0x08,   28 /* Private */,
+      30,    0,  399,    2, 0x08,   29 /* Private */,
+      31,    0,  400,    2, 0x08,   30 /* Private */,
+      32,    0,  401,    2, 0x08,   31 /* Private */,
+      33,    0,  402,    2, 0x08,   32 /* Private */,
+      34,    0,  403,    2, 0x08,   33 /* Private */,
+      35,    0,  404,    2, 0x08,   34 /* Private */,
+      36,    0,  405,    2, 0x08,   35 /* Private */,
+      37,    0,  406,    2, 0x08,   36 /* Private */,
+      38,    0,  407,    2, 0x08,   37 /* Private */,
+      39,    0,  408,    2, 0x08,   38 /* Private */,
+      40,    0,  409,    2, 0x08,   39 /* Private */,
+      41,    0,  410,    2, 0x08,   40 /* Private */,
+      42,    0,  411,    2, 0x08,   41 /* Private */,
+      43,    0,  412,    2, 0x08,   42 /* Private */,
+      44,    0,  413,    2, 0x08,   43 /* Private */,
+      45,    0,  414,    2, 0x08,   44 /* Private */,
+      46,    0,  415,    2, 0x08,   45 /* Private */,
+      47,    0,  416,    2, 0x08,   46 /* Private */,
+      48,    0,  417,    2, 0x08,   47 /* Private */,
+      49,    0,  418,    2, 0x08,   48 /* Private */,
+      50,    0,  419,    2, 0x08,   49 /* Private */,
+      51,    0,  420,    2, 0x08,   50 /* Private */,
+      52,    0,  421,    2, 0x08,   51 /* Private */,
+      53,    0,  422,    2, 0x08,   52 /* Private */,
+      54,    0,  423,    2, 0x08,   53 /* Private */,
+      55,    0,  424,    2, 0x08,   54 /* Private */,
+      56,    0,  425,    2, 0x08,   55 /* Private */,
+      57,    0,  426,    2, 0x08,   56 /* Private */,
+      58,    0,  427,    2, 0x08,   57 /* Private */,
+      59,    0,  428,    2, 0x08,   58 /* Private */,
+      60,    0,  429,    2, 0x08,   59 /* Private */,
+      61,    0,  430,    2, 0x08,   60 /* Private */,
+      62,    0,  431,    2, 0x08,   61 /* Private */,
+      63,    0,  432,    2, 0x08,   62 /* Private */,
+      64,    0,  433,    2, 0x08,   63 /* Private */,
+      65,    0,  434,    2, 0x08,   64 /* Private */,
+      66,    0,  435,    2, 0x08,   65 /* Private */,
+      67,    0,  436,    2, 0x08,   66 /* Private */,
+      68,    0,  437,    2, 0x08,   67 /* Private */,
 
  // slots: parameters
     QMetaType::Void, QMetaType::Double,    3,
@@ -325,6 +329,7 @@ Q_CONSTINIT static const uint qt_meta_data_MainWindow[] = {
     QMetaType::Void, 0x80000000 | 15,   16,
     QMetaType::Void, 0x80000000 | 19,   20,
     QMetaType::Void, 0x80000000 | 19,   20,
+    QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
@@ -475,6 +480,8 @@ Q_CONSTINIT const QMetaObject MainWindow::staticMetaObject = { {
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onBatchSingleCellGeometryCalculation'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onMixtureModelingForSingleGeometryFeature'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onEstimateDivisionBySingleGeometry'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onBatchEstimateDivisionBySingleGeometry'
@@ -558,22 +565,23 @@ void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 38: _t->onNeighborPairGeometryCalculation(); break;
         case 39: _t->onBatchNeighborPairGeometryCalculation(); break;
         case 40: _t->onBatchSingleCellGeometryCalculation(); break;
-        case 41: _t->onEstimateDivisionBySingleGeometry(); break;
-        case 42: _t->onBatchEstimateDivisionBySingleGeometry(); break;
-        case 43: _t->onCompareWithRealDivision(); break;
-        case 44: _t->onPrecisionAndRecallCurveOverSingleGeometry(); break;
-        case 45: _t->onVertexDisplaySetting(); break;
-        case 46: _t->onLineDisplaySetting(); break;
-        case 47: _t->onPolygonDisplaySetting(); break;
-        case 48: _t->onNeighborPairDisplaySetting(); break;
-        case 49: _t->onDivisionPairDisplaySetting(); break;
-        case 50: _t->onFindVertex(); break;
-        case 51: _t->onFindLine(); break;
-        case 52: _t->onFindPolygon(); break;
-        case 53: _t->onGenerateRandomNetwork(); break;
-        case 54: _t->onCompareBatchEstimations(); break;
-        case 55: _t->onExportFeatureNames(); break;
-        case 56: _t->onDebugAll(); break;
+        case 41: _t->onMixtureModelingForSingleGeometryFeature(); break;
+        case 42: _t->onEstimateDivisionBySingleGeometry(); break;
+        case 43: _t->onBatchEstimateDivisionBySingleGeometry(); break;
+        case 44: _t->onCompareWithRealDivision(); break;
+        case 45: _t->onPrecisionAndRecallCurveOverSingleGeometry(); break;
+        case 46: _t->onVertexDisplaySetting(); break;
+        case 47: _t->onLineDisplaySetting(); break;
+        case 48: _t->onPolygonDisplaySetting(); break;
+        case 49: _t->onNeighborPairDisplaySetting(); break;
+        case 50: _t->onDivisionPairDisplaySetting(); break;
+        case 51: _t->onFindVertex(); break;
+        case 52: _t->onFindLine(); break;
+        case 53: _t->onFindPolygon(); break;
+        case 54: _t->onGenerateRandomNetwork(); break;
+        case 55: _t->onCompareBatchEstimations(); break;
+        case 56: _t->onExportFeatureNames(); break;
+        case 57: _t->onDebugAll(); break;
         default: ;
         }
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
@@ -644,13 +652,13 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 57)
+        if (_id < 58)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 57;
+        _id -= 58;
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 57)
+        if (_id < 58)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 57;
+        _id -= 58;
     }
     return _id;
 }

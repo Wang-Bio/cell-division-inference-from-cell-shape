@@ -69,6 +69,7 @@ public:
     QAction *actionExport_All_Data;
     QAction *actionBatch_Neighbor_Pair_Geometry_Calculation;
     QAction *actionBatch_Single_Cell_Geometry_Calculation;
+    QAction *actionMixture_Modeling_for_Single_Geometry_Feature;
     QAction *actionBatch_Estimate_Division_by_single_geometry;
     QAction *actionCheck_Geometry_Calculation_Single_Pair;
     QAction *actionPrecision_and_Recall_Curve_Over_Single_Geometry;
@@ -227,6 +228,8 @@ public:
         actionBatch_Neighbor_Pair_Geometry_Calculation->setObjectName("actionBatch_Neighbor_Pair_Geometry_Calculation");
         actionBatch_Single_Cell_Geometry_Calculation = new QAction(MainWindow);
         actionBatch_Single_Cell_Geometry_Calculation->setObjectName("actionBatch_Single_Cell_Geometry_Calculation");
+        actionMixture_Modeling_for_Single_Geometry_Feature = new QAction(MainWindow);
+        actionMixture_Modeling_for_Single_Geometry_Feature->setObjectName("actionMixture_Modeling_for_Single_Geometry_Feature");
         actionBatch_Estimate_Division_by_single_geometry = new QAction(MainWindow);
         actionBatch_Estimate_Division_by_single_geometry->setObjectName("actionBatch_Estimate_Division_by_single_geometry");
         actionCheck_Geometry_Calculation_Single_Pair = new QAction(MainWindow);
@@ -549,6 +552,7 @@ public:
         menuGeometry->addAction(actionNeighbor_Pair_Geometry_Calculation);
         menuGeometry->addAction(actionBatch_Neighbor_Pair_Geometry_Calculation);
         menuGeometry->addAction(actionBatch_Single_Cell_Geometry_Calculation);
+        menuGeometry->addAction(actionMixture_Modeling_for_Single_Geometry_Feature);
         menuEstimate->addAction(actionEstimate_division_by_single_geometry);
         menuEstimate->addAction(actionCompare_with_real_division);
         menuEstimate->addAction(actionBatch_Estimate_Division_by_single_geometry);
@@ -619,6 +623,7 @@ public:
         actionExport_All_Data->setText(QCoreApplication::translate("MainWindow", "Export All Data (JSON)", nullptr));
         actionBatch_Neighbor_Pair_Geometry_Calculation->setText(QCoreApplication::translate("MainWindow", "Batch Neighbor Pair Geometry Calculation", nullptr));
         actionBatch_Single_Cell_Geometry_Calculation->setText(QCoreApplication::translate("MainWindow", "Batch Single Cell Geometry Calculation", nullptr));
+        actionMixture_Modeling_for_Single_Geometry_Feature->setText(QCoreApplication::translate("MainWindow", "Mixture modeling for single geometry feature", nullptr));
         actionBatch_Estimate_Division_by_single_geometry->setText(QCoreApplication::translate("MainWindow", "Batch Estimate Division by single geometry", nullptr));
         actionCheck_Geometry_Calculation_Single_Pair->setText(QCoreApplication::translate("MainWindow", "Check Geometry Calculation (Single Pair)", nullptr));
         actionPrecision_and_Recall_Curve_Over_Single_Geometry->setText(QCoreApplication::translate("MainWindow", "Batch Estimate Division by ranging single geometry", nullptr));

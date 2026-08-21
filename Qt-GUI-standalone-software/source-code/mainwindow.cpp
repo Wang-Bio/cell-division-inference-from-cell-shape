@@ -11,6 +11,7 @@
 #include "neighborgeometrycalculator.h"
 #include "batchdivisionestimator.h"
 #include "geometryio.h"
+#include "singlefeaturemixtureanalysis.h"
 
 #include <QtMath>
 #include <QSplitter>
@@ -180,6 +181,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionNeighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onNeighborPairGeometryCalculation);
     connect(ui->actionBatch_Neighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchNeighborPairGeometryCalculation);
     connect(ui->actionBatch_Single_Cell_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchSingleCellGeometryCalculation);
+    connect(ui->actionMixture_Modeling_for_Single_Geometry_Feature, &QAction::triggered, this, &MainWindow::onMixtureModelingForSingleGeometryFeature);
 
 //menuBar Estimate function
     connect(ui->actionEstimate_division_by_single_geometry, &QAction::triggered, this, &MainWindow::onEstimateDivisionBySingleGeometry);
@@ -2591,6 +2593,44 @@ void MainWindow::onBatchSingleCellGeometryCalculation()
         message += "\n\nWarnings:\n- " + summary.warnings.join("\n- ");
 
     QMessageBox::information(this, "Batch Single Cell Geometry", message);
+}
+
+void MainWindow::onMixtureModelingForSingleGeometryFeature()
+{
+    SingleFeatureMixtureOptions options;
+    if (!SingleFeatureMixtureAnalysis::getOptions(this, &options))
+        return;
+
+    auto *thread = new QThread(this);
+    auto *worker = new SingleFeatureMixtureWorker(options);
+    auto *progress = new QProgressDialog("Preparing mixture analysis…", "Cancel",
+                                         0, options.bootstrapCount, this);
+    progress->setWindowTitle("Mixture modeling for single geometry feature");
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    worker->moveToThread(thread);
+    connect(thread, &QThread::started, worker, &SingleFeatureMixtureWorker::run);
+    connect(progress, &QProgressDialog::canceled, worker,
+            &SingleFeatureMixtureWorker::cancel, Qt::DirectConnection);
+    connect(worker, &SingleFeatureMixtureWorker::progress, this,
+            [progress](int value, int maximum, const QString &message) {
+        progress->setMaximum(maximum);
+        progress->setValue(value);
+        progress->setLabelText(message);
+    });
+    connect(worker, &SingleFeatureMixtureWorker::finished, this,
+            [this, progress](bool success, const QString &message) {
+        progress->close();
+        if (success)
+            QMessageBox::information(this, "Mixture modeling", message);
+        else if (message != QStringLiteral("Mixture analysis cancelled."))
+            QMessageBox::critical(this, "Mixture modeling", message);
+    });
+    connect(worker, &SingleFeatureMixtureWorker::finished, thread, &QThread::quit);
+    connect(worker, &SingleFeatureMixtureWorker::finished, worker, &QObject::deleteLater);
+    connect(thread, &QThread::finished, progress, &QObject::deleteLater);
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    thread->start();
 }
 
 void MainWindow::clearDivisionArrowVector(QVector<QGraphicsPathItem*> &arrows)

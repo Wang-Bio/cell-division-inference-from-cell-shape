@@ -15,6 +15,7 @@ debug/geometryio.o
 debug/polygonitem.o
 debug/vertexitem.o
 debug/precisionrecallsweepworker.o
+debug/singlefeaturemixtureanalysis.o
 debug/moc_canvasmanager.o
 debug/moc_interactivegraphicsview.o
 debug/moc_lineitem.o
@@ -22,3 +23,4 @@ debug/moc_mainwindow.o
 debug/moc_polygonitem.o
 debug/moc_vertexitem.o
 debug/moc_precisionrecallsweepworker.o
+debug/moc_singlefeaturemixtureanalysis.o

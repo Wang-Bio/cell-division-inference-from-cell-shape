@@ -42,7 +42,8 @@ SOURCES += \
     geometryio.cpp \
     polygonitem.cpp \
     vertexitem.cpp \
-    precisionrecallsweepworker.cpp
+    precisionrecallsweepworker.cpp \
+    singlefeaturemixtureanalysis.cpp
 
 HEADERS += \
     canvasmanager.h \
@@ -60,7 +61,8 @@ HEADERS += \
     geometryio.h \
     polygonitem.h \
     vertexitem.h \
-    precisionrecallsweepworker.h
+    precisionrecallsweepworker.h \
+    singlefeaturemixtureanalysis.h
 
 FORMS += \
     mainwindow.ui
