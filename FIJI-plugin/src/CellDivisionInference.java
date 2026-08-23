@@ -35,6 +35,7 @@ import org.jgrapht.alg.interfaces.MatchingAlgorithm;
 import org.jgrapht.alg.matching.blossom.v5.KolmogorovWeightedMatching;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleWeightedGraph;
+import org.jgrapht.util.SupplierUtil;
 
 public class CellDivisionInference implements PlugIn {
 
@@ -4977,12 +4978,38 @@ public class CellDivisionInference implements PlugIn {
                 double bx = pb.x - ps.x;
                 double by = pb.y - ps.y;
 
-                double cross = ax * by - ay * bx;
-                double dot = ax * bx + ay * by;
-                double angleRad = Math.atan2(cross, dot);
-                double magnitude = Math.abs(angleRad);
-
-                anglesDeg.add(Math.toDegrees(magnitude));
+                // Follow the Qt calculator exactly: estimate each outgoing tangent
+                // from its stored centreline at three cell-relative scales and use
+                // their median angle.  Detected networks contain curved, densely
+                // sampled paths, so the adjacent support vertex is not a reliable
+                // tangent (and was the reason valid >145 degree pairs disappeared).
+                ArrayList<Double> scaleAngles = new ArrayList<>();
+                List<Point2D.Double> pathA = pathAway(lineBetween(shared, connA), ps);
+                List<Point2D.Double> pathB = pathAway(lineBetween(shared, connB), ps);
+                double averageSqrtArea = (Math.sqrt(areaA) + Math.sqrt(areaB)) / 2.0;
+                double exclude = Math.max(1.5, 0.03 * averageSqrtArea);
+                double[] windowFractions = {0.15, 0.20, 0.25};
+                for(double fraction : windowFractions){
+                    double cap = Math.min(fraction * averageSqrtArea,
+                            Math.min(pathChordLength(pathA) / 3.0, pathChordLength(pathB) / 3.0));
+                    Point2D.Double tangentA = cap > 0.0 ? tangentAtScale(pathA, ps, exclude, cap) : null;
+                    Point2D.Double tangentB = cap > 0.0 ? tangentAtScale(pathB, ps, exclude, cap) : null;
+                    if(tangentA != null && tangentB != null){
+                        double cross = Math.abs(tangentA.x * tangentB.y - tangentA.y * tangentB.x);
+                        double dot = tangentA.x * tangentB.x + tangentA.y * tangentB.y;
+                        scaleAngles.add(Math.toDegrees(Math.atan2(cross, dot)));
+                    }
+                }
+                if(!scaleAngles.isEmpty()){
+                    Collections.sort(scaleAngles);
+                    anglesDeg.add(scaleAngles.get(scaleAngles.size() / 2));
+                } else {
+                    // Qt's documented backward-compatible fallback for a missing,
+                    // short, or invalid centreline path.
+                    double cross = ax * by - ay * bx;
+                    double dot = ax * bx + ay * by;
+                    anglesDeg.add(Math.toDegrees(Math.abs(Math.atan2(cross, dot))));
+                }
             }
         }
 
@@ -5399,6 +5426,80 @@ public class CellDivisionInference implements PlugIn {
         double py = a.y + clamped * dy;
 
         return Math.hypot(p.x - px, p.y - py);
+    }
+
+    // ---- Path-aware junction tangents (Qt neighborgeometrycalculator.cpp) ----
+    private LineEdge lineBetween(int firstVertex, int secondVertex){
+        LineEdge key = new LineEdge(firstVertex, secondVertex);
+        for(LineEdge edge : lineEdges) if(edge.equals(key)) return edge;
+        return null;
+    }
+
+    private static List<Point2D.Double> pathAway(LineEdge line, Point2D.Double junction){
+        if(line == null || !line.pathValid || line.path == null || line.path.size() < 2)
+            return Collections.emptyList();
+        ArrayList<Point2D.Double> path = new ArrayList<>(line.path);
+        if(path.get(path.size() - 1).distance(junction) < path.get(0).distance(junction))
+            Collections.reverse(path);
+        return path;
+    }
+
+    private static double pathChordLength(List<Point2D.Double> path){
+        return path == null || path.size() < 2 ? 0.0 : path.get(0).distance(path.get(path.size() - 1));
+    }
+
+    private static Point2D.Double tangentAtScale(List<Point2D.Double> path, Point2D.Double junction,
+                                                  double exclude, double window){
+        if(path == null || path.isEmpty()) return null;
+        ArrayList<Point2D.Double> samples = new ArrayList<>();
+        double distance = junction.distance(path.get(0));
+        Point2D.Double previous = path.get(0);
+        for(Point2D.Double point : path){
+            distance += previous.distance(point);
+            previous = point;
+            if(distance >= exclude && distance <= exclude + window) samples.add(point);
+        }
+        if(samples.size() < 3) return null;
+
+        double[] weights = new double[samples.size()];
+        Arrays.fill(weights, 1.0);
+        Point2D.Double axis = new Point2D.Double();
+        for(int iteration = 0; iteration < 3; iteration++){
+            double weightSum = 0.0, centerX = 0.0, centerY = 0.0;
+            for(int i = 0; i < samples.size(); i++){
+                weightSum += weights[i];
+                centerX += weights[i] * samples.get(i).x;
+                centerY += weights[i] * samples.get(i).y;
+            }
+            centerX /= weightSum;
+            centerY /= weightSum;
+            double xx = 0.0, xy = 0.0, yy = 0.0;
+            for(int i = 0; i < samples.size(); i++){
+                double x = samples.get(i).x - centerX, y = samples.get(i).y - centerY;
+                xx += weights[i] * x * x;
+                xy += weights[i] * x * y;
+                yy += weights[i] * y * y;
+            }
+            double angle = 0.5 * Math.atan2(2.0 * xy, xx - yy);
+            axis = new Point2D.Double(Math.cos(angle), Math.sin(angle));
+            double[] residuals = new double[samples.size()];
+            for(int i = 0; i < samples.size(); i++){
+                Point2D.Double point = samples.get(i);
+                residuals[i] = Math.abs((point.x - centerX) * axis.y - (point.y - centerY) * axis.x);
+            }
+            double[] sorted = residuals.clone();
+            Arrays.sort(sorted);
+            double scale = 1.4826 * sorted[sorted.length / 2] + 1e-9;
+            double cutoff = 1.345 * scale;
+            for(int i = 0; i < weights.length; i++)
+                weights[i] = residuals[i] <= cutoff ? 1.0 : cutoff / residuals[i];
+        }
+        Point2D.Double last = path.get(path.size() - 1);
+        if(axis.x * (last.x - junction.x) + axis.y * (last.y - junction.y) < 0.0){
+            axis.x = -axis.x;
+            axis.y = -axis.y;
+        }
+        return axis;
     }
 
     // ---- Junction angle helper: Qt connectingVertexFor() ----
@@ -5829,7 +5930,13 @@ public class CellDivisionInference implements PlugIn {
             if(prior == null || canonical.score > prior.score) unique.put(key, canonical);
         }
 
-        Graph<Integer, DefaultWeightedEdge> graph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+        // Blossom V temporarily augments the graph with internal/dummy vertices.
+        // The class-only constructor has no vertex supplier, so getMatching()
+        // throws UnsupportedOperationException when the algorithm calls addVertex().
+        // Start generated IDs after the real polygon range to keep them disjoint.
+        Graph<Integer, DefaultWeightedEdge> graph = new SimpleWeightedGraph<>(
+                SupplierUtil.createIntegerSupplier(polygonCount),
+                SupplierUtil.createDefaultWeightedEdgeSupplier());
         for(int i = 0; i < polygonCount; ++i) graph.addVertex(i);
         HashMap<DefaultWeightedEdge, CandidateMatch> source = new HashMap<>();
         for(CandidateMatch candidate : unique.values()){
