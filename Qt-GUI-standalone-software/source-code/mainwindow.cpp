@@ -1120,7 +1120,20 @@ bool MainWindow::exportSceneImage(const QString &filePath,
     if (!scene)
         return false;
 
-    const QRectF rect = scene->sceneRect();
+    // A geometry-only JSON import sizes the scene around its vertices.  When a
+    // full-size raster is subsequently used as the background, that explicit
+    // scene rect can therefore be much smaller than the image.  Rendering only
+    // sceneRect() used to crop exports to the vicinity of the polygon network.
+    // Include the complete visible base image while retaining any canvas area
+    // outside it (for example, geometry extending past an image edge).
+    QRectF rect = scene->sceneRect();
+    const auto includeVisibleImageBounds = [&rect, scene](QGraphicsPixmapItem *item) {
+        if (item && item->scene() == scene && item->isVisible())
+            rect = rect.united(item->sceneBoundingRect());
+    };
+    includeVisibleImageBounds(m_sourceImageItem);
+    includeVisibleImageBounds(m_backgroundItem);
+
     if (rect.isNull() || rect.width() <= 0 || rect.height() <= 0)
         return false;
 
