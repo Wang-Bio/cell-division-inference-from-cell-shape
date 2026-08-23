@@ -3062,6 +3062,114 @@ public class CellDivisionInference implements PlugIn {
     }
     private static boolean[] exteriorBackground4(ByteProcessor bp){return backgroundInfo4(bp).acceptedPixels;}
 
+    /**
+     * Return the ordinary cell faces which share a real boundary segment with
+     * the accepted exterior (or a sufficiently large internal void).
+     * Cardinal neighbours are intentional: the C++ detector does not treat a
+     * diagonal contact at a junction as boundary support.
+     */
+    private static Set<Integer> epidermalCellLabels(ByteProcessor bp,BackgroundInfo background){
+        int w=bp.getWidth(),h=bp.getHeight();
+        HashMap<Integer,Integer> boundarySupport=new HashMap<>();
+        final int[] dx={-1,1,0,0},dy={0,0,-1,1};
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+            if((bp.get(x,y)&0xff)==0)continue;
+            boolean touchesOutside=false;
+            HashSet<Integer> cells=new HashSet<>();
+            for(int k=0;k<4;k++){
+                int nx=x+dx[k],ny=y+dy[k];
+                if(nx<0||ny<0||nx>=w||ny>=h)continue;
+                int label=background.labels[ny*w+nx];
+                if(label<0)continue;
+                if(background.acceptedLabels[label])touchesOutside=true;
+                else cells.add(label);
+            }
+            if(touchesOutside)for(int cell:cells)
+                boundarySupport.put(cell,boundarySupport.getOrDefault(cell,0)+1);
+        }
+        HashSet<Integer> epidermal=new HashSet<>();
+        // A one-pixel contact can merely be a meeting at a junction.  A shared
+        // boundary segment has support from at least two skeleton pixels.
+        for(Map.Entry<Integer,Integer> support:boundarySupport.entrySet())
+            if(support.getValue()>=2)epidermal.add(support.getKey());
+        return epidermal;
+    }
+
+    private static Map<Integer,Integer> adjacentCellVotes(BackgroundInfo background,
+                                                           int w,int h,
+                                                           Collection<Point> points,
+                                                           int radius){
+        HashMap<Integer,Integer> votes=new HashMap<>();
+        for(Point point:points)for(int dy=-radius;dy<=radius;dy++)for(int dx=-radius;dx<=radius;dx++){
+            int x=point.x+dx,y=point.y+dy;
+            if(x<0||y<0||x>=w||y>=h)continue;
+            int label=background.labels[y*w+x];
+            if(label>=0&&!background.acceptedLabels[label])
+                votes.put(label,votes.getOrDefault(label,0)+1);
+        }
+        return votes;
+    }
+
+    // Package visibility lets the small, dependency-free regression harness
+    // exercise exactly the detector used by the production menu action.
+    static List<Point> detectInnerCellVertices(ByteProcessor bp){
+        int w=bp.getWidth(),h=bp.getHeight();
+        BackgroundInfo background=backgroundInfo4(bp);
+        Set<Integer> epidermal=epidermalCellLabels(bp,background);
+        ArrayList<Point> retained=new ArrayList<>();
+        for(Point junction:clusterPoints(findJunctionPixels(bp),2.0)){
+            Map<Integer,Integer> adjacent=adjacentCellVotes(background,w,h,
+                    Collections.singletonList(junction),3);
+            boolean belongsToInnerCell=false;
+            for(int label:adjacent.keySet())if(!epidermal.contains(label)){
+                belongsToInnerCell=true;
+                break;
+            }
+            if(belongsToInnerCell)retained.add(junction);
+        }
+        return retained;
+    }
+
+    private static ByteProcessor vertexRegressionMask(){return new ByteProcessor(25,25);}
+    private static void vertexRegressionHorizontal(ByteProcessor bp,int y,int x0,int x1){for(int x=x0;x<=x1;x++)bp.set(x,y,255);}
+    private static void vertexRegressionVertical(ByteProcessor bp,int x,int y0,int y1){for(int y=y0;y<=y1;y++)bp.set(x,y,255);}
+    private static void vertexRegressionRectangle(ByteProcessor bp,int low,int high){
+        vertexRegressionHorizontal(bp,low,low,high);vertexRegressionHorizontal(bp,high,low,high);
+        vertexRegressionVertical(bp,low,low,high);vertexRegressionVertical(bp,high,low,high);
+    }
+    private static boolean vertexRegressionNear(List<Point> points,int x,int y){
+        for(Point point:points)if(point.distance(x,y)<=1.5)return true;
+        return false;
+    }
+    private static void requireVertexRegression(boolean condition,String message){
+        if(!condition)throw new AssertionError(message);
+    }
+
+    // Static representative-mask coverage kept beside the production detector
+    // so the single-source FIJI plugin can be compiled without a test project.
+    static void runVertexDetectionRegressionTests(){
+        ByteProcessor inner=vertexRegressionMask();vertexRegressionRectangle(inner,2,22);
+        vertexRegressionVertical(inner,7,2,22);vertexRegressionVertical(inner,17,2,22);
+        vertexRegressionHorizontal(inner,7,2,22);vertexRegressionHorizontal(inner,17,2,22);
+        vertexRegressionVertical(inner,12,7,17);vertexRegressionHorizontal(inner,12,7,12);
+        requireVertexRegression(vertexRegressionNear(detectInnerCellVertices(inner),12,12),"inner three-way junction was rejected");
+
+        ByteProcessor mixed=vertexRegressionMask();vertexRegressionRectangle(mixed,2,22);
+        vertexRegressionVertical(mixed,7,2,22);vertexRegressionVertical(mixed,17,2,22);
+        vertexRegressionHorizontal(mixed,7,2,22);vertexRegressionHorizontal(mixed,17,2,22);
+        requireVertexRegression(vertexRegressionNear(detectInnerCellVertices(mixed),7,7),"junction shared by inner and epidermal cells was rejected");
+
+        ByteProcessor epidermal=vertexRegressionMask();vertexRegressionRectangle(epidermal,2,22);
+        vertexRegressionHorizontal(epidermal,7,2,22);vertexRegressionVertical(epidermal,12,2,7);
+        requireVertexRegression(!vertexRegressionNear(detectInnerCellVertices(epidermal),12,7),"epidermal-only junction was retained");
+
+        ByteProcessor corner=vertexRegressionMask();vertexRegressionRectangle(corner,5,19);
+        requireVertexRegression(!vertexRegressionNear(detectInnerCellVertices(corner),5,5),"degree-two outer-contour corner was retained");
+
+        ByteProcessor ordinary=vertexRegressionMask();vertexRegressionHorizontal(ordinary,12,3,21);
+        requireVertexRegression(!vertexRegressionNear(detectInnerCellVertices(ordinary),12,12),"ordinary non-junction skeleton pixel was retained");
+    }
+
     private static boolean isOuterBoundaryPoint(Point p,boolean[] exterior,int w,int h){
         final int[] dx={1,0,-1,0},dy={0,1,0,-1};
         for(int k=0;k<4;k++){int x=p.x+dx[k],y=p.y+dy[k];if(x>=0&&y>=0&&x<w&&y<h&&exterior[y*w+x])return true;}
@@ -3315,22 +3423,13 @@ public class CellDivisionInference implements PlugIn {
 
     private void detectVertices3Neighbors(JFrame frame){
         if(currentImp==null) return;
-        JSpinner errorSpinner=new JSpinner(new SpinnerNumberModel(outerDetectionConfig.maximumFitError,0.1,100.0,0.1));
-        JSpinner.NumberEditor editor=new JSpinner.NumberEditor(errorSpinner,"0.0");errorSpinner.setEditor(editor);
-        JPanel panel=new JPanel(new BorderLayout(8,0));panel.add(new JLabel("Maximum contour fitting error (px):"),BorderLayout.WEST);panel.add(errorSpinner,BorderLayout.CENTER);
-        if(JOptionPane.showConfirmDialog(frame,panel,"Detect Vertices",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;
-        outerDetectionConfig.maximumFitError=((Number)errorSpinner.getValue()).doubleValue();
         new Thread(() -> {
-            ByteProcessor bp=(ByteProcessor)currentImp.getProcessor().convertToByte(true);int w=bp.getWidth(),h=bp.getHeight();
-            List<Point> branches=clusterPoints(findJunctionPixels(bp),2.0),anchors=regionBoundaryJunctions(bp,outerDetectionConfig);boolean[] exterior=exteriorBackground4(bp);
-            ArrayList<Point> automatic=new ArrayList<>();ArrayList<VertexKind> kinds=new ArrayList<>();
-            for(Point anchor:anchors){automatic.add(anchor);kinds.add(VertexKind.BOUNDARY_JUNCTION);}
-            for(Point branch:branches){boolean merged=false;for(Point anchor:anchors)if(anchor.distance(branch)<=outerDetectionConfig.junctionMergeRadius){merged=true;break;}if(!merged){automatic.add(branch);kinds.add(isOuterBoundaryPoint(branch,exterior,w,h)?VertexKind.BOUNDARY_JUNCTION:VertexKind.INTERIOR_JUNCTION);if(isOuterBoundaryPoint(branch,exterior,w,h))anchors.add(branch);}}
-            for(Point support:detectOuterContourSupport(bp,anchors,outerDetectionConfig)){automatic.add(support);kinds.add(VertexKind.CONTOUR_SUPPORT);}
+            ByteProcessor bp=(ByteProcessor)currentImp.getProcessor().convertToByte(true);
+            List<Point> automatic=detectInnerCellVertices(bp);
             // Retain manual work; replace only the previous automatic detection set.
             ArrayList<Point> combined=new ArrayList<>();ArrayList<Point2D.Double> geometry=new ArrayList<>();ArrayList<VertexKind> combinedKinds=new ArrayList<>();
             for(int i=0;i<vertexPoints.size();i++){VertexKind kind=i<vertexKinds.size()?vertexKinds.get(i):VertexKind.MANUAL_TOPOLOGICAL;if(kind==VertexKind.MANUAL_TOPOLOGICAL||kind==VertexKind.AMBIGUOUS){combined.add(vertexPoints.get(i));Point2D.Double g=i<vertexGeometryPoints.size()?vertexGeometryPoints.get(i):new Point2D.Double(vertexPoints.get(i).x,vertexPoints.get(i).y);geometry.add(g);combinedKinds.add(kind);}}
-            for(int i=0;i<automatic.size();i++){Point p=automatic.get(i);boolean duplicate=false;for(Point existing:combined)if(existing.distance(p)<=1.0){duplicate=true;break;}if(!duplicate){combined.add(p);geometry.add(new Point2D.Double(p.x,p.y));combinedKinds.add(kinds.get(i));}}
+            for(Point p:automatic){boolean duplicate=false;for(Point existing:combined)if(existing.distance(p)<=1.0){duplicate=true;break;}if(!duplicate){combined.add(p);geometry.add(new Point2D.Double(p.x,p.y));combinedKinds.add(VertexKind.INTERIOR_JUNCTION);}}
             vertexPoints=combined;vertexGeometryPoints=geometry;vertexKinds=combinedKinds;lineEdges.clear();polygons.clear();
             SwingUtilities.invokeLater(() -> {imagePanel.setOverlayPoints(vertexPoints);imagePanel.setLines(lineEdges);imagePanel.setPolygons(polygons);});
         }).start();
