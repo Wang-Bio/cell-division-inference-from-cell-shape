@@ -1741,10 +1741,14 @@ public class CellDivisionInference implements PlugIn {
 
         new Thread(() -> {
 
-            ImagePlus work=currentImp.duplicate();
-
-            IJ.run(work,"Make Binary","");
-            IJ.run(work,"Skeletonize","");
+            // Do not use ImageJ's Make Binary/Skeletonize commands here.  Qt
+            // uses an inverted Otsu mask followed by Guo-Hall thinning,
+            // destairing and spur removal.  ImageJ's automatic threshold and
+            // thinning implementation are different, so the old pipeline
+            // could change junctions, faces and ultimately division estimates
+            // even when both applications opened the same pixels.
+            ByteProcessor skeleton = segmentWithQtCompatibleGuoHall(currentImp);
+            ImagePlus work = new ImagePlus(currentImp.getTitle() + "-skeleton", skeleton);
 
             currentImp=work;
             currentBI=work.getProcessor().getBufferedImage();
@@ -1756,6 +1760,108 @@ public class CellDivisionInference implements PlugIn {
             });
 
         }).start();
+    }
+
+    /** Qt-compatible implementation of ImageAnalysis::segmentWithGuoHall. */
+    static ByteProcessor segmentWithQtCompatibleGuoHall(ImagePlus source){
+        BufferedImage image=source.getProcessor().getBufferedImage();
+        int w=image.getWidth(),h=image.getHeight();
+        int[] gray=new int[w*h],histogram=new int[256];
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){
+            int rgb=image.getRGB(x,y);
+            int r=(rgb>>>16)&255,g=(rgb>>>8)&255,b=rgb&255;
+            // OpenCV COLOR_BGR2GRAY uses these Rec. 601 coefficients.
+            int value=(int)Math.round(0.299*r+0.587*g+0.114*b);
+            gray[y*w+x]=value;histogram[value]++;
+        }
+        int threshold=otsuThreshold(histogram,w*h);
+        byte[] pixels=new byte[w*h];
+        // cv::THRESH_BINARY_INV: values equal to the threshold are foreground.
+        for(int i=0;i<pixels.length;i++)pixels[i]=(byte)(gray[i]<=threshold?1:0);
+        guoHallThin(pixels,w,h);
+        destairSkeleton(pixels,w,h);
+        removeSkeletonSpurs(pixels,w,h);
+        ByteProcessor result=new ByteProcessor(w,h);
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++)result.set(x,y,pixels[y*w+x]!=0?255:0);
+        return result;
+    }
+
+    private static int otsuThreshold(int[] histogram,int total){
+        double sum=0.0;for(int i=0;i<256;i++)sum+=i*(double)histogram[i];
+        long background=0;double backgroundSum=0.0,best=-1.0;int threshold=0;
+        for(int i=0;i<256;i++){
+            background+=histogram[i];
+            if(background==0)continue;
+            long foreground=total-background;
+            if(foreground==0)break;
+            backgroundSum+=i*(double)histogram[i];
+            double meanBackground=backgroundSum/background;
+            double meanForeground=(sum-backgroundSum)/foreground;
+            double difference=meanBackground-meanForeground;
+            double variance=background*(double)foreground*difference*difference;
+            if(variance>best){best=variance;threshold=i;}
+        }
+        return threshold;
+    }
+
+    private static int binaryAt(byte[] pixels,int w,int y,int x){return pixels[y*w+x]&1;}
+
+    private static void guoHallThin(byte[] pixels,int w,int h){
+        boolean changed;
+        do{
+            changed=guoHallIteration(pixels,w,h,0);
+            changed=guoHallIteration(pixels,w,h,1)||changed;
+        }while(changed);
+    }
+
+    private static boolean guoHallIteration(byte[] p,int w,int h,int iteration){
+        boolean[] remove=new boolean[p.length];boolean changed=false;
+        for(int y=1;y<h-1;y++)for(int x=1;x<w-1;x++)if(binaryAt(p,w,y,x)!=0){
+            int p2=binaryAt(p,w,y-1,x),p3=binaryAt(p,w,y-1,x+1);
+            int p4=binaryAt(p,w,y,x+1),p5=binaryAt(p,w,y+1,x+1);
+            int p6=binaryAt(p,w,y+1,x),p7=binaryAt(p,w,y+1,x-1);
+            int p8=binaryAt(p,w,y,x-1),p9=binaryAt(p,w,y-1,x-1);
+            int connectivity=(p2==0?p3:0)+(p3==0?p4:0)+(p4==0?p5:0)+(p5==0?p6:0)
+                    +(p6==0?p7:0)+(p7==0?p8:0)+(p8==0?p9:0)+(p9==0?p2:0);
+            int n1=(p2|p3)+(p4|p5)+(p6|p7)+(p8|p9);
+            int n2=(p3|p4)+(p5|p6)+(p7|p8)+(p9|p2);
+            int neighbors=Math.min(n1,n2);
+            int m=iteration==0?((p2|p4|(p6==0?1:0))&p8):((p4|p6|(p8==0?1:0))&p2);
+            if(connectivity==1&&neighbors>=2&&neighbors<=3&&m==0)remove[y*w+x]=true;
+        }
+        for(int i=0;i<p.length;i++)if(remove[i]){p[i]=0;changed=true;}
+        return changed;
+    }
+
+    private static void destairSkeleton(byte[] p,int w,int h){
+        for(int pass=0;pass<2;pass++){
+            boolean[] remove=new boolean[p.length];boolean any=false;
+            for(int y=1;y<h-1;y++)for(int x=1;x<w-1;x++)if(binaryAt(p,w,y,x)!=0){
+                int e=binaryAt(p,w,y,x+1),ne=binaryAt(p,w,y-1,x+1),n=binaryAt(p,w,y-1,x);
+                int nw=binaryAt(p,w,y-1,x-1),west=binaryAt(p,w,y,x-1),sw=binaryAt(p,w,y+1,x-1);
+                int south=binaryAt(p,w,y+1,x),se=binaryAt(p,w,y+1,x+1);
+                boolean match=pass==0
+                        ? n!=0&&((e!=0&&ne==0&&sw==0&&(west==0||south==0))||(west!=0&&nw==0&&se==0&&(e==0||south==0)))
+                        : south!=0&&((e!=0&&se==0&&nw==0&&(west==0||n==0))||(west!=0&&sw==0&&ne==0&&(e==0||n==0)));
+                if(match){remove[y*w+x]=true;any=true;}
+            }
+            if(!any)break;
+            for(int i=0;i<p.length;i++)if(remove[i])p[i]=0;
+        }
+    }
+
+    private static void removeSkeletonSpurs(byte[] p,int w,int h){
+        final int[] dx={-1,0,1,-1,1,-1,0,1},dy={-1,-1,-1,0,0,1,1,1};
+        while(true){
+            boolean[] remove=new boolean[p.length];boolean any=false;
+            for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(binaryAt(p,w,y,x)!=0){
+                int neighbors=0;
+                for(int k=0;k<8;k++){int nx=x+dx[k],ny=y+dy[k];if(nx>=0&&ny>=0&&nx<w&&ny<h)neighbors+=binaryAt(p,w,ny,nx);}
+                if(neighbors==1){remove[y*w+x]=true;any=true;}
+            }
+            if(!any)return;
+            for(int i=0;i<p.length;i++)if(remove[i])p[i]=0;
+        }
     }
 
     // =========================

@@ -76,6 +76,27 @@ The manuscript further demonstrates transferability checks in non-model species 
 - The full neighbor-pair feature table and per-snapshot files are provided to support re-analysis.
 - Example files are included for fast verification of file formats and analysis flow.
 
+### FIJI/Qt parity
+
+Network extraction is pixel-sensitive: a one-pixel difference in the skeleton can add or remove a
+junction, which changes polygon membership and neighbors. Older FIJI plugin source used ImageJ's
+`Make Binary` and `Skeletonize` commands, while Qt used inverted Otsu binarization, Guo-Hall
+thinning, destairing, and iterative spur removal. Consequently, the two applications could produce
+different JSON networks—and different junction-angle division estimates—from the same raw image.
+
+The FIJI source now implements the Qt segmentation pipeline directly. For comparable results:
+
+1. Open the same unmodified image in each application (do not pre-threshold one copy only).
+2. Run skeletonization once, followed by the same vertex, line, and polygon detection workflow.
+3. Use the same division feature, threshold direction/value, and matching mode. The defaults are
+   mean junction angle, `>= 145°`, and global maximum-weight matching.
+4. Compare topology by coordinates and connectivity rather than JSON array order or numeric IDs;
+   IDs can legitimately differ while describing the same graph.
+
+Existing JSON files are not retroactively changed. Re-run extraction with the updated source, or
+load one exported JSON into both applications when comparing division-estimation code independently
+of segmentation. Manually moved vertices and other edits must also be identical.
+
 If you are reviewing methodology transfer to another species/system, we recommend first checking whether the mean junction-angle distribution is bimodal in your dataset, and then set a value cutoff to distinguish the high-angle group and low-angle group. Also We recommend you to only use early leaf primordia, where cells are actively dividing.
 
 ---
