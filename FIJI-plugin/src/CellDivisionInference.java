@@ -3453,7 +3453,7 @@ public class CellDivisionInference implements PlugIn {
 
             // If vertices are slightly off the skeleton (e.g. after clustering),
             // this tolerance makes endpoint matching robust.
-            final int hitRadius = 2;   // try 1..3
+            final int hitRadius = 1;
 
             // Use overlayPoints so manual edits (drag/add/delete) are respected.
             List<Point> verts = imagePanel.getOverlayPoints();
@@ -3468,6 +3468,8 @@ public class CellDivisionInference implements PlugIn {
             int[] owner = vertexAtPixel.clone();
             int[] distance = new int[w*h];
             Arrays.fill(distance, Integer.MAX_VALUE);
+            int[] parent = new int[w*h];
+            Arrays.fill(parent, -1);
             ArrayDeque<Integer> queue = new ArrayDeque<>();
             for(int pixel=0; pixel<owner.length; pixel++){
                 if(owner[pixel] >= 0){
@@ -3476,8 +3478,12 @@ public class CellDivisionInference implements PlugIn {
                 }
             }
 
-            HashMap<Long, Integer> bestEdgeLength = new HashMap<>();
-            HashSet<LineEdge> edges = new HashSet<>();
+            class Candidate {
+                int length = Integer.MAX_VALUE;
+                int firstMeeting = -1;
+                int secondMeeting = -1;
+            }
+            HashMap<Long, Candidate> candidates = new HashMap<>();
             while(!queue.isEmpty()){
                 int cur = queue.removeFirst();
                 int cx = cur % w;
@@ -3494,26 +3500,72 @@ public class CellDivisionInference implements PlugIn {
                     if(owner[next] < 0){
                         owner[next] = owner[cur];
                         distance[next] = distance[cur] + 1;
+                        parent[next] = cur;
                         queue.addLast(next);
                     } else if(owner[next] != owner[cur]){
                         int first = Math.min(owner[cur], owner[next]);
                         int second = Math.max(owner[cur], owner[next]);
                         long key = edgeKey(first, second);
                         int length = distance[cur] + distance[next] + 1;
-                        Integer previousLength = bestEdgeLength.get(key);
-                        if(previousLength == null || length < previousLength){
-                            bestEdgeLength.put(key, length);
-                            edges.add(new LineEdge(first, second));
+                        Candidate candidate = candidates.computeIfAbsent(key, ignored -> new Candidate());
+                        if(length < candidate.length){
+                            candidate.length = length;
+                            if(owner[cur] == first){
+                                candidate.firstMeeting = cur;
+                                candidate.secondMeeting = next;
+                            } else {
+                                candidate.firstMeeting = next;
+                                candidate.secondMeeting = cur;
+                            }
                         }
                     }
                 }
             }
 
-            lineEdges = new ArrayList<>(edges);
+            BackgroundInfo background = backgroundInfo4(bp);
+            Set<Integer> epidermalCells = epidermalCellLabels(bp, background);
+            ArrayList<LineEdge> innerEdges = new ArrayList<>();
+            for(Map.Entry<Long,Candidate> entry : candidates.entrySet()){
+                int first = (int)(entry.getKey() >> 32);
+                int second = (int)(long)entry.getKey();
+                Candidate candidate = entry.getValue();
+
+                ArrayList<Integer> firstHalf = pathToSource(candidate.firstMeeting, parent);
+                Collections.reverse(firstHalf);
+                ArrayList<Integer> secondHalf = pathToSource(candidate.secondMeeting, parent);
+                ArrayList<Point> pixelPath = new ArrayList<>(firstHalf.size()+secondHalf.size()+2);
+                pixelPath.add(verts.get(first));
+                for(int pixel:firstHalf) pixelPath.add(new Point(pixel%w,pixel/w));
+                for(int pixel:secondHalf) pixelPath.add(new Point(pixel%w,pixel/w));
+                pixelPath.add(verts.get(second));
+
+                Map<Integer,Integer> votes = adjacentCellVotes(background,w,h,pixelPath,1);
+                ArrayList<Map.Entry<Integer,Integer>> rankedFaces = new ArrayList<>(votes.entrySet());
+                rankedFaces.sort((a,b) -> {
+                    int byVotes=Integer.compare(b.getValue(),a.getValue());
+                    return byVotes!=0?byVotes:Integer.compare(a.getKey(),b.getKey());
+                });
+                // Keep inner/inner and inner/outermost walls. A wall between two
+                // epidermal cells belongs only to the outermost-cell network.
+                if(rankedFaces.size()<2 || epidermalCells.contains(rankedFaces.get(0).getKey())
+                        && epidermalCells.contains(rankedFaces.get(1).getKey())) continue;
+
+                LineEdge edge = new LineEdge(first,second);
+                for(Point point:pixelPath) edge.path.add(new Point2D.Double(point.x,point.y));
+                edge.pathValid=edge.path.size()>=2;
+                innerEdges.add(edge);
+            }
+            lineEdges = innerEdges;
 
             SwingUtilities.invokeLater(() -> imagePanel.setLines(lineEdges));
 
         }).start();
+    }
+
+    private static ArrayList<Integer> pathToSource(int pixel,int[] parent){
+        ArrayList<Integer> path=new ArrayList<>();
+        while(pixel>=0){path.add(pixel);pixel=parent[pixel];}
+        return path;
     }
 
 
@@ -3710,7 +3762,52 @@ public class CellDivisionInference implements PlugIn {
 
             polygons = found;
 
-            SwingUtilities.invokeLater(() -> imagePanel.setPolygons(polygons));
+            // As in the Qt application, polygon detection is the authoritative
+            // topology pass. Remove detected branches which bound no cell, then
+            // compact vertex indices so every remaining overlay item is valid.
+            HashSet<Long> polygonEdgeKeys=new HashSet<>();
+            TreeSet<Integer> polygonVertexIds=new TreeSet<>();
+            for(List<Integer> polygon:polygons){
+                for(int i=0;i<polygon.size();i++){
+                    int a=polygon.get(i),b=polygon.get((i+1)%polygon.size());
+                    polygonVertexIds.add(a);
+                    polygonEdgeKeys.add(edgeKey(a,b));
+                }
+            }
+            ArrayList<LineEdge> retainedEdges=new ArrayList<>();
+            for(LineEdge edge:lineEdges)if(polygonEdgeKeys.contains(edgeKey(edge.v1,edge.v2)))retainedEdges.add(edge);
+
+            HashMap<Integer,Integer> remap=new HashMap<>();
+            ArrayList<Point> retainedPoints=new ArrayList<>();
+            ArrayList<Point2D.Double> retainedGeometry=new ArrayList<>();
+            ArrayList<VertexKind> retainedKinds=new ArrayList<>();
+            for(int oldId:polygonVertexIds){
+                remap.put(oldId,retainedPoints.size());
+                retainedPoints.add(verts.get(oldId));
+                retainedGeometry.add(oldId<vertexGeometryPoints.size()?vertexGeometryPoints.get(oldId):
+                        new Point2D.Double(verts.get(oldId).x,verts.get(oldId).y));
+                retainedKinds.add(oldId<vertexKinds.size()?vertexKinds.get(oldId):VertexKind.MANUAL_TOPOLOGICAL);
+            }
+            ArrayList<LineEdge> compactEdges=new ArrayList<>();
+            for(LineEdge oldEdge:retainedEdges){
+                LineEdge edge=new LineEdge(remap.get(oldEdge.v1),remap.get(oldEdge.v2));
+                edge.path=new ArrayList<>(oldEdge.path);edge.pathValid=oldEdge.pathValid;compactEdges.add(edge);
+            }
+            ArrayList<List<Integer>> compactPolygons=new ArrayList<>();
+            for(List<Integer> polygon:polygons){
+                ArrayList<Integer> compact=new ArrayList<>(polygon.size());
+                for(int oldId:polygon)compact.add(remap.get(oldId));
+                compactPolygons.add(compact);
+            }
+            vertexPoints=retainedPoints;vertexGeometryPoints=retainedGeometry;vertexKinds=retainedKinds;
+            lineEdges=compactEdges;polygons=compactPolygons;
+
+            SwingUtilities.invokeLater(() -> {
+                imagePanel.setOverlayPoints(vertexPoints);
+                imagePanel.setLines(lineEdges);
+                imagePanel.setPolygons(polygons);
+                updateInfoPanel();
+            });
 
         }).start();
     }
