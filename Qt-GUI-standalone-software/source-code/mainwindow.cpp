@@ -2307,6 +2307,58 @@ void MainWindow::onPolygonDetection()
         delete dup;
     }
 
+    // Polygon detection is the authoritative topology pass.  Remove graph
+    // elements that are not part of any polygon so stray detection branches do
+    // not remain on the editable canvas (or get exported as cell geometry).
+    QSet<int> polygonVertexIds;
+    QSet<QString> polygonEdgeKeys;
+    const auto edgeKey = [](int firstId, int secondId) {
+        if (firstId > secondId)
+            std::swap(firstId, secondId);
+        return QString::number(firstId) + QLatin1Char(':') + QString::number(secondId);
+    };
+
+    for (QGraphicsItem *item : scene->items()) {
+        if (!item || item->type() != PolygonItem::Type)
+            continue;
+
+        const QVector<int> ids = static_cast<PolygonItem*>(item)->vertexIds();
+        if (ids.size() < 3)
+            continue;
+        for (int index = 0; index < ids.size(); ++index) {
+            polygonVertexIds.insert(ids[index]);
+            polygonEdgeKeys.insert(edgeKey(ids[index], ids[(index + 1) % ids.size()]));
+        }
+    }
+
+    QList<LineItem*> orphanLines;
+    for (QGraphicsItem *item : scene->items()) {
+        if (item && item->type() == LineItem::Type) {
+            auto *line = static_cast<LineItem*>(item);
+            if (!polygonEdgeKeys.contains(edgeKey(line->v1Id(), line->v2Id())))
+                orphanLines.append(line);
+        }
+    }
+    for (LineItem *line : orphanLines) {
+        scene->removeItem(line);
+        delete line;
+    }
+
+    QList<VertexItem*> orphanVertices;
+    for (QGraphicsItem *item : scene->items()) {
+        if (item && item->type() == VertexItem::Type) {
+            auto *vertex = static_cast<VertexItem*>(item);
+            if (!polygonVertexIds.contains(vertex->id()))
+                orphanVertices.append(vertex);
+        }
+    }
+    for (VertexItem *vertex : orphanVertices) {
+        scene->removeItem(vertex);
+        delete vertex;
+    }
+
+    updateVertexCountLabel();
+    updateLineCountLabel();
     updatePolygonCountLabel();
 
     //QMessageBox::information(this, "Polygon Detection",QString("Detected %1 polygons, added %2 new polygons, removed %3 duplicates.").arg(detectedPolygons.size()).arg(addedCount).arg(duplicates.size()));
