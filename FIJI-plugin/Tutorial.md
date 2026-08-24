@@ -79,23 +79,15 @@ Use the following settings (by default):
 
 Select **OK**. Estimated divisions are displayed as orange arrows.
 
-### Step 5: Import real division pairs
-
-Open:
-
-`Import&Export` → `Import Real Division Pairs`
-
-Then select:
-
-`example-data/exampled_real_division_paris.csv`
-
-Real divisions are displayed as pink arrows.
-
-### Step 6: Compare estimated vs. real divisions
+### Step 5: Compare estimated vs. real divisions
 
 Open:
 
 `Estimate` → `Compare Estimated and Real Divisions`
+
+When prompted, select the real division pair file:
+
+`example-data/exampled_real_division_paris.csv`
 
 Results are shown as arrows:
 
@@ -103,7 +95,7 @@ Results are shown as arrows:
 - **False positives:** green  
 - **False negatives:** blue
 
-### Step 7: Export geometry results
+### Step 6: Export geometry results
 
 Open:
 
@@ -111,7 +103,7 @@ Open:
 
 This exports geometric measurements and real division labels for downstream analysis.
 
-### Step 8: Export estimated division pairs
+### Step 7: Export estimated division pairs
 
 Open:
 

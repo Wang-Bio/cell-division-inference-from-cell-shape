@@ -6458,6 +6458,89 @@ public class CellDivisionInference implements PlugIn {
         return set;
     }
 
+    private static boolean isRealDivisionHeader(String line){
+        if(line == null) return false;
+        String trimmed = line.trim().toLowerCase(Locale.ROOT);
+        if(trimmed.isEmpty()) return false;
+        String[] fields = trimmed.split("[,;\\s]+");
+        String joined = String.join("_", fields);
+        if(joined.equals("real_division_pair") || joined.equals("realdivisionpair")) return true;
+        HashSet<String> fieldSet = new HashSet<>(Arrays.asList(fields));
+        return fieldSet.contains("first_cell_index") && fieldSet.contains("second_cell_index");
+    }
+
+    private static class RealDivisionFileResult {
+        final ArrayList<int[]> pairs = new ArrayList<>();
+        final ArrayList<Double> times = new ArrayList<>();
+        final ArrayList<String> warnings = new ArrayList<>();
+    }
+
+    /** Read the same real-division format accepted by MainWindow::onCompareWithRealDivision. */
+    private static RealDivisionFileResult readQtRealDivisionFile(File file) throws IOException{
+        RealDivisionFileResult result = new RealDivisionFileResult();
+        try(BufferedReader reader = new BufferedReader(new InputStreamReader(
+                new FileInputStream(file), StandardCharsets.UTF_8))){
+            String line;
+            int lineNumber = 0;
+            while((line = reader.readLine()) != null){
+                ++lineNumber;
+                line = line.trim();
+                if(line.isEmpty()) continue;
+
+                // The current format can contain a marker row followed by a header row.
+                if(isRealDivisionHeader(line)) continue;
+
+                String[] parts = line.split("[,;\\s]+");
+                if(parts.length < 2){
+                    result.warnings.add("Line " + lineNumber + ": Expected at least two integers.");
+                    continue;
+                }
+
+                int firstIndex = 0;
+                int secondIndex = 1;
+                int timeIndex = 2;
+                Integer firstId = tryParseInt(parts[firstIndex]);
+                if(firstId == null && parts.length >= 3){
+                    firstIndex = 1;
+                    secondIndex = 2;
+                    timeIndex = 3;
+                    firstId = tryParseInt(parts[firstIndex]);
+                }
+                if(parts.length <= secondIndex){
+                    result.warnings.add("Line " + lineNumber + ": Expected at least two integers.");
+                    continue;
+                }
+                Integer secondId = tryParseInt(parts[secondIndex]);
+                Integer time = -1;
+                if(parts.length > timeIndex){
+                    time = tryParseInt(parts[timeIndex]);
+                    if(time == null) time = -1;
+                }
+
+                if(firstId == null || secondId == null){
+                    // Qt silently tolerates an unrecognized first row as a legacy header.
+                    if(lineNumber != 1)
+                        result.warnings.add("Line " + lineNumber + ": Unable to parse polygon ids.");
+                    continue;
+                }
+                result.pairs.add(new int[]{firstId, secondId});
+                result.times.add(time.doubleValue());
+            }
+        }
+        return result;
+    }
+
+    private HashMap<Integer, Integer> polygonIndexByDisplayId(){
+        HashMap<Integer, Integer> byId = new HashMap<>();
+        List<Integer> displayIds = imagePanel == null ? null : imagePanel.polygonDisplayIds;
+        for(int index = 0; index < polygons.size(); ++index){
+            int id = displayIds != null && displayIds.size() == polygons.size()
+                    ? displayIds.get(index) : index;
+            byId.put(id, index);
+        }
+        return byId;
+    }
+
     private void compareEstimatedAndRealDivision(JFrame frame){
 
         if(polygons == null || polygons.isEmpty()){
@@ -6465,6 +6548,47 @@ public class CellDivisionInference implements PlugIn {
                     "No polygons available.\nLoad / detect polygons first.",
                     "Compare Estimated and Real Division",
                     JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Qt asks for the ground-truth file as part of every comparison.
+        HashSet<Long> estSetAll = selectedEstimatedSet(neighborPairEstimationCache);
+        if(estSetAll.isEmpty()){
+            JOptionPane.showMessageDialog(frame,
+                    "No estimated division pairs selected.\nRun: Process → divided pair estimation... first.",
+                    "Compare Estimated and Real Division",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String defaultDirectory = OpenDialog.getDefaultDirectory();
+        JFileChooser chooser = defaultDirectory != null && !defaultDirectory.trim().isEmpty()
+                ? new JFileChooser(defaultDirectory) : new JFileChooser();
+        chooser.setDialogTitle("Select Real Division File");
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Text Files (*.txt, *.csv)", "txt", "csv"));
+        if(chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
+        File realDivisionFile = chooser.getSelectedFile();
+        if(realDivisionFile == null) return;
+        File parentDirectory = realDivisionFile.getParentFile();
+        if(parentDirectory != null)
+            OpenDialog.setDefaultDirectory(parentDirectory.getAbsolutePath() + File.separator);
+
+        clearRealDivisionPairCache();
+        clearComparisonPairCaches();
+        RealDivisionFileResult parsed;
+        try{
+            parsed = readQtRealDivisionFile(realDivisionFile);
+        }catch(IOException ex){
+            JOptionPane.showMessageDialog(frame,
+                    "Failed to open file: " + ex.getMessage(),
+                    "Compare Estimated and Real Division", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if(parsed.pairs.isEmpty()){
+            JOptionPane.showMessageDialog(frame,
+                    "No valid real division pairs were found in the file.",
+                    "Compare Estimated and Real Division", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
@@ -6483,21 +6607,33 @@ public class CellDivisionInference implements PlugIn {
 
         HashSet<Long> neighborSet = normalizePairListToSet(pairs);
 
+        HashMap<Integer, Integer> indexById = polygonIndexByDisplayId();
+        HashSet<Long> loadedRealKeys = new HashSet<>();
+        for(int i = 0; i < parsed.pairs.size(); ++i){
+            int firstId = parsed.pairs.get(i)[0];
+            int secondId = parsed.pairs.get(i)[1];
+            Integer firstIndex = indexById.get(firstId);
+            Integer secondIndex = indexById.get(secondId);
+            if(firstIndex == null || secondIndex == null || firstIndex.equals(secondIndex)){
+                parsed.warnings.add("Pair (" + firstId + ", " + secondId
+                        + ") is not a neighbor in the current scene and was ignored.");
+                continue;
+            }
+            long key = pairKey(firstIndex, secondIndex);
+            if(!neighborSet.contains(key)){
+                parsed.warnings.add("Pair (" + firstId + ", " + secondId
+                        + ") is not a neighbor in the current scene and was ignored.");
+                continue;
+            }
+            if(!loadedRealKeys.add(key)) continue;
+            RealDivisionEntry entry = new RealDivisionEntry();
+            entry.timing = parsed.times.get(i);
+            realDivisionPairCache.put(key, entry);
+        }
         if(realDivisionPairCache.isEmpty()){
             JOptionPane.showMessageDialog(frame,
-                    "No real division pairs loaded.\nImport them first: Import & Export → Import Real Division Pairs...",
-                    "Compare Estimated and Real Division",
-                    JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        // Estimated set = selected estimation pairs
-        HashSet<Long> estSetAll = selectedEstimatedSet(neighborPairEstimationCache);
-        if(estSetAll.isEmpty()){
-            JOptionPane.showMessageDialog(frame,
-                    "No estimated division pairs selected.\nRun: Process → divided pair estimation... first.",
-                    "Compare Estimated and Real Division",
-                    JOptionPane.WARNING_MESSAGE);
+                    "No real division pairs matched the current scene's neighbors.",
+                    "Compare Estimated and Real Division", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
@@ -6596,7 +6732,8 @@ public class CellDivisionInference implements PlugIn {
                 "Recall: "    + (m.recall<0 ? "NA" : String.format(Locale.ROOT,"%.4f", m.recall)) + "\n" +
                 "F1: "        + (m.f1<0 ? "NA" : String.format(Locale.ROOT,"%.4f", m.f1)) + "\n" +
                 "Specificity: "+ (m.specificity<0 ? "NA" : String.format(Locale.ROOT,"%.4f", m.specificity)) + "\n" +
-                "Accuracy: "  + (m.accuracy<0 ? "NA" : String.format(Locale.ROOT,"%.4f", m.accuracy)) + "\n\n" +
+                "Accuracy: "  + (m.accuracy<0 ? "NA" : String.format(Locale.ROOT,"%.4f", m.accuracy)) +
+                (parsed.warnings.isEmpty() ? "" : "\n\nWarnings:\n- " + String.join("\n- ", parsed.warnings)) + "\n\n" +
                 "Visualization caches updated:\n" +
                 "- TruePositive / FalsePositive / FalseNegative arrows";
 
