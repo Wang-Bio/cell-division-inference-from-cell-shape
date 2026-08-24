@@ -16,6 +16,7 @@ import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 import java.util.*;
 import java.util.List;
 import java.io.*;
@@ -508,33 +509,15 @@ public class CellDivisionInference implements PlugIn {
 
             JMenu ioMenu = new JMenu("Import & Export");
 
-            ioMenu.add(new JMenuItem(new AbstractAction("Import Polygonal Cell Networks...") {
+            ioMenu.add(new JMenuItem(new AbstractAction("Import...") {
                 @Override public void actionPerformed(ActionEvent e){
                     importData(frame);
                 }                
             }));
 
-            ioMenu.add(new JMenuItem(new AbstractAction("Import Real Division Pairs..."){
+            ioMenu.add(new JMenuItem(new AbstractAction("Export..."){
                 @Override public void actionPerformed(ActionEvent e){
-                    importRealDivisionPairs(frame);
-                }
-            }));
-
-            ioMenu.add(new JMenuItem(new AbstractAction("Export Polygonal Cell Networks..."){
-                @Override public void actionPerformed(ActionEvent e){
-                    exportData(frame);
-                }
-            }));
-
-            ioMenu.add(new JMenuItem(new AbstractAction("Export Neighbor Pair Geometrics..."){
-                @Override public void actionPerformed(ActionEvent e){
-                    exportNeighborPairGeometrics(frame);
-                }
-            }));
-
-            ioMenu.add(new JMenuItem(new AbstractAction("Export Estimated Division Pairs..."){
-                @Override public void actionPerformed(ActionEvent e){
-                    exportEstimatedDivisionPairs(frame);
+                    exportWithOptions(frame);
                 }
             }));
 
@@ -1889,6 +1872,18 @@ public class CellDivisionInference implements PlugIn {
         if(name == null) return;
 
         File file = new File(dir, name);
+        if(!name.toLowerCase(Locale.ROOT).endsWith(".json")){
+            ImagePlus imp=IJ.openImage(file.getAbsolutePath());
+            if(imp==null){IJ.error("Import failed","Unsupported file. Select JSON or an image.");return;}
+            currentImp=imp;currentBI=imp.getProcessor().getBufferedImage();currentGeometrySourceFileName=name;
+            vertexPoints.clear();vertexGeometryPoints.clear();vertexKinds.clear();lineEdges.clear();polygons.clear();
+            imagePanel.setImage(currentBI);imagePanel.setOverlayPoints(vertexPoints);imagePanel.setLines(lineEdges);imagePanel.setPolygons(polygons);
+            frame.setTitle("Cell Division Inference — "+name);updateInfoPanel();adjustWindowToContent();return;
+        }
+        importDataFile(frame, file);
+    }
+
+    private void importDataFile(JFrame frame, File file){
         currentGeometrySourceFileName = file.getName();
 
         ImportResult result;
@@ -2248,6 +2243,126 @@ public class CellDivisionInference implements PlugIn {
         }
     }
 
+    /** Qt-compatible, multi-output export dialog.  One selection can create all
+     * requested artifacts with the same base name, just like the desktop UI. */
+    private void exportWithOptions(JFrame frame){
+        if(vertexPoints == null || vertexPoints.isEmpty()){
+            JOptionPane.showMessageDialog(frame, "No canvas available to export.", "Export", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JCheckBox json = new JCheckBox("Geometry JSON", true);
+        JCheckBox vertices = new JCheckBox("Vertex information", true);
+        JCheckBox lines = new JCheckBox("Line information", true);
+        JCheckBox polygonInfo = new JCheckBox("Polygon information", true);
+        JCheckBox neighbors = new JCheckBox("Neighbor pair information", false);
+        JCheckBox real = new JCheckBox("Real division pairs", false);
+        JCheckBox estimated = new JCheckBox("Estimated division pairs", false);
+        JCheckBox geometry = new JCheckBox("Neighbor pair geometry (CSV)", false);
+        JCheckBox performance = new JCheckBox("Performance matrix (CSV)", false);
+        JCheckBox background = new JCheckBox("Background image", false);
+        JCheckBox geometryImage = new JCheckBox("Image with polygons/lines/vertices", false);
+        JCheckBox realImage = new JCheckBox("Image with real division pairs", false);
+        JCheckBox estimatedImage = new JCheckBox("Image with estimated division pairs", false);
+        JCheckBox comparedImage = new JCheckBox("Image with compared division pairs", false);
+        JSpinner quality = new JSpinner(new SpinnerNumberModel(3.0, 1.0, 10.0, 0.5));
+        JTextField baseName = new JTextField(baseNameWithoutExtension(currentGeometrySourceFileName), 24);
+        JTextField directory = new JTextField(OpenDialog.getDefaultDirectory(), 28);
+        JButton browse = new JButton("Browse...");
+        browse.addActionListener(e -> {
+            JFileChooser fc = new JFileChooser(directory.getText());
+            fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            if(fc.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) directory.setText(fc.getSelectedFile().getAbsolutePath());
+        });
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.add(new JLabel("Data"));
+        for(JCheckBox c : new JCheckBox[]{json, vertices, lines, polygonInfo, neighbors, real, estimated, geometry, performance}) panel.add(c);
+        panel.add(Box.createVerticalStrut(6)); panel.add(new JLabel("Images"));
+        for(JCheckBox c : new JCheckBox[]{background, geometryImage, realImage, estimatedImage, comparedImage}) panel.add(c);
+        JPanel q = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2)); q.add(new JLabel("Image quality scale: ")); q.add(quality); panel.add(q);
+        JPanel d = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2)); d.add(directory); d.add(browse); panel.add(new JLabel("Destination")); panel.add(d);
+        JPanel b = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2)); b.add(new JLabel("Base file name: ")); b.add(baseName); panel.add(b);
+
+        if(JOptionPane.showConfirmDialog(frame, new JScrollPane(panel), "Export", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;
+        File dir = new File(directory.getText().trim().isEmpty() ? System.getProperty("user.home") : directory.getText().trim());
+        if(!dir.exists() && !dir.mkdirs()) { IJ.error("Export failed", "Cannot create " + dir); return; }
+        String base = baseName.getText().trim().isEmpty() ? "export" : baseNameWithoutExtension(baseName.getText().trim());
+        ArrayList<String> done = new ArrayList<>(), warnings = new ArrayList<>();
+        try{
+            if(json.isSelected()){
+                File f = new File(dir, base + ".json");
+                writeTopologyJson(f, lines.isSelected(), polygonInfo.isSelected(), vertices.isSelected(), neighbors.isSelected()); done.add(f.getName());
+            }
+            if(real.isSelected()) writeRealDivisionPairsCsv(new File(dir, base + "_real_division_pairs.csv"), base, done, warnings);
+            if(estimated.isSelected()) writeSelectedDivisionPairsCsv(new File(dir, base + "_estimated_division_pairs.csv"), base, done, warnings);
+            if(geometry.isSelected()) writeNeighborGeometryForExport(new File(dir, base + "_neighbor_geometry.csv"), done, warnings);
+            if(performance.isSelected()) writePerformanceCsv(new File(dir, base + "_performance_matrix.csv"), done, warnings);
+            double scale = ((Number)quality.getValue()).doubleValue();
+            exportRequestedImage(background.isSelected(), new File(dir, base + "_background.png"), scale, 0, done, warnings);
+            exportRequestedImage(geometryImage.isSelected(), new File(dir, base + "_geometry.png"), scale, 1, done, warnings);
+            exportRequestedImage(realImage.isSelected(), new File(dir, base + "_real_divisions.png"), scale, 2, done, warnings);
+            exportRequestedImage(estimatedImage.isSelected(), new File(dir, base + "_estimated_divisions.png"), scale, 3, done, warnings);
+            exportRequestedImage(comparedImage.isSelected(), new File(dir, base + "_compared_divisions.png"), scale, 4, done, warnings);
+        }catch(Exception ex){ warnings.add(ex.getMessage()); }
+        String message = done.isEmpty() ? "Nothing was exported." : "Exported:\n- " + String.join("\n- ", done);
+        if(!warnings.isEmpty()) message += "\n\nWarnings:\n- " + String.join("\n- ", warnings);
+        JOptionPane.showMessageDialog(frame, message, "Export", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void writeRealDivisionPairsCsv(File file, String source, List<String> done, List<String> warnings) throws IOException{
+        if(realDivisionPairCache.isEmpty()){ warnings.add("No real division pairs available to export."); return; }
+        try(BufferedWriter w = utf8Writer(file)){ w.write("file_name,first_cell_id,second_cell_id,hours_ago,divided\n");
+            ArrayList<Long> keys = new ArrayList<>(realDivisionPairCache.keySet()); Collections.sort(keys);
+            for(long k: keys){ RealDivisionEntry e=realDivisionPairCache.get(k); int a=(int)(k>>32), b=(int)k;
+                w.write(escapeCsvField(source)+","+a+","+b+","+(e!=null&&Double.isFinite(e.timing)?formatTimingValue(e.timing):"")+",1\n"); }} done.add(file.getName());
+    }
+
+    private void writeSelectedDivisionPairsCsv(File file, String source, List<String> done, List<String> warnings) throws IOException{
+        ArrayList<int[]> pairs=new ArrayList<>(); for(Map.Entry<Long,EstimationEntry> e:neighborPairEstimationCache.entrySet()) if(e.getValue()!=null&&e.getValue().selected) pairs.add(new int[]{(int)(e.getKey()>>32),(int)(long)e.getKey()});
+        pairs=normalizeAndSortPairs(pairs); if(pairs.isEmpty()){warnings.add("No estimated division pairs available to export.");return;}
+        try(BufferedWriter w=utf8Writer(file)){w.write("file_name,first_cell_id,second_cell_id,divided\n"); for(int[] p:pairs)w.write(escapeCsvField(source)+","+p[0]+","+p[1]+",1\n");} done.add(file.getName());
+    }
+
+    private BufferedWriter utf8Writer(File f) throws IOException{return new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f),StandardCharsets.UTF_8));}
+
+    private void writeNeighborGeometryForExport(File file,List<String> done,List<String>warnings)throws IOException{
+        List<int[]> pairs=imagePanel==null?null:imagePanel.getNeighborPairs(); if(pairs==null||pairs.isEmpty())pairs=detectNeighborPairsFromPolygons(polygons);
+        ArrayList<int[]> sorted=normalizeAndSortPairs(pairs); if(sorted.isEmpty()){warnings.add("No neighbor pairs available for geometry export.");return;} writeNeighborPairGeometryCsv(file,sorted);done.add(file.getName());
+    }
+
+    private void writePerformanceCsv(File file,List<String> done,List<String>warnings)throws IOException{
+        if(lastDivisionMetrics==null){warnings.add("No performance metrics available to export.");return;} DivisionMetrics m=lastDivisionMetrics;
+        try(BufferedWriter w=utf8Writer(file)){w.write("estimated_pairs,real_pairs,neighbor_pairs,true_positive,false_positive,false_negative,true_negative,precision,recall,f1,specificity,accuracy\n");
+            w.write(m.estimatedPairs+","+m.realPairs+","+m.neighborPairs+","+m.truePositives+","+m.falsePositives+","+m.falseNegatives+","+m.trueNegatives+","+metricCsv(m.precision)+","+metricCsv(m.recall)+","+metricCsv(m.f1)+","+metricCsv(m.specificity)+","+metricCsv(m.accuracy)+"\n");}done.add(file.getName());
+    }
+    private static String metricCsv(double v){return v<0||Double.isNaN(v)?"N/A":String.format(Locale.ROOT,"%.6f",v);}
+
+    private void exportRequestedImage(boolean requested, File file, double scale, int mode,
+                                      List<String> done, List<String> warnings) throws IOException{
+        if(!requested) return;
+        if(mode==0){
+            BufferedImage source=currentBI;
+            if(source==null && imagePanel!=null) source=imagePanel.backgroundImage;
+            if(source==null){warnings.add("No background raw image available for export.");return;}
+            int w=Math.max(1,(int)Math.round(source.getWidth()*scale)), h=Math.max(1,(int)Math.round(source.getHeight()*scale));
+            BufferedImage out=new BufferedImage(w,h,BufferedImage.TYPE_INT_ARGB); Graphics2D g=out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC); g.drawImage(source,0,0,w,h,null);g.dispose();ImageIO.write(out,"png",file);done.add(file.getName());return;
+        }
+        if(imagePanel==null){warnings.add("No canvas available for image export.");return;}
+        boolean n=showNeighborLinks,e=showDivisionArrows,r=showRealDivisionArrows,tp=showTruePositiveDivisionArrows,fp=showFalsePositiveDivisionArrows,fn=showFalseNegativeDivisionArrows;
+        try{
+            showNeighborLinks=false; showDivisionArrows=mode==3; showRealDivisionArrows=mode==2;
+            showTruePositiveDivisionArrows=showFalsePositiveDivisionArrows=showFalseNegativeDivisionArrows=(mode==4);
+            Dimension size=imagePanel.getPreferredSize(); int w=Math.max(1,(int)Math.round(size.width*scale)),h=Math.max(1,(int)Math.round(size.height*scale));
+            BufferedImage out=new BufferedImage(w,h,BufferedImage.TYPE_INT_ARGB); Graphics2D g=out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);g.scale(scale,scale);imagePanel.setSize(size);imagePanel.paint(g);g.dispose();
+            if(!ImageIO.write(out,"png",file))throw new IOException("PNG writer is unavailable");done.add(file.getName());
+        }finally{showNeighborLinks=n;showDivisionArrows=e;showRealDivisionArrows=r;showTruePositiveDivisionArrows=tp;showFalsePositiveDivisionArrows=fp;showFalseNegativeDivisionArrows=fn;imagePanel.repaint();}
+    }
+
     private void exportData(JFrame frame){
 
         if(vertexPoints == null || vertexPoints.isEmpty()){
@@ -2560,6 +2675,11 @@ public class CellDivisionInference implements PlugIn {
     }
 
     private void writeTopologyJson(File file, boolean includeLines, boolean includePolygons) throws IOException{
+        writeTopologyJson(file, includeLines, includePolygons, true, includePolygons);
+    }
+
+    private void writeTopologyJson(File file, boolean includeLines, boolean includePolygons,
+                                   boolean includeVertices, boolean includeNeighborPairs) throws IOException{
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonObject root = new JsonObject();
@@ -2576,7 +2696,7 @@ public class CellDivisionInference implements PlugIn {
             o.addProperty("kind", kind.name());
             vArr.add(o);
         }
-        root.add("vertices", vArr);
+        if(includeVertices) root.add("vertices", vArr);
 
         // lines (optional)
         if(includeLines && lineEdges != null && !lineEdges.isEmpty()){
@@ -2615,7 +2735,7 @@ public class CellDivisionInference implements PlugIn {
         }
 
         // neighborPairs: only meaningful if polygons are exported
-        if(includePolygons){
+        if(includePolygons && includeNeighborPairs){
             List<int[]> pairs = (imagePanel == null) ? null : imagePanel.getNeighborPairs();
             if(pairs != null && !pairs.isEmpty()){
                 JsonArray nArr = new JsonArray();
