@@ -60,7 +60,7 @@ The polygonal cell network is displayed as an overlay.
 
 Open:
 
-`Geometry` → `Neighbor Pair Geometrical Calculation`
+`Geometry` → `Neighbor Pair Geometry Calculation`
 
 A preview of neighboring cell pairs and calculated geometric values will be shown.
 
@@ -68,7 +68,7 @@ A preview of neighboring cell pairs and calculated geometric values will be show
 
 Open:
 
-`Estimate` → `Divided Pair Estimation`
+`Estimate` → `Estimate division by single geometry`
 
 Use the following settings (by default):
 
@@ -83,7 +83,7 @@ Select **OK**. Estimated divisions are displayed as orange arrows.
 
 Open:
 
-`Estimate` → `Compare Estimated and Real Divisions`
+`Estimate` → `Compare with real division`
 
 When prompted, select the real division pair file:
 
@@ -119,13 +119,13 @@ This exports position information for all estimated division pairs.
 
 Either open a new plugin window, or use:
 
-`Edit` → `Delete All and Reset`
+`Edit` → `Reset All`
 
 ### Step 2: Load a binary image
 
 Open:
 
-`Open` → `Binary Image`
+`Open` → `Open Raw Image`
 
 Then select:
 
@@ -137,7 +137,7 @@ The binary polygonal network image will be displayed.
 
 Open:
 
-`Detect` → `Skeletonize`
+`Detect` → `Skeletonization`
 
 This converts the binary image to a one-pixel-wide skeleton.
 
@@ -145,7 +145,7 @@ This converts the binary image to a one-pixel-wide skeleton.
 
 Open:
 
-`Detect` → `Detect Vertices`
+`Detect` → `Vertex Detection`
 
 Vertices are detected where a pixel has three connected neighbors.
 
@@ -158,7 +158,7 @@ Manual editing shortcuts:
 
 Open:
 
-`Detect` → `Detect Lines`
+`Detect` → `Line Detection`
 
 Lines are detected from the skeletonized image.
 
@@ -171,7 +171,7 @@ Manual editing shortcuts:
 
 Open:
 
-`Detect` → `Detect Polygons`
+`Detect` → `Polygon Detection`
 
 Polygons are detected from vertices and lines.
 

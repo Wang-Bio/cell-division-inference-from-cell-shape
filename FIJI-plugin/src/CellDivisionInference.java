@@ -275,25 +275,25 @@ public class CellDivisionInference implements PlugIn {
 
             JMenu fileMenu=new JMenu("Open");
 
-            fileMenu.add(new JMenuItem(new AbstractAction("Binary Image…"){
+            fileMenu.add(new JMenuItem(new AbstractAction("Open Raw Image"){
                 public void actionPerformed(ActionEvent e){
                     openImage(frame);
                 }
             }));
 
-            fileMenu.add(new JMenuItem(new AbstractAction("Create Canvas..."){
+            fileMenu.add(new JMenuItem(new AbstractAction("Create Canvas"){
                 public void actionPerformed(ActionEvent e){
                     createCanvas(frame);
                 }
             }));
 
-            fileMenu.add(new JMenuItem(new AbstractAction("Open Background..."){
+            fileMenu.add(new JMenuItem(new AbstractAction("Open Background"){
                 public void actionPerformed(ActionEvent e){
                     openBackground(frame);
                 }
             }));
 
-            showSourceImageMenuItem = new JMenuItem(new AbstractAction("Remove Background / Show Source Image"){
+            showSourceImageMenuItem = new JMenuItem(new AbstractAction("Delete Image"){
                 public void actionPerformed(ActionEvent e){
                     imagePanel.showSourceImage();
                     updateInfoPanel();
@@ -304,31 +304,31 @@ public class CellDivisionInference implements PlugIn {
 
             JMenu processMenu=new JMenu("Detect");
 
-            processMenu.add(new JMenuItem(new AbstractAction("Skeletonize"){
+            processMenu.add(new JMenuItem(new AbstractAction("Skeletonization"){
                 public void actionPerformed(ActionEvent e){
                     skeletonize2D(frame);
                 }
             }));
 
-            processMenu.add(new JMenuItem(new AbstractAction("Detect Vertices"){
+            processMenu.add(new JMenuItem(new AbstractAction("Vertex Detection"){
                 public void actionPerformed(ActionEvent e){
                     detectVertices3Neighbors(frame);
                 }
             }));
 
-            processMenu.add(new JMenuItem(new AbstractAction("Detect Lines"){
+            processMenu.add(new JMenuItem(new AbstractAction("Line Detection"){
                 public void actionPerformed(ActionEvent e){
                     detectLines(frame);
                 }
             }));
 
-            processMenu.add(new JMenuItem(new AbstractAction("Detect Polygons"){
+            processMenu.add(new JMenuItem(new AbstractAction("Polygon Detection"){
                 public void actionPerformed(ActionEvent e){
                     detectPolygons(frame);
                 }
             }));
 
-            processMenu.add(new JMenuItem(new AbstractAction("Detect Neighbor Polygons"){
+            processMenu.add(new JMenuItem(new AbstractAction("Detect Neighbor Pairs"){
                 public void actionPerformed(ActionEvent e){
                     detectNeighborPairs(frame);
                 }
@@ -343,7 +343,7 @@ public class CellDivisionInference implements PlugIn {
             */
             JMenu geometryMenu=new JMenu("Geometry");
 
-            geometryMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Geometrical Calculation...") {
+            geometryMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Geometry Calculation") {
                 @Override public void actionPerformed(ActionEvent e){
                     calculateAllNeighborPairGeometries(frame);
                 }                
@@ -351,13 +351,13 @@ public class CellDivisionInference implements PlugIn {
 
             JMenu estimateMenu=new JMenu("Estimate");
 
-            estimateMenu.add(new JMenuItem(new AbstractAction("divided pair estimation...") {
+            estimateMenu.add(new JMenuItem(new AbstractAction("Estimate division by single geometry") {
                 @Override public void actionPerformed(ActionEvent e){
                     showNeighborPairEstimationDialog(frame);
                 }
             }));
 
-            estimateMenu.add(new JMenuItem(new AbstractAction("Compare Estimated and Real Division...") {
+            estimateMenu.add(new JMenuItem(new AbstractAction("Compare with real division") {
                 @Override public void actionPerformed(ActionEvent e){
                     compareEstimatedAndRealDivision(frame);
                 }
@@ -365,19 +365,19 @@ public class CellDivisionInference implements PlugIn {
 
             JMenu editMenu = new JMenu("Edit");
 
-            editMenu.add(new JMenuItem(new AbstractAction("Add vertex...") {
+            editMenu.add(new JMenuItem(new AbstractAction("Add Vertex") {
                 @Override public void actionPerformed(ActionEvent e){
                     showAddVertexDialog(frame);
                 }
             }));
 
-            editMenu.add(new JMenuItem(new AbstractAction("Add line...") {
+            editMenu.add(new JMenuItem(new AbstractAction("Add Line") {
                 @Override public void actionPerformed(ActionEvent e){
                     showAddLineDialog(frame);
                 }
             }));
 
-            editMenu.add(new JMenuItem(new AbstractAction("Add polygon...") {
+            editMenu.add(new JMenuItem(new AbstractAction("Add Polygon") {
                 @Override public void actionPerformed(ActionEvent e){
                     showAddPolygonDialog(frame);
                 }
@@ -385,19 +385,19 @@ public class CellDivisionInference implements PlugIn {
 
             editMenu.addSeparator();
 
-            editMenu.add(new JMenuItem(new AbstractAction("Delete vertex...") {
+            editMenu.add(new JMenuItem(new AbstractAction("Delete Vertex") {
                 @Override public void actionPerformed(ActionEvent e){
                     showDeleteVertexDialog(frame);
                 }
             }));
 
-            editMenu.add(new JMenuItem(new AbstractAction("Delete line...") {
+            editMenu.add(new JMenuItem(new AbstractAction("Delete Line") {
                 @Override public void actionPerformed(ActionEvent e){
                     showDeleteLineDialog(frame);
                 }
             }));
 
-            editMenu.add(new JMenuItem(new AbstractAction("Delete polygon...") {
+            editMenu.add(new JMenuItem(new AbstractAction("Delete Polygon") {
                 @Override public void actionPerformed(ActionEvent e){
                     showDeletePolygonDialog(frame);
                 }
@@ -405,19 +405,19 @@ public class CellDivisionInference implements PlugIn {
 
             editMenu.addSeparator();
 
-            editMenu.add(new JMenuItem(new AbstractAction("Delete all vertices") {
+            editMenu.add(new JMenuItem(new AbstractAction("Delete All Vertices") {
                 @Override public void actionPerformed(ActionEvent e){
                     deleteAllVertices();
                 }
             }));
 
-            editMenu.add(new JMenuItem(new AbstractAction("Delete all lines") {
+            editMenu.add(new JMenuItem(new AbstractAction("Delete All Lines") {
                 @Override public void actionPerformed(ActionEvent e){
                     deleteAllLines();
                 }
             }));
 
-            editMenu.add(new JMenuItem(new AbstractAction("Delete all polygons") {
+            editMenu.add(new JMenuItem(new AbstractAction("Delete All Polygons") {
                 @Override public void actionPerformed(ActionEvent e){
                     deleteAllPolygons();
                 }
@@ -433,7 +433,7 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
-            editMenu.add(new JMenuItem(new AbstractAction("Delete all and reset") {
+            editMenu.add(new JMenuItem(new AbstractAction("Reset All") {
                 @Override public void actionPerformed(ActionEvent e){
                     resetWholeWindow(frame);
                 }
@@ -441,34 +441,34 @@ public class CellDivisionInference implements PlugIn {
 
             JMenu displayMenu = new JMenu("Display");
 
-            displayMenu.add(new JMenuItem(new AbstractAction("Vertex Settings...") {
+            displayMenu.add(new JMenuItem(new AbstractAction("Vertex Display Setting") {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     showVertexSettingsDialog(frame);
                 }
             }));
 
-            displayMenu.add(new JMenuItem(new AbstractAction("Line Settings...") {
+            displayMenu.add(new JMenuItem(new AbstractAction("Line Display Setting") {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     showLineSettingsDialog(frame);
                 }
             }));
 
-            displayMenu.add(new JMenuItem(new AbstractAction("Polygon Settings...") {
+            displayMenu.add(new JMenuItem(new AbstractAction("Polygon Display Setting") {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     showPolygonSettingsDialog(frame);
                 }
             }));
 
-            displayMenu.add(new JMenuItem(new AbstractAction("Neighbor Link Settings..."){
+            displayMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Display Setting"){
                 public void actionPerformed(ActionEvent e){
                     showNeighborLinkSettings(frame);
                 }
             }));
 
-            displayMenu.add(new JMenuItem(new AbstractAction("Division Arrow Settings..."){
+            displayMenu.add(new JMenuItem(new AbstractAction("Division Pair Display Setting"){
                 @Override public void actionPerformed(ActionEvent e){
                     showDivisionArrowSettings(frame);
                 }
@@ -476,46 +476,33 @@ public class CellDivisionInference implements PlugIn {
 
             JMenu findMenu = new JMenu("Find");
 
-            findMenu.add(new JMenuItem(new AbstractAction("Find vertex...") {
+            findMenu.add(new JMenuItem(new AbstractAction("Find Vertex") {
                 @Override public void actionPerformed(ActionEvent e){
                     showFindVertexDialog(frame);
                 }
             }));
 
-            findMenu.add(new JMenuItem(new AbstractAction("Find line...") {
+            findMenu.add(new JMenuItem(new AbstractAction("Find Line") {
                 @Override public void actionPerformed(ActionEvent e){
                     showFindLineDialog(frame);
                 }
             }));
 
-            findMenu.add(new JMenuItem(new AbstractAction("Find polygon...") {
+            findMenu.add(new JMenuItem(new AbstractAction("Find Polygon") {
                 @Override public void actionPerformed(ActionEvent e){
                     showFindPolygonDialog(frame);
                 }
             }));
 
-            JMenu debugMenu = new JMenu("Debug");
-
-            debugMenu.add(new JMenuItem(new AbstractAction("Debug All") {
-                @Override public void actionPerformed(ActionEvent e){ showNetworkDebugger(frame); }
-            }));
-
-            debugMenu.add(new JMenuItem(new AbstractAction("Check unconnected vertices and lines") {
-                @Override public void actionPerformed(ActionEvent e){
-                    checkUnconnectedVerticesAndLines(frame);
-                }
-            }));
-
-
             JMenu ioMenu = new JMenu("Import & Export");
 
-            ioMenu.add(new JMenuItem(new AbstractAction("Import...") {
+            ioMenu.add(new JMenuItem(new AbstractAction("Import") {
                 @Override public void actionPerformed(ActionEvent e){
                     importData(frame);
                 }                
             }));
 
-            ioMenu.add(new JMenuItem(new AbstractAction("Export..."){
+            ioMenu.add(new JMenuItem(new AbstractAction("Export"){
                 @Override public void actionPerformed(ActionEvent e){
                     exportWithOptions(frame);
                 }
@@ -528,7 +515,6 @@ public class CellDivisionInference implements PlugIn {
             bar.add(displayMenu);
             bar.add(editMenu);
             bar.add(findMenu);
-            bar.add(debugMenu);
             bar.add(ioMenu);
 
             frame.setJMenuBar(bar);
@@ -1433,7 +1419,7 @@ public class CellDivisionInference implements PlugIn {
         int ans = JOptionPane.showConfirmDialog(
                 frame,
                 "Delete all data and reset this window to a fresh state?",
-                "Delete all and reset",
+                "Reset All",
                 JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.WARNING_MESSAGE
         );
@@ -2882,7 +2868,7 @@ public class CellDivisionInference implements PlugIn {
         ArrayList<int[]> sortedPairs = normalizeAndSortPairs(selectedPairs);
         if(sortedPairs.isEmpty()){
             JOptionPane.showMessageDialog(frame,
-                    "No estimated division pairs selected.\nRun: Process → divided pair estimation... first.",
+                    "No estimated division pairs selected.\nRun: Estimate → Estimate division by single geometry first.",
                     "Export Estimated Division Pairs",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
@@ -4104,7 +4090,7 @@ public class CellDivisionInference implements PlugIn {
     private void detectNeighborPairs(JFrame frame){
 
         if(polygons == null || polygons.size() < 2){
-            JOptionPane.showMessageDialog(frame, "No polygons (need ≥2). Run Detect Polygons first.");
+            JOptionPane.showMessageDialog(frame, "No polygons (need ≥2). Run Detect → Polygon Detection first.");
             imagePanel.setNeighborPairs(new ArrayList<>());
             updateInfoPanel();
             return;
@@ -4179,7 +4165,7 @@ public class CellDivisionInference implements PlugIn {
         lastDivisionMetrics = null;
     }
 
-    // ===== divided pair estimation cache (threshold + matching results) =====
+    // ===== Estimate division by single geometry cache (threshold + matching results) =====
     private final HashMap<Long, EstimationEntry> neighborPairEstimationCache = new HashMap<>();
     private Criterion lastEstimationCriterion = null;
     private void clearNeighborPairEstimationCache(){
@@ -4236,7 +4222,7 @@ public class CellDivisionInference implements PlugIn {
             pairs = imagePanel.getNeighborPairs();
         }
 
-        // If user hasn't run "Detect Neighbor Polygons", fallback: compute neighbors by >=2 shared vertices (Qt rule).
+        // If the user has not run "Detect Neighbor Pairs", fall back to the Qt rule: >=2 shared vertices.
         if(pairs == null || pairs.isEmpty()){
             pairs = detectNeighborPairsFromPolygons(polygons);
         }
@@ -5695,7 +5681,7 @@ public class CellDivisionInference implements PlugIn {
     private void calculateAllNeighborPairGeometries(JFrame frame){
 
         if(polygons == null || polygons.size() < 2){
-            JOptionPane.showMessageDialog(frame, "Need at least 2 polygons.", "Neighbor Pair Geometrical Calculation",
+            JOptionPane.showMessageDialog(frame, "Need at least 2 polygons.", "Neighbor Pair Geometry Calculation",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -5710,7 +5696,7 @@ public class CellDivisionInference implements PlugIn {
         if(pairs == null || pairs.isEmpty()){
             JOptionPane.showMessageDialog(frame,
                     "No neighboring polygon pairs found.\n(Need pairs sharing >=2 vertices.)",
-                    "Neighbor Pair Geometrical Calculation",
+                    "Neighbor Pair Geometry Calculation",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
@@ -5803,14 +5789,14 @@ public class CellDivisionInference implements PlugIn {
     }
 
     // =========================
-    // divided pair estimation (threshold + matching)
+    // Estimate division by single geometry (threshold + matching)
     // =========================
 
     private void showNeighborPairEstimationDialog(JFrame frame){
 
         // Need geometry already computed (same requirement as Qt estimation stage)
         if(polygons == null || polygons.size() < 2){
-            JOptionPane.showMessageDialog(frame, "Need at least 2 polygons.", "divided pair estimation",
+            JOptionPane.showMessageDialog(frame, "Need at least 2 polygons.", "Estimate division by single geometry",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -5824,7 +5810,7 @@ public class CellDivisionInference implements PlugIn {
         criterion.threshold = lastEstimationCriterion.threshold;
         criterion.matchingMode = lastEstimationCriterion.matchingMode;
 
-        JDialog dialog = new JDialog(frame, "divided pair estimation (Single Feature)", true);
+        JDialog dialog = new JDialog(frame, "Estimate division by single geometry", true);
         dialog.setLayout(new BorderLayout());
 
         JPanel form = new JPanel(new GridBagLayout());
@@ -5927,15 +5913,15 @@ public class CellDivisionInference implements PlugIn {
         if(pairs == null || pairs.isEmpty()){
             JOptionPane.showMessageDialog(frame,
                     "No neighboring polygon pairs found.\n(Need pairs sharing >=2 vertices.)",
-                    "divided pair estimation",
+                    "Estimate division by single geometry",
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
         if(!hasGeometryForPairs(pairs)){
             JOptionPane.showMessageDialog(frame,
-                    "Neighbor-pair geometries are not available.\nRun: Process → Neighbor Pair Geometrical Calculation... first.",
-                    "divided pair estimation",
+                    "Neighbor-pair geometries are not available.\nRun: Geometry → Neighbor Pair Geometry Calculation first.",
+                    "Estimate division by single geometry",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -5944,7 +5930,7 @@ public class CellDivisionInference implements PlugIn {
         if(featIdx < 0){
             JOptionPane.showMessageDialog(frame,
                     "Unknown geometry feature key: " + criterion.featureKey,
-                    "divided pair estimation",
+                    "Estimate division by single geometry",
                     JOptionPane.ERROR_MESSAGE);
             return;
         }
@@ -6015,7 +6001,7 @@ public class CellDivisionInference implements PlugIn {
         if(imagePanel != null) imagePanel.repaint();
         updateInfoPanel();
 
-        IJ.showStatus("divided pair estimation done. Selected pairs: " + selectedCount);
+        IJ.showStatus("Estimate division by single geometry done. Selected pairs: " + selectedCount);
 
         // refresh preview to show estimation columns
         showNeighborPairPreviewDialog(frame);
@@ -6483,7 +6469,7 @@ public class CellDivisionInference implements PlugIn {
         if(polygons == null || polygons.isEmpty()){
             JOptionPane.showMessageDialog(frame,
                     "No polygons available.\nLoad / detect polygons first.",
-                    "Compare Estimated and Real Division",
+                    "Compare with real division",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -6492,8 +6478,8 @@ public class CellDivisionInference implements PlugIn {
         HashSet<Long> estSetAll = selectedEstimatedSet(neighborPairEstimationCache);
         if(estSetAll.isEmpty()){
             JOptionPane.showMessageDialog(frame,
-                    "No estimated division pairs selected.\nRun: Process → divided pair estimation... first.",
-                    "Compare Estimated and Real Division",
+                    "No estimated division pairs selected.\nRun: Estimate → Estimate division by single geometry first.",
+                    "Compare with real division",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -6519,13 +6505,13 @@ public class CellDivisionInference implements PlugIn {
         }catch(IOException ex){
             JOptionPane.showMessageDialog(frame,
                     "Failed to open file: " + ex.getMessage(),
-                    "Compare Estimated and Real Division", JOptionPane.ERROR_MESSAGE);
+                    "Compare with real division", JOptionPane.ERROR_MESSAGE);
             return;
         }
         if(parsed.pairs.isEmpty()){
             JOptionPane.showMessageDialog(frame,
                     "No valid real division pairs were found in the file.",
-                    "Compare Estimated and Real Division", JOptionPane.INFORMATION_MESSAGE);
+                    "Compare with real division", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
@@ -6537,7 +6523,7 @@ public class CellDivisionInference implements PlugIn {
         if(pairs == null || pairs.isEmpty()){
             JOptionPane.showMessageDialog(frame,
                     "No neighbor pairs found.\nRun Neighbor Detection first.",
-                    "Compare Estimated and Real Division",
+                    "Compare with real division",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -6570,7 +6556,7 @@ public class CellDivisionInference implements PlugIn {
         if(realDivisionPairCache.isEmpty()){
             JOptionPane.showMessageDialog(frame,
                     "No real division pairs matched the current scene's neighbors.",
-                    "Compare Estimated and Real Division", JOptionPane.INFORMATION_MESSAGE);
+                    "Compare with real division", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
@@ -6675,7 +6661,7 @@ public class CellDivisionInference implements PlugIn {
                 "- TruePositive / FalsePositive / FalseNegative arrows";
 
         JOptionPane.showMessageDialog(frame, msg,
-                "Compare Estimated and Real Division",
+                "Compare with real division",
                 JOptionPane.INFORMATION_MESSAGE);
 
         IJ.showStatus("Compare done: TP=" + m.truePositives + " FP=" + m.falsePositives + " FN=" + m.falseNegatives
