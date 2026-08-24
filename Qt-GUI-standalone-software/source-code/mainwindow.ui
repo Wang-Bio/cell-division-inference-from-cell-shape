@@ -418,6 +418,7 @@
      <string>Fixed samples</string>
     </property>
     <addaction name="actionFixed_Samples_Batch_Neighbor_Pair_Geometry_Calculation"/>
+    <addaction name="actionFixed_Samples_Batch_Estimate_Division_by_single_geometry"/>
    </widget>
    <widget class="QMenu" name="menuEstimate">
     <property name="title">
@@ -466,11 +467,11 @@
    <addaction name="menuOpen"/>
    <addaction name="menuDetection"/>
    <addaction name="menuGeometry"/>
-   <addaction name="menuFixed_Samples"/>
    <addaction name="menuEstimate"/>
    <addaction name="menuDisplay"/>
    <addaction name="menuEdit"/>
    <addaction name="menuFind"/>
+   <addaction name="menuFixed_Samples"/>
    <addaction name="menuImport_Export"/>
    <addaction name="menuDebug"/>
    <addaction name="menuUnderDevelopment"/>
@@ -682,6 +683,11 @@
   <action name="actionFixed_Samples_Batch_Neighbor_Pair_Geometry_Calculation">
    <property name="text">
     <string>Batch Neighbor Pair Geometry Calculation</string>
+   </property>
+  </action>
+  <action name="actionFixed_Samples_Batch_Estimate_Division_by_single_geometry">
+   <property name="text">
+    <string>Batch Estimate Division by single geometry</string>
    </property>
   </action>
   <action name="actionBatch_Single_Cell_Geometry_Calculation">

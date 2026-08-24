@@ -182,6 +182,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionNeighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onNeighborPairGeometryCalculation);
     connect(ui->actionBatch_Neighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchNeighborPairGeometryCalculation);
     connect(ui->actionFixed_Samples_Batch_Neighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onFixedSamplesBatchNeighborPairGeometryCalculation);
+    connect(ui->actionFixed_Samples_Batch_Estimate_Division_by_single_geometry, &QAction::triggered, this, &MainWindow::onFixedSamplesBatchEstimateDivisionBySingleGeometry);
     connect(ui->actionBatch_Single_Cell_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchSingleCellGeometryCalculation);
     connect(ui->actionMixture_Modeling_for_Single_Geometry_Feature, &QAction::triggered, this, &MainWindow::onMixtureModelingForSingleGeometryFeature);
     connect(ui->actionOverlap_Index_for_All_Features, &QAction::triggered, this, &MainWindow::onOverlapIndexForAllFeatures);
@@ -2527,12 +2528,15 @@ void MainWindow::runBatchNeighborPairGeometryCalculation(bool includeCentroids)
     if (geometryDirectory.isEmpty())
         return;
 
-    const QString realDivisionDirectory = QFileDialog::getExistingDirectory(
-            this,
-            "Select Folder with Real Division Pair Files",
-            geometryDirectory);
-    if (realDivisionDirectory.isEmpty())
-        return;
+    QString realDivisionDirectory;
+    if (!includeCentroids) {
+        realDivisionDirectory = QFileDialog::getExistingDirectory(
+                this,
+                "Select Folder with Real Division Pair Files",
+                geometryDirectory);
+        if (realDivisionDirectory.isEmpty())
+            return;
+    }
 
     QProgressDialog progress("Preparing geometry calculations...", QString(), 0, 0, this);
     progress.setWindowTitle(dialogTitle);
@@ -2575,11 +2579,13 @@ void MainWindow::runBatchNeighborPairGeometryCalculation(bool includeCentroids)
                                                    geometryDirectory,
                                                    realDivisionDirectory,
                                                    settings,
-                                                   updateProgress]() {
+                                                   updateProgress,
+                                                   includeCentroids]() {
         summary = BatchDivisionEstimator::processNeighborGeometryDirectory(geometryDirectory,
                                                                             realDivisionDirectory,
                                                                             settings,
-                                                                            updateProgress);
+                                                                            updateProgress,
+                                                                            !includeCentroids);
     });
     connect(calculationThread, &QThread::finished, &calculationLoop, &QEventLoop::quit);
     connect(calculationThread, &QThread::finished, calculationThread, &QObject::deleteLater);
@@ -2966,6 +2972,16 @@ void MainWindow::onEstimateDivisionBySingleGeometry(){
 
 void MainWindow::onBatchEstimateDivisionBySingleGeometry()
 {
+    runBatchEstimateDivisionBySingleGeometry(false);
+}
+
+void MainWindow::onFixedSamplesBatchEstimateDivisionBySingleGeometry()
+{
+    runBatchEstimateDivisionBySingleGeometry(true);
+}
+
+void MainWindow::runBatchEstimateDivisionBySingleGeometry(bool includeCentroids)
+{
     QString defaultPath = ui->label_input_directory_value->text();
     if (defaultPath.isEmpty() || defaultPath == "-")
         defaultPath = QDir::homePath();
@@ -3023,14 +3039,17 @@ void MainWindow::onBatchEstimateDivisionBySingleGeometry()
 
     QString exportMessage;
     if (!summary.pairRows.isEmpty()) {
-        const QString defaultPath = QFileInfo(geometryCsv).dir().filePath("batch_single_geometry_estimation.csv");
+        const QString exportFileName = includeCentroids
+                ? QStringLiteral("fixed_samples_batch_single_geometry_estimation.csv")
+                : QStringLiteral("batch_single_geometry_estimation.csv");
+        const QString defaultPath = QFileInfo(geometryCsv).dir().filePath(exportFileName);
         const QString savePath = QFileDialog::getSaveFileName(this,
                                                               "Export Batch Division Estimation",
                                                               defaultPath,
                                                               "CSV Files (*.csv)");
         if (!savePath.isEmpty()) {
             QString errorMessage;
-            if (!BatchDivisionEstimator::exportDivisionEstimatesToCsv(savePath, summary.pairRows, &errorMessage)) {
+            if (!BatchDivisionEstimator::exportDivisionEstimatesToCsv(savePath, summary.pairRows, includeCentroids, &errorMessage)) {
                 QMessageBox::critical(this, "Batch Estimate Division", errorMessage.isEmpty() ? QString("Failed to export CSV to %1").arg(savePath) : errorMessage);
                 return;
             }

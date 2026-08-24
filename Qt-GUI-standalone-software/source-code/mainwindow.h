@@ -202,9 +202,12 @@ private slots:
 //menuBar Estimation functions
     void onEstimateDivisionBySingleGeometry();
     void onBatchEstimateDivisionBySingleGeometry();
+    void onFixedSamplesBatchEstimateDivisionBySingleGeometry();
     void onCompareWithRealDivision();
 
     void onPrecisionAndRecallCurveOverSingleGeometry();
+
+    void runBatchEstimateDivisionBySingleGeometry(bool includeCentroids);
 
 //menuBar Display functions
     void onVertexDisplaySetting();

@@ -362,9 +362,9 @@ QStringList parseCsvLine(const QString &line)
     return fields;
 }
 
-QStringList divisionCsvHeaders()
+QStringList divisionCsvHeaders(bool includeCentroids)
 {
-    return {
+    QStringList headers = {
         "filename",
         "cell_1_id",
         "cell_2_id",
@@ -421,9 +421,16 @@ QStringList divisionCsvHeaders()
         "junction_angle_max",
         "junction_angle_mean"
     };
+    if (includeCentroids) {
+        headers.insert(3, "cell_1_centroid_x");
+        headers.insert(4, "cell_1_centroid_y");
+        headers.insert(5, "cell_2_centroid_x");
+        headers.insert(6, "cell_2_centroid_y");
+    }
+    return headers;
 }
 
-QStringList buildDivisionCsvRow(const BatchDivisionEstimator::DivisionPairRow &row)
+QStringList buildDivisionCsvRow(const BatchDivisionEstimator::DivisionPairRow &row, bool includeCentroids)
 {
     const auto &geom = row.geometry;
     QStringList values = {
@@ -483,6 +490,12 @@ QStringList buildDivisionCsvRow(const BatchDivisionEstimator::DivisionPairRow &r
         formatValue(geom.junctionAngleMaxDegrees),
         formatValue(geom.junctionAngleAverageDegrees)
     };
+    if (includeCentroids) {
+        values.insert(3, formatValue(geom.firstCentroidX));
+        values.insert(4, formatValue(geom.firstCentroidY));
+        values.insert(5, formatValue(geom.secondCentroidX));
+        values.insert(6, formatValue(geom.secondCentroidY));
+    }
     return values;
 }
 
@@ -837,7 +850,8 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
         const QString &directoryPath,
         const QString &realDivisionDirectoryPath,
         const NeighborPairGeometrySettings &settings,
-        const GeometryProgressCallback &progressCallback)
+        const GeometryProgressCallback &progressCallback,
+        bool loadRealDivisionPairs)
 {
     GeometrySummary summary;
     QDir dir(directoryPath);
@@ -847,7 +861,7 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
     }
 
     const QDir realDivisionDir(realDivisionDirectoryPath);
-    if (!realDivisionDir.exists()) {
+    if (loadRealDivisionPairs && !realDivisionDir.exists()) {
         summary.errors << QString("Real division pair directory does not exist: %1").arg(realDivisionDirectoryPath);
         return summary;
     }
@@ -862,7 +876,9 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
         progressCallback(0, files.size(), QString(), 0, 0);
 
     QStringList exceptionWarnings;
-    const QHash<QString, QSet<QString>> exceptions = loadExceptionPairs(realDivisionDir, &exceptionWarnings);
+    const QHash<QString, QSet<QString>> exceptions = loadRealDivisionPairs
+            ? loadExceptionPairs(realDivisionDir, &exceptionWarnings)
+            : QHash<QString, QSet<QString>>();
     summary.warnings.append(exceptionWarnings);
 
     for (const QFileInfo &info : files) {
@@ -890,12 +906,12 @@ BatchDivisionEstimator::GeometrySummary BatchDivisionEstimator::processNeighborG
         QStringList parseWarnings;
         QHash<QString, int> realPairTimes;
         QSet<QString> realPairKeys;
-        const QSet<QString> exceptionKeys = exceptionPairsForFile(info, exceptions);
-        const QString realDivisionFile = findRealDivisionFile(realDivisionDir, info);
-        if (realDivisionFile.isEmpty()) {
+        const QSet<QString> exceptionKeys = loadRealDivisionPairs ? exceptionPairsForFile(info, exceptions) : QSet<QString>();
+        const QString realDivisionFile = loadRealDivisionPairs ? findRealDivisionFile(realDivisionDir, info) : QString();
+        if (loadRealDivisionPairs && realDivisionFile.isEmpty()) {
             summary.warnings << QString("%1: no matching real division pair file found in %2.")
                                 .arg(info.fileName(), realDivisionDir.absolutePath());
-        } else {
+        } else if (loadRealDivisionPairs) {
             const QVector<RealDivisionEntry> realPairs = readDivisionPairs(realDivisionFile, parseWarnings);
             for (const RealDivisionEntry &pair : realPairs) {
                 const QString key = normalizedPairKey(pair.firstId, pair.secondId);
@@ -1130,6 +1146,7 @@ bool BatchDivisionEstimator::exportSingleCellGeometryToCsv(const QString &filePa
 
 bool BatchDivisionEstimator::exportDivisionEstimatesToCsv(const QString &filePath,
                                                           const QVector<DivisionPairRow> &rows,
+                                                          bool includeCentroids,
                                                           QString *errorMessage)
 {
     QFile file(filePath);
@@ -1140,13 +1157,13 @@ bool BatchDivisionEstimator::exportDivisionEstimatesToCsv(const QString &filePat
     }
 
     QTextStream stream(&file);
-    QStringList headers = divisionCsvHeaders();
+    QStringList headers = divisionCsvHeaders(includeCentroids);
     for (QString &header : headers)
         header = escapeForCsv(header);
     stream << headers.join(',') << '\n';
 
     for (const DivisionPairRow &row : rows) {
-        QStringList fields = buildDivisionCsvRow(row);
+        QStringList fields = buildDivisionCsvRow(row, includeCentroids);
         for (QString &field : fields)
             field = escapeForCsv(field);
         stream << fields.join(',') << '\n';

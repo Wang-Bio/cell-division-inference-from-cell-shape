@@ -129,7 +129,8 @@ public:
     static GeometrySummary processNeighborGeometryDirectory(const QString &directoryPath,
                                                              const QString &realDivisionDirectoryPath,
                                                              const NeighborPairGeometrySettings &settings,
-                                                             const GeometryProgressCallback &progressCallback = {});
+                                                             const GeometryProgressCallback &progressCallback = {},
+                                                             bool loadRealDivisionPairs = true);
     static bool exportNeighborGeometryToCsv(const QString &filePath,
                                             const QVector<GeometryEntry> &entries,
                                             const NeighborPairGeometrySettings &settings,
@@ -150,6 +151,7 @@ public:
     static BatchResult estimateGeometryCsv(const QString &filePath, const DivisionEstimator::Criterion &criterion);
     static bool exportDivisionEstimatesToCsv(const QString &filePath,
                                              const QVector<DivisionPairRow> &rows,
+                                             bool includeCentroids,
                                              QString *errorMessage = nullptr);
     static bool exportPerformanceMatrixFigure(const QString &filePath,
                                               const DivisionMetrics &metrics,
