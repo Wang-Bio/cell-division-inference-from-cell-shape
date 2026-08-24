@@ -4110,74 +4110,10 @@ public class CellDivisionInference implements PlugIn {
             return;
         }
 
-        // --- collect pairs in a set to avoid duplicates ---
-        HashSet<PolyPair> pairSet = new HashSet<>();
-
-        // ===== A) vertex-touch neighbors (share ≥1 vertex) =====
-        HashMap<Integer, ArrayList<Integer>> vertexToPolys = new HashMap<>();
-
-        for(int pi = 0; pi < polygons.size(); pi++){
-            List<Integer> poly = polygons.get(pi);
-            if(poly == null) continue;
-
-            // unique vertices within this polygon
-            HashSet<Integer> uniq = new HashSet<>();
-            for(int vid : poly){
-                if(vid < 0) continue;
-                if(!uniq.add(vid)) continue;
-                vertexToPolys.computeIfAbsent(vid, k -> new ArrayList<>()).add(pi);
-            }
-        }
-
-        for(Map.Entry<Integer, ArrayList<Integer>> en : vertexToPolys.entrySet()){
-            ArrayList<Integer> lst = en.getValue();
-            int k = lst.size();
-            for(int i = 0; i < k; i++){
-                for(int j = i + 1; j < k; j++){
-                    pairSet.add(new PolyPair(lst.get(i), lst.get(j)));
-                }
-            }
-        }
-
-        // ===== B) shared-line neighbors (share a line edge in lineEdges) =====
-        // Build a set of existing line edges
-        HashSet<Long> existingLineKeys = new HashSet<>();
-        if(lineEdges != null){
-            for(LineEdge e : lineEdges){
-                existingLineKeys.add(edgeKey(e.v1, e.v2));
-            }
-        }
-
-        // Map edgeKey -> first polygon that owns it; when second polygon hits same edge => neighbor pair
-        HashMap<Long, Integer> edgeOwner = new HashMap<>();
-
-        for(int pi = 0; pi < polygons.size(); pi++){
-            List<Integer> poly = polygons.get(pi);
-            if(poly == null || poly.size() < 2) continue;
-
-            int m = poly.size();
-            for(int i = 0; i < m; i++){
-                int va = poly.get(i);
-                int vb = poly.get((i + 1) % m);
-                if(va < 0 || vb < 0) continue;
-
-                long key = edgeKey(va, vb);
-
-                // Only count if this edge is a real detected line
-                if(!existingLineKeys.contains(key)) continue;
-
-                Integer prev = edgeOwner.putIfAbsent(key, pi);
-                if(prev != null && prev != pi){
-                    pairSet.add(new PolyPair(prev, pi));
-                }
-            }
-        }
-
-        // ===== Convert to ImagePanel format =====
-        ArrayList<int[]> pairsForPanel = new ArrayList<>();
-        for(PolyPair p : pairSet){
-            pairsForPanel.add(new int[]{p.a, p.b});
-        }
+        // Qt's NeighborPair::isNeighbor requires two distinct shared vertices.
+        // In particular, cells which meet only at a corner are not neighbors.
+        ArrayList<int[]> pairsForPanel = new ArrayList<>(
+                detectNeighborPairsFromPolygons(polygons));
 
         // optional: stable order
         pairsForPanel.sort((x, y) -> {
@@ -4476,8 +4412,9 @@ public class CellDivisionInference implements PlugIn {
         for(int pid=0; pid<polys.size(); pid++){
             List<Integer> poly = polys.get(pid);
             if(poly == null) continue;
+            HashSet<Integer> uniqueVertices = new HashSet<>();
             for(Integer vid : poly){
-                if(vid == null) continue;
+                if(vid == null || vid < 0 || !uniqueVertices.add(vid)) continue;
                 vToPolys.computeIfAbsent(vid, k -> new ArrayList<>()).add(pid);
             }
         }
