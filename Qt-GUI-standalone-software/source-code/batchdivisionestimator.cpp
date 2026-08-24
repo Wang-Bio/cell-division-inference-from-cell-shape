@@ -74,7 +74,7 @@ QVector<QPair<int, int>> computeNeighborPairs(const QVector<PolygonItem*> &polyg
     return pairs;
 }
 
-QStringList buildHeaders(const NeighborPairGeometrySettings &settings)
+QStringList buildHeaders(const NeighborPairGeometrySettings &settings, bool includeCentroids = false)
 {
     QStringList headers = {
         "fileName",
@@ -85,6 +85,13 @@ QStringList buildHeaders(const NeighborPairGeometrySettings &settings)
         "division_timing",
         "exception_label"
     };
+
+    if (includeCentroids) {
+        headers.insert(4, "firstCentroidX");
+        headers.insert(5, "firstCentroidY");
+        headers.insert(6, "secondCentroidX");
+        headers.insert(7, "secondCentroidY");
+    }
 
     if (settings.computeAreaRatio)
         headers << "areaRatio";
@@ -173,8 +180,11 @@ QVector<BatchDivisionEstimator::GeometryEntry> sortedNormalizedGeometryEntries(c
     QVector<BatchDivisionEstimator::GeometryEntry> sorted = entries;
 
     for (auto &entry : sorted) {
-        if (entry.firstId > entry.secondId)
+        if (entry.firstId > entry.secondId) {
             std::swap(entry.firstId, entry.secondId);
+            std::swap(entry.geometry.firstCentroidX, entry.geometry.secondCentroidX);
+            std::swap(entry.geometry.firstCentroidY, entry.geometry.secondCentroidY);
+        }
     }
 
     std::stable_sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b) {
@@ -192,7 +202,8 @@ QVector<BatchDivisionEstimator::GeometryEntry> sortedNormalizedGeometryEntries(c
 }
 
 QStringList buildRow(const BatchDivisionEstimator::GeometryEntry &entry,
-                     const NeighborPairGeometrySettings &settings)
+                     const NeighborPairGeometrySettings &settings,
+                     bool includeCentroids = false)
 {
     QStringList row = {
         entry.fileName,
@@ -203,6 +214,13 @@ QStringList buildRow(const BatchDivisionEstimator::GeometryEntry &entry,
         QString::number(entry.observedDivision ? entry.divisionTime : -1),
         entry.exceptionLabel ? QStringLiteral("1") : QStringLiteral("0")
     };
+
+    if (includeCentroids) {
+        row.insert(4, formatValue(entry.geometry.firstCentroidX));
+        row.insert(5, formatValue(entry.geometry.firstCentroidY));
+        row.insert(6, formatValue(entry.geometry.secondCentroidX));
+        row.insert(7, formatValue(entry.geometry.secondCentroidY));
+    }
 
     const auto &res = entry.geometry;
 
@@ -792,6 +810,8 @@ NeighborPairGeometryCalculator::Result geometryFromCsv(const QStringList &fields
         return ok ? parsed : std::numeric_limits<double>::quiet_NaN();
     };
 #define READ_GEOMETRY(member) result.member = value(#member)
+    READ_GEOMETRY(firstCentroidX); READ_GEOMETRY(firstCentroidY);
+    READ_GEOMETRY(secondCentroidX); READ_GEOMETRY(secondCentroidY);
     READ_GEOMETRY(areaRatio); READ_GEOMETRY(areaMean); READ_GEOMETRY(areaMin); READ_GEOMETRY(areaMax); READ_GEOMETRY(areaDiff);
     READ_GEOMETRY(perimeterRatio); READ_GEOMETRY(perimeterMean); READ_GEOMETRY(perimeterMin); READ_GEOMETRY(perimeterMax); READ_GEOMETRY(perimeterDiff);
     READ_GEOMETRY(aspectRatio); READ_GEOMETRY(aspectMean); READ_GEOMETRY(aspectMin); READ_GEOMETRY(aspectMax); READ_GEOMETRY(aspectDiff);
@@ -966,6 +986,33 @@ bool BatchDivisionEstimator::exportNeighborGeometryToCsv(const QString &filePath
     const QVector<GeometryEntry> sortedEntries = sortedNormalizedGeometryEntries(entries);
     for (const GeometryEntry &entry : sortedEntries) {
         QStringList row = buildRow(entry, settings);
+        for (QString &field : row)
+            field = escapeForCsv(field);
+        stream << row.join(',') << '\n';
+    }
+
+    return true;
+}
+
+bool BatchDivisionEstimator::exportFixedSampleNeighborGeometryToCsv(
+        const QString &filePath,
+        const QVector<GeometryEntry> &entries,
+        const NeighborPairGeometrySettings &settings,
+        QString *errorMessage)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (errorMessage)
+            *errorMessage = QString("Unable to open %1 for writing").arg(filePath);
+        return false;
+    }
+
+    QTextStream stream(&file);
+    stream << buildHeaders(settings, true).join(',') << '\n';
+
+    const QVector<GeometryEntry> sortedEntries = sortedNormalizedGeometryEntries(entries);
+    for (const GeometryEntry &entry : sortedEntries) {
+        QStringList row = buildRow(entry, settings, true);
         for (QString &field : row)
             field = escapeForCsv(field);
         stream << row.join(',') << '\n';

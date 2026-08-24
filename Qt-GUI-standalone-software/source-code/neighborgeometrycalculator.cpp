@@ -276,6 +276,13 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
 
     if(!first || !second) return result;
 
+    const QPointF firstCentroid = first->centroid();
+    const QPointF secondCentroid = second->centroid();
+    result.firstCentroidX = firstCentroid.x();
+    result.firstCentroidY = firstCentroid.y();
+    result.secondCentroidX = secondCentroid.x();
+    result.secondCentroidY = secondCentroid.y();
+
     const auto safeRatio = [](double a, double b) {
         if (!std::isfinite(a) || !std::isfinite(b) || a <= 0.0 || b <= 0.0)
             return -1.0;
@@ -682,13 +689,9 @@ NeighborPairGeometryCalculator::Result NeighborPairGeometryCalculator::calculate
         computeStats(vertexCountA, vertexCountB, result.vertexCountMean, result.vertexCountMin, result.vertexCountMax, result.vertexCountDiff);
 
     if (settings.computeCentroidDistance) {
-        const QPointF centA = first ? first->centroid() : QPointF();
-        const QPointF centB = second ? second->centroid() : QPointF();
-        if (first && second) {
-            result.centroidDistance = QLineF(centA, centB).length();
-            if (avgSqrtArea > 0.0 && std::isfinite(result.centroidDistance))
-                result.centroidDistanceNormalized = result.centroidDistance / avgSqrtArea;
-        }
+        result.centroidDistance = QLineF(firstCentroid, secondCentroid).length();
+        if (avgSqrtArea > 0.0 && std::isfinite(result.centroidDistance))
+            result.centroidDistanceNormalized = result.centroidDistance / avgSqrtArea;
     }
 
     if (settings.computeUnionAspectRatio) {

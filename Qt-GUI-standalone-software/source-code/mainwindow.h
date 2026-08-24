@@ -113,6 +113,7 @@ private:
     void applyDivisionMetricsToLabels(const BatchDivisionEstimator::DivisionMetrics &metrics);
     QVector<BatchDivisionEstimator::GeometryEntry> geometryEntriesWithDivisionLabels(
             const QVector<BatchDivisionEstimator::GeometryEntry> &entries) const;
+    void runBatchNeighborPairGeometryCalculation(bool includeCentroids);
 
     bool openRawImageInternal(const QString &filePath = QString());
     bool importJsonFile(const QString &filePath);
@@ -193,6 +194,7 @@ private slots:
     void onGeometryCalculationSetting();
     void onNeighborPairGeometryCalculation();
     void onBatchNeighborPairGeometryCalculation();
+    void onFixedSamplesBatchNeighborPairGeometryCalculation();
     void onBatchSingleCellGeometryCalculation();
     void onMixtureModelingForSingleGeometryFeature();
     void onOverlapIndexForAllFeatures();

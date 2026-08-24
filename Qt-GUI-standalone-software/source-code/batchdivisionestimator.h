@@ -134,6 +134,10 @@ public:
                                             const QVector<GeometryEntry> &entries,
                                             const NeighborPairGeometrySettings &settings,
                                             QString *errorMessage = nullptr);
+    static bool exportFixedSampleNeighborGeometryToCsv(const QString &filePath,
+                                                       const QVector<GeometryEntry> &entries,
+                                                       const NeighborPairGeometrySettings &settings,
+                                                       QString *errorMessage = nullptr);
     static SingleCellGeometrySummary processSingleCellGeometryDirectory(const QString &directoryPath);
     static bool exportSingleCellGeometryToCsv(const QString &filePath,
                                               const QVector<SingleCellGeometryEntry> &entries,

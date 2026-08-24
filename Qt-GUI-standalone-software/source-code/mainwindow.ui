@@ -413,6 +413,12 @@
     <addaction name="actionMixture_Modeling_for_Single_Geometry_Feature"/>
     <addaction name="actionOverlap_Index_for_All_Features"/>
    </widget>
+   <widget class="QMenu" name="menuFixed_Samples">
+    <property name="title">
+     <string>Fixed samples</string>
+    </property>
+    <addaction name="actionFixed_Samples_Batch_Neighbor_Pair_Geometry_Calculation"/>
+   </widget>
    <widget class="QMenu" name="menuEstimate">
     <property name="title">
      <string>Estimate</string>
@@ -460,6 +466,7 @@
    <addaction name="menuOpen"/>
    <addaction name="menuDetection"/>
    <addaction name="menuGeometry"/>
+   <addaction name="menuFixed_Samples"/>
    <addaction name="menuEstimate"/>
    <addaction name="menuDisplay"/>
    <addaction name="menuEdit"/>
@@ -671,6 +678,11 @@
     <property name="text">
      <string>Batch Neighbor Pair Geometry Calculation</string>
     </property>
+  </action>
+  <action name="actionFixed_Samples_Batch_Neighbor_Pair_Geometry_Calculation">
+   <property name="text">
+    <string>Batch Neighbor Pair Geometry Calculation</string>
+   </property>
   </action>
   <action name="actionBatch_Single_Cell_Geometry_Calculation">
    <property name="text">

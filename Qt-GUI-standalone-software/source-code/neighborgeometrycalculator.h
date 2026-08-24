@@ -50,6 +50,11 @@ public:
         PolygonItem *first = nullptr;
         PolygonItem *second = nullptr;
 
+        double firstCentroidX = std::numeric_limits<double>::quiet_NaN();
+        double firstCentroidY = std::numeric_limits<double>::quiet_NaN();
+        double secondCentroidX = std::numeric_limits<double>::quiet_NaN();
+        double secondCentroidY = std::numeric_limits<double>::quiet_NaN();
+
         double areaRatio = -1.0;
         double areaMean = std::numeric_limits<double>::quiet_NaN();
         double areaMin = std::numeric_limits<double>::quiet_NaN();

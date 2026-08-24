@@ -181,6 +181,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionGeometry_Calculation_Setting, &QAction::triggered, this, &MainWindow::onGeometryCalculationSetting);
     connect(ui->actionNeighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onNeighborPairGeometryCalculation);
     connect(ui->actionBatch_Neighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchNeighborPairGeometryCalculation);
+    connect(ui->actionFixed_Samples_Batch_Neighbor_Pair_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onFixedSamplesBatchNeighborPairGeometryCalculation);
     connect(ui->actionBatch_Single_Cell_Geometry_Calculation, &QAction::triggered, this, &MainWindow::onBatchSingleCellGeometryCalculation);
     connect(ui->actionMixture_Modeling_for_Single_Geometry_Feature, &QAction::triggered, this, &MainWindow::onMixtureModelingForSingleGeometryFeature);
     connect(ui->actionOverlap_Index_for_All_Features, &QAction::triggered, this, &MainWindow::onOverlapIndexForAllFeatures);
@@ -2503,9 +2504,22 @@ void MainWindow::onNeighborPairGeometryCalculation()
 
 void MainWindow::onBatchNeighborPairGeometryCalculation()
 {
+    runBatchNeighborPairGeometryCalculation(false);
+}
+
+void MainWindow::onFixedSamplesBatchNeighborPairGeometryCalculation()
+{
+    runBatchNeighborPairGeometryCalculation(true);
+}
+
+void MainWindow::runBatchNeighborPairGeometryCalculation(bool includeCentroids)
+{
+    const QString dialogTitle = includeCentroids
+            ? QStringLiteral("Fixed Samples Batch Neighbor Pair Geometry")
+            : QStringLiteral("Batch Neighbor Pair Geometry");
     const NeighborPairGeometrySettings settings = NeighborPairGeometryCalculator::currentSettings();
     if (!anyGeometryCalculationEnabled(settings)) {
-        QMessageBox::information(this, "Batch Neighbor Pair Geometry", "All geometry calculations are currently disabled. Enable them via Geometry Calculation Setting.");
+        QMessageBox::information(this, dialogTitle, "All geometry calculations are currently disabled. Enable them via Geometry Calculation Setting.");
         return;
     }
 
@@ -2521,7 +2535,7 @@ void MainWindow::onBatchNeighborPairGeometryCalculation()
         return;
 
     QProgressDialog progress("Preparing geometry calculations...", QString(), 0, 0, this);
-    progress.setWindowTitle("Batch Neighbor Pair Geometry");
+    progress.setWindowTitle(dialogTitle);
     progress.setWindowModality(Qt::WindowModal);
     progress.setCancelButton(nullptr);
     progress.setMinimumDuration(0);
@@ -2583,11 +2597,14 @@ void MainWindow::onBatchNeighborPairGeometryCalculation()
         if (!summary.warnings.isEmpty()) {
             message += "\n\nWarnings:\n- " + summary.warnings.join("\n- ");
         }
-        QMessageBox::information(this, "Batch Neighbor Pair Geometry", message);
+        QMessageBox::information(this, dialogTitle, message);
         return;
     }
 
-    const QString defaultPath = QDir(geometryDirectory).filePath("batch_neighbor_pair_geometry.csv");
+    const QString defaultFileName = includeCentroids
+            ? QStringLiteral("fixed_samples_batch_neighbor_pair_geometry.csv")
+            : QStringLiteral("batch_neighbor_pair_geometry.csv");
+    const QString defaultPath = QDir(geometryDirectory).filePath(defaultFileName);
     const QString savePath = QFileDialog::getSaveFileName(this,
                                                           "Export Neighbor Pair Geometry",
                                                           defaultPath,
@@ -2596,8 +2613,11 @@ void MainWindow::onBatchNeighborPairGeometryCalculation()
         return;
 
     QString errorMessage;
-    if (!BatchDivisionEstimator::exportNeighborGeometryToCsv(savePath, summary.entries, settings, &errorMessage)) {
-        QMessageBox::critical(this, "Batch Neighbor Pair Geometry", errorMessage.isEmpty() ? QString("Failed to export CSV to %1").arg(savePath) : errorMessage);
+    const bool exported = includeCentroids
+            ? BatchDivisionEstimator::exportFixedSampleNeighborGeometryToCsv(savePath, summary.entries, settings, &errorMessage)
+            : BatchDivisionEstimator::exportNeighborGeometryToCsv(savePath, summary.entries, settings, &errorMessage);
+    if (!exported) {
+        QMessageBox::critical(this, dialogTitle, errorMessage.isEmpty() ? QString("Failed to export CSV to %1").arg(savePath) : errorMessage);
         return;
     }
 
@@ -2611,7 +2631,7 @@ void MainWindow::onBatchNeighborPairGeometryCalculation()
     if (!summary.warnings.isEmpty())
         message += "\n\nWarnings:\n- " + summary.warnings.join("\n- ");
 
-    QMessageBox::information(this, "Batch Neighbor Pair Geometry", message);
+    QMessageBox::information(this, dialogTitle, message);
 }
 
 void MainWindow::onBatchSingleCellGeometryCalculation()
