@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QStyleFactory>
 
 
@@ -34,6 +35,8 @@ static void setDarkTheme(QApplication& app) {
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    QCoreApplication::setApplicationName(QStringLiteral("Cell Division Inference"));
+    QCoreApplication::setOrganizationName(QStringLiteral("Tsukaya Lab"));
     setDarkTheme(a);
     MainWindow w;
     w.show();

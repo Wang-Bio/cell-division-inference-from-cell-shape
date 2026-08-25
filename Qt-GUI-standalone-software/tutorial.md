@@ -1,14 +1,14 @@
 # Cell Division Inference by Qt-based GUI software
 
 ## 1. Installation 
-There is no need for installation for windows users. Open the "/portable-software/inferring_cell_division.exe", and there is no need for library deployment. 
+There is no need for installation for Windows users. Open the "/portable-software/Cell Division Inference.exe", and there is no need for library deployment.
 
 ### Platform notes
 The linux version and mac version is currently under development. 
 
 ## 2. Launch the software
 
-Double click the "/portable-software/inferring_cell_division.exe". 
+Double click the "/portable-software/Cell Division Inference.exe".
 
 ## 3. Example Dataset
 
