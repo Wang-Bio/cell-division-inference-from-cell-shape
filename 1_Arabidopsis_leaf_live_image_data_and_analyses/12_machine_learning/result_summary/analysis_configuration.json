@@ -1,0 +1,127 @@
+{
+  "all_data_csv": "batch_neighbor_pair_geometry.csv",
+  "accepted_splits_csv": "all_satisfying_primordia_splits.csv",
+  "expected_accepted_split_count": 75,
+  "n_split_rows_to_run": 75,
+  "split_grouping": "fileName prefix before final _<time>h token",
+  "primordia": [
+    "sample1",
+    "sample10",
+    "sample11",
+    "sample12",
+    "sample2",
+    "sample3",
+    "sample4",
+    "sample5",
+    "sample6",
+    "sample7",
+    "sample8",
+    "sample9"
+  ],
+  "n_primordia": 12,
+  "dataset_filtering": {
+    "dataset_name": "full input dataset",
+    "exception_source": "integrated_column",
+    "exception_column": "exception_label",
+    "exception_positive_value": 1,
+    "n_rows_original": 7624,
+    "n_rows_removed_as_exceptions": 51,
+    "n_rows_retained": 7573,
+    "observed_exception_value_counts": {
+      "0": 7573,
+      "1": 51
+    }
+  },
+  "n_daughter_pairs_after_exception_filter": 1114,
+  "n_non_daughter_pairs_after_exception_filter": 6459,
+  "models": [
+    "lr",
+    "svm",
+    "xgboost",
+    "lightgbm"
+  ],
+  "feature_modes": [
+    "all",
+    "selected4"
+  ],
+  "all_feature_count_required": 49,
+  "selected_four_features": [
+    "junctionAngleAverageDegrees",
+    "normalizedSharedEdgeLength",
+    "unionConvexDeficiency",
+    "unionCircularity"
+  ],
+  "cv": {
+    "method": "StratifiedKFold on training rows",
+    "folds": 5,
+    "shuffle": true,
+    "seed": 42
+  },
+  "threshold_selection": {
+    "source": "cross-validated training probabilities only",
+    "criterion": "maximum F1.0 after exact maximum-weight matching",
+    "n_thresholds": 200,
+    "range": [
+      0.0,
+      1.0
+    ]
+  },
+  "matching": {
+    "method": "exact NetworkX maximum_weight_matching",
+    "maxcardinality": false,
+    "weight": "model positive-class score",
+    "scope": "within each snapshot"
+  },
+  "hyperparameter_search_enabled": false,
+  "parallel_execution": {
+    "global_across_split_model_feature_jobs": true,
+    "max_total_parallel_jobs": 36,
+    "threads_per_global_job": 1,
+    "nested_process_pools": false,
+    "total_planned_jobs": 600
+  },
+  "model_settings": {
+    "logistic_regression": {
+      "imputation": "median fitted on training data",
+      "scaling": "StandardScaler fitted on training data",
+      "solver": "liblinear",
+      "penalty": "l2",
+      "C": 1.0,
+      "class_weight": "balanced",
+      "max_iter": 5000
+    },
+    "linear_svm": {
+      "imputation": "median fitted on training data",
+      "scaling": "StandardScaler fitted on training data",
+      "C": 1.0,
+      "class_weight": "balanced",
+      "probability_calibration": "sigmoid",
+      "calibration_cv": 3,
+      "max_iter": 20000
+    },
+    "xgboost": {
+      "n_estimators": 600,
+      "learning_rate": 0.05,
+      "max_depth": 4,
+      "min_child_weight": 1.0,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "reg_lambda": 1.0,
+      "reg_alpha": 0.0,
+      "gamma": 0.0,
+      "class_imbalance": "scale_pos_weight = n_negative / n_positive"
+    },
+    "lightgbm": {
+      "n_estimators": 1500,
+      "learning_rate": 0.02,
+      "num_leaves": 63,
+      "max_depth": -1,
+      "min_child_samples": 20,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "reg_lambda": 1.0,
+      "reg_alpha": 0.0,
+      "class_imbalance": "scale_pos_weight = n_negative / n_positive"
+    }
+  }
+}

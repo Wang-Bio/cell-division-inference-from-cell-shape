@@ -1,0 +1,13 @@
+file_name,first_cell_id,second_cell_id,hours_ago,divided
+sample2_12h,0,1,2,1
+sample2_12h,2,6,12,1
+sample2_12h,8,12,2,1
+sample2_12h,3,4,6,1
+sample2_12h,14,16,6,1
+sample2_12h,5,7,6,1
+sample2_12h,11,17,12,1
+sample2_12h,19,25,12,1
+sample2_12h,27,29,10,1
+sample2_12h,20,23,4,1
+sample2_12h,26,22,10,1
+sample2_12h,15,18,12,1

@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "angle_column": "junctionAngleAverageDegrees",
+    "observed_division_column": "observed_division",
+    "observed_label_status": "ok",
+    "cutoff_angle_deg": 141.47130660218542,
+    "low_angle_rule": "angle < cutoff_angle_deg",
+    "high_angle_rule": "angle >= cutoff_angle_deg",
+    "n_valid_angles": 10907,
+    "n_valid_observed_labels": 10907
+  },
+  "groups": {
+    "low_angle_group": {
+      "n": 9068,
+      "mean_angle_deg": 113.43682490152183,
+      "median_angle_deg": 113.4252415,
+      "std_angle_deg": 12.45012026525347,
+      "min_angle_deg": 48.490515,
+      "max_angle_deg": 141.435475
+    },
+    "high_angle_group": {
+      "n": 1839,
+      "mean_angle_deg": 157.13927157422515,
+      "median_angle_deg": 156.703621,
+      "std_angle_deg": 9.07539599872452,
+      "min_angle_deg": 141.47211,
+      "max_angle_deg": 179.670366
+    },
+    "daughter_pairs": {
+      "n": 0,
+      "mean_angle_deg": null,
+      "median_angle_deg": null,
+      "std_angle_deg": null,
+      "min_angle_deg": null,
+      "max_angle_deg": null
+    },
+    "non_daughter_pairs": {
+      "n": 10907,
+      "mean_angle_deg": 120.80537715522142,
+      "median_angle_deg": 116.561072,
+      "std_angle_deg": 20.260836116179394,
+      "min_angle_deg": 48.490515,
+      "max_angle_deg": 179.670366
+    }
+  },
+  "comparisons": {
+    "low_angle_group_vs_non_daughter_pairs": {
+      "group_a": "low_angle_group",
+      "group_b": "non_daughter_pairs",
+      "n_group_a": 9068,
+      "n_group_b": 10907,
+      "test": "scipy.stats.ks_2samp",
+      "alternative": "two-sided",
+      "mode": "auto",
+      "status": "ok",
+      "statistic_D": 0.16860731640231041,
+      "pvalue": 1.659310154173672e-123,
+      "statistic_location": 141.435475,
+      "statistic_sign": 1,
+      "note": null
+    },
+    "high_angle_group_vs_daughter_pairs": {
+      "group_a": "high_angle_group",
+      "group_b": "daughter_pairs",
+      "n_group_a": 1839,
+      "n_group_b": 0,
+      "test": "scipy.stats.ks_2samp",
+      "alternative": "two-sided",
+      "mode": "auto",
+      "status": "skipped_empty_group",
+      "statistic_D": null,
+      "pvalue": null,
+      "statistic_location": null,
+      "statistic_sign": null,
+      "note": "Both groups need at least one valid angle for scipy.stats.ks_2samp."
+    },
+    "low_angle_group_vs_high_angle_group": {
+      "group_a": "low_angle_group",
+      "group_b": "high_angle_group",
+      "n_group_a": 9068,
+      "n_group_b": 1839,
+      "test": "scipy.stats.ks_2samp",
+      "alternative": "two-sided",
+      "mode": "auto",
+      "status": "ok",
+      "statistic_D": 1.0,
+      "pvalue": 0.0,
+      "statistic_location": 141.435475,
+      "statistic_sign": 1,
+      "note": null
+    },
+    "daughter_pairs_vs_non_daughter_pairs": {
+      "group_a": "daughter_pairs",
+      "group_b": "non_daughter_pairs",
+      "n_group_a": 0,
+      "n_group_b": 10907,
+      "test": "scipy.stats.ks_2samp",
+      "alternative": "two-sided",
+      "mode": "auto",
+      "status": "skipped_empty_group",
+      "statistic_D": null,
+      "pvalue": null,
+      "statistic_location": null,
+      "statistic_sign": null,
+      "note": "Both groups need at least one valid angle for scipy.stats.ks_2samp."
+    }
+  }
+}

@@ -1,0 +1,50 @@
+feature,plot_label,overlap_index,overlap_percent,n_daughter,n_non_daughter
+junctionAngleAverageDegrees,Junction angle mean,0.045906735751295336,4.590673575129534,386,1950
+junctionAngleMinDegrees,Junction angle minimum,0.05562375448385811,5.562375448385811,386,1950
+unionCircularity,Union circularity,0.07098179885744653,7.098179885744653,386,1950
+unionConvexDeficiency,Union convex deficiency,0.07980603161950311,7.980603161950311,386,1950
+normalizedSharedEdgeLength,Normalized shared cell wall length,0.10747176830078385,10.747176830078384,386,1950
+junctionAngleMaxDegrees,Junction angle maximum,0.1165962534874452,11.659625348744521,386,1950
+sharedEdgeLength,Shared cell wall length,0.17348478809618706,17.348478809618705,386,1950
+centroidDistanceNormalized,Centroid distance normalized,0.2359612063239006,23.59612063239006,386,1950
+centroidSharedEdgeDistanceNormalized,Normalized distance between centroids and shared edge,0.261902484389531,26.190248438953102,386,1950
+sharedEdgeUnsharedVerticesDistanceNormalized,Normalized distance between shared edge and unshared vertices,0.29330941942340905,29.330941942340903,386,1950
+centroidDistance,Centroid distance,0.33891590275009964,33.89159027500996,386,1950
+centroidSharedEdgeDistance,Distance between centroids and shared edge,0.3516301315265046,35.16301315265046,386,1950
+sharedEdgeUnsharedVerticesDistance,Distance between shared edge and unshared vertices,0.3628856117975289,36.28856117975289,386,1950
+junctionAngleRatio,Junction angle ratio,0.5959266640095655,59.59266640095655,386,1950
+unionAspectRatio,Union aspect ratio,0.6887578052344892,68.87578052344891,386,1950
+sharedEdgeUnionAxisAngleDegrees,Angle between shared edge and union axis,0.701166467384084,70.11664673840839,386,1950
+junctionAngleDifferenceDegrees,Junction angle difference,0.7342048624950179,73.42048624950179,386,1950
+vertexCountMean,Vertex count mean,0.7760063770426464,77.60063770426464,386,1950
+vertexCountMax,Vertex count maximum,0.7923050352065896,79.23050352065896,386,1950
+vertexCountMin,Vertex count minimum,0.801323236349143,80.1323236349143,386,1950
+vertexCountRatio,Vertex count ratio,0.8154138434967451,81.5413843496745,386,1950
+areaMean,Area mean,0.8325176032948054,83.25176032948053,386,1950
+aspectRatio,Ratio of aspect ratio,0.8378397768035073,83.78397768035073,386,1950
+sharedEdgeUnionCentroidDistance,Distance between union centroid and shared edge,0.8379434037465125,83.79434037465126,386,1950
+circularityMax,Circularity maximum,0.8472698286169789,84.72698286169789,386,1950
+areaMax,Area maximum,0.8479287896904477,84.79287896904478,386,1950
+perimeterMean,Perimeter mean,0.8490261724458615,84.90261724458615,386,1950
+circularityMean,Circularity mean,0.8501155838979674,85.01155838979673,386,1950
+aspectDiff,Aspect ratio difference,0.8575129533678757,85.75129533678756,386,1950
+areaMin,Area minimum,0.858166600239139,85.8166600239139,386,1950
+areaRatio,Area ratio,0.8593702670386609,85.9370267038661,386,1950
+perimeterMax,Perimeter maximum,0.8610336123289491,86.10336123289491,386,1950
+perimeterRatio,Perimeter ratio,0.8672671715158762,86.72671715158762,386,1950
+sharedEdgeUnionCentroidDistanceNormalized,Normalized distance between union centroid and shared edge,0.8687950046499269,86.87950046499269,386,1950
+perimeterDiff,Perimeter difference,0.8695469642619902,86.95469642619902,386,1950
+aspectMean,Aspect ratio mean,0.8757566095389929,87.57566095389929,386,1950
+areaDiff,Area difference,0.8825880164740267,88.25880164740268,386,1950
+perimeterMin,Perimeter minimum,0.8888587750763915,88.88587750763915,386,1950
+circularityMin,Circularity minimum,0.8889544307160887,88.89544307160887,386,1950
+circularityRatio,Circularity ratio,0.8891590275009964,88.91590275009963,386,1950
+aspectMin,Aspect ratio minimum,0.8968991630131526,89.68991630131526,386,1950
+circularityDiff,Circularity difference,0.8988043045037865,89.88043045037864,386,1950
+aspectMax,Aspect ratio maximum,0.9238421681944997,92.38421681944997,386,1950
+vertexCountDiff,Vertex count difference,0.9760170054470572,97.60170054470572,386,1950
+solidityRatio,Solidity ratio,0.9817776006377043,98.17776006377042,386,1950
+solidityMean,Solidity mean,0.9817776006377043,98.17776006377042,386,1950
+solidityDiff,Solidity difference,0.9817776006377043,98.17776006377042,386,1950
+solidityMin,Solidity minimum,0.9823435631725788,98.23435631725788,386,1950
+solidityMax,Solidity maximum,0.9989743589743589,99.8974358974359,386,1950

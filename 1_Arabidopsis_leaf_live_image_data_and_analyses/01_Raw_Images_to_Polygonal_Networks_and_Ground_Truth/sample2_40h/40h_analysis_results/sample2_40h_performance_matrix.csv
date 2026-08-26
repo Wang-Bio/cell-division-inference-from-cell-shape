@@ -1,0 +1,2 @@
+estimated_pairs,real_pairs,neighbor_pairs,true_positive,false_positive,false_negative,true_negative,precision,recall,f1,specificity,accuracy
+32,31,197,31,1,0,165,0.968750,1.000000,0.984127,0.993976,0.994924

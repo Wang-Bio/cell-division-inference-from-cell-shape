@@ -1,0 +1,13 @@
+{
+  "scheduler": "one global ProcessPoolExecutor across split/model/feature jobs",
+  "parallel_unit": "one complete (split_id, model_name, feature_mode) analysis",
+  "n_splits": 75,
+  "n_models": 4,
+  "n_feature_modes": 2,
+  "total_jobs": 600,
+  "requested_workers": 36,
+  "detected_logical_cpus": 36,
+  "workers_used": 36,
+  "threads_per_job": 1,
+  "nested_process_pools": false
+}

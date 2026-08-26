@@ -1,0 +1,2 @@
+TP,FP,FN,TN,precision,recall,specificity,f1,accuracy,balanced_accuracy,support_pos,support_neg,evaluated_pairs,pred_pos,pred_neg,selected_pairs_raw,selected_pairs_evaluated,skipped_exception,skipped_missing_observed,feature,operator,threshold
+291,1121,823,5338,0.20609065155807366,0.2612208258527828,0.8264437219383806,0.2304038004750594,0.7432985606760861,0.5438322738955816,1114,6459,7573,1412,6161,1412,1412,51,0,randomScore,>=,0.05

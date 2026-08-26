@@ -1,0 +1,4 @@
+region,analysis,difference_rpl4d_minus_WT,p_exact,permutations,mean_vertical_prop_WT,mean_vertical_prop_rpl4d-3,primordia_WT,primordia_rpl4d-3
+whole,primordium-level vertical_prop,0.12201395613435861,0.0180345969819654,184756,0.518868043370393,0.6408819995047517,10,10
+apical,primordium-level vertical_prop,0.15296656783875295,0.00903894866743164,184756,0.54491994478951,0.697886512628263,10,10
+basal,primordium-level vertical_prop,0.06906022650290222,0.2556128082443872,184756,0.5106275466393202,0.5796877731422224,10,10

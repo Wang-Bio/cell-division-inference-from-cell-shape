@@ -1,112 +1,31 @@
-# A high-throughput cell division detection method based on inferring from cell shapes
+# Data, analysis code, and software for “Inferring recent cell division from cell shapes”
 
-This repository contains the **code, software, and datasets** for the study:
+## Overview
 
-> **A high-throughput cell division detection method based on inferring from cell shapes**  
-> Zining Wang, Yujie Zhao, Hokuto Nakayama, Gorou Horiguchi, Yasuhiro Inoue\, Atsushi Mochizuki\, and Hirokazu Tsukaya\*
+This Zenodo archive accompanies the manuscript **“Inferring recent cell division from cell shapes.”** It contains the five Supplementary Data Sets used to develop, validate, and apply a shape-based framework for inferring recent daughter-cell pairs from static polygonal cell networks.
 
-This study is current under submission/reviewing process, and the algorithm/codes might be improved or additional features could be enhanced.
+The archive includes image data, cell-wall outlines, polygonal-network files, live-imaging-derived ground-truth daughter-pair annotations, geometric measurements, analysis scripts and outputs, and FIJI/ImageJ and Qt/C++ software.
 
-The study introduces a practical method to infer **recent daughter-cell pairs** from static cell geometry, with a simple junction-angle threshold (default ~145°) and optional machine-learning extensions.
+## Repository contents
 
-This repository provides a FIJI/ImageJ-plugin and a standalone Qt-based software which could be used for cell division estimation. The example data and the full data set were also provided. 
+1. [`1_Arabidopsis_leaf_live_image_data_and_analyses/`](1_Arabidopsis_leaf_live_image_data_and_analyses/) — *Arabidopsis thaliana* leaf live-imaging data, polygonal cell networks, ground-truth daughter pairs, neighboring-cell-pair geometry, and the principal validation and feature analyses.
 
-## Repository structure
-```text
-.
-├── FIJI-plugin/
-│   └── UTokyo.TsukayaLab.WangZining-1.0-SNAPSHOT.jar
-├── Qt-GUI-standalone-software/
-│   ├── portable-software/
-│   └── source-code/
-├── full-data-set/
-│   ├── 13_primordia_30_snapshots/
-│   └── all_neighbor_pairs_geometry.csv
-├── example-data/
-│   ├── exampled_raw_image.jpg
-│   ├── exampled_binary_image.png
-│   └── real_division_paris.csv
-└── LICENSE
-```
+2. [`2_Arabidopsis_rpl4d3_WT_fixed_primordia_data_and_analyses/`](2_Arabidopsis_rpl4d3_WT_fixed_primordia_data_and_analyses/) — Fixed wild-type and *rpl4d-3* leaf-primordium data, inferred divisions, leaf-shape and division-orientation analyses, and sensitivity analyses.
 
-### Key contents
+3. [`3_Arabidopsis_SAM_live_image_data_and_analyses/`](3_Arabidopsis_SAM_live_image_data_and_analyses/) — *Arabidopsis* shoot apical meristem (SAM) live-imaging data, polygonal cell networks, ground-truth daughter pairs, neighboring-cell-pair geometry, and independent validation analyses.
 
-- `full-data-set/13_primordia_30_snapshots/`  
-  Polygon-network files (`.json`) and corresponding observed daughter-pair labels (`*_real_division_pairs.csv` or `.txt`) from live imaging.
-- `full-data-set/all_neighbor_pairs_geometry.csv`  
-  Aggregated geometric feature table across neighboring pairs.
-- `FIJI-plugin/UTokyo.TsukayaLab.WangZining-1.0-SNAPSHOT.jar`  
-  Plugin package for FIJI/ImageJ.
-- `Qt-GUI-standalone-software/source-code/`  
-  C++/Qt/OpenCV source code for network extraction and division inference.
-- `example-data/`  
-  Minimal files for quick trial runs and software checking.
+4. [`4_Non_model_fixed_sample_analysis/`](4_Non_model_fixed_sample_analysis/) — Fixed-sample images, extracted cell-shape data, neighboring-cell-pair geometry, and mixture-model analyses for *Ipomoea coccinea* and *Oxalis corniculata*.
 
----
+5. [`5_Software_Qt_FIJI/`](5_Software_Qt_FIJI/) — The Cell Division Inference FIJI/ImageJ plugin and Qt graphical user interface, including source code, compiled distributions, example data, and tutorials.
 
-## Biological scope and intended use
+Detailed data definitions, analysis instructions, and software requirements are provided in the README files within the corresponding numbered directories.
 
-This method is validated primarily on **early Arabidopsis leaf primordia** and is most reliable in tissues where:
+## Reproducibility and versioning
 
-- cell boundaries can be segmented cleanly;
-- bimodel distribution of mean junction angle is significant.
+This deposit preserves the data, code, and software version associated with the manuscript. For reproduction of the reported analyses, use this archived version. The latest development version is available from the [project GitHub repository](https://github.com/Wang-Bio/cell-division-inference-from-cell-shape).
 
-The manuscript further demonstrates transferability checks in non-model species (e.g., *Ipomoea coccinea*, *Oxalis corniculata*) using bimodality of junction-angle distributions.
+## Citation
 
----
+Please cite both the associated article and this Zenodo record when using these materials:
 
-## Typical workflow for fixed-tissue experiments
-
-1. **Prepare sample** (fixation + cell wall staining).
-2. **Acquire confocal image** with clear epidermal boundaries.
-3. **Binary image** manually draw the polygon cell networks. Or skip step 3,4 and manually label the vertex and generate polygonal cell networks from confocal image. 
-4. **Segment/skeletonize** boundaries (within provided tools/workflow).
-5. **Extract polygon network** and neighbor pairs.
-6. **Compute geometric features**.
-7. **Infer daughter pairs** using single-feature rule (recommended default: mean junction angle cutoff near 145°), or
-8. **Apply one-to-one matching** to enforce biological constraints (a cell cannot belong to multiple daughter pairs).
-9. **Export division map** and downstream metrics (e.g., orientation distribution, regional patterns).
-
----
-
-## Reproducibility notes
-
-- Ground-truth daughter pairs in this repository were annotated from live-imaging time series.
-- The study benchmark reports high precision and recall using a single-feature junction-angle criterion (above 145° mean junction angle, 93.5% precision, 92.2% recall)
-- The full neighbor-pair feature table and per-snapshot files are provided to support re-analysis.
-- Example files are included for fast verification of file formats and analysis flow.
-
-### FIJI/Qt parity
-
-Network extraction is pixel-sensitive: a one-pixel difference in the skeleton can add or remove a
-junction, which changes polygon membership and neighbors. Older FIJI plugin source used ImageJ's
-`Make Binary` and `Skeletonize` commands, while Qt used inverted Otsu binarization, Guo-Hall
-thinning, destairing, and iterative spur removal. Consequently, the two applications could produce
-different JSON networks—and different junction-angle division estimates—from the same raw image.
-
-The FIJI source now implements the Qt segmentation pipeline directly. For comparable results:
-
-1. Open the same unmodified image in each application (do not pre-threshold one copy only).
-2. Run skeletonization once, followed by the same vertex, line, and polygon detection workflow.
-3. Use the same division feature, threshold direction/value, and matching mode. The defaults are
-   mean junction angle, `>= 145°`, and global maximum-weight matching.
-4. Compare topology by coordinates and connectivity rather than JSON array order or numeric IDs;
-   IDs can legitimately differ while describing the same graph.
-
-Existing JSON files are not retroactively changed. Re-run extraction with the updated source, or
-load one exported JSON into both applications when comparing division-estimation code independently
-of segmentation. Manually moved vertices and other edits must also be identical.
-
-If you are reviewing methodology transfer to another species/system, we recommend first checking whether the mean junction-angle distribution is bimodal in your dataset, and then set a value cutoff to distinguish the high-angle group and low-angle group. Also We recommend you to only use early leaf primordia, where cells are actively dividing.
-
----
-
-## Contact
-
-For correspondence regarding materials, method usage, or reproducibility:
-- First author:
-- Zining Wang: `wangzining2020@g.ecc.u-tokyo.ac.jp`
-- Correspondence authors:
-- Hirokazu Tsukaya: `tsukaya3946@g.ecc.u-tokyo.ac.jp`
-- Yasuhiro Inoue: `inoue.yasuhiro.4n@kyoto-u.ac.jp`
-- Atsushi Mochizuki: `mochi@infront.kyoto-u.ac.jp`
+Wang Z, Zhao Y, Nakayama H, Horiguchi G, Inoue Y, Mochizuki A, and Tsukaya H. **Inferring recent cell division from cell shapes.** Manuscript under revision at *The Plant Cell*.

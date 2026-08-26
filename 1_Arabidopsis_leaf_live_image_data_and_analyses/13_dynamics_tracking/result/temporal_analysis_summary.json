@@ -1,0 +1,152 @@
+{
+  "source_csv": "temporal_change_tracks.csv",
+  "output_folder": "result",
+  "combined_csv": "result\\temporal_analysis_combined_values.csv",
+  "mean_sd_by_time_frame_csv": "result\\temporal_analysis_mean_sd_by_time_frame.csv",
+  "plot_png": "result\\temporal_analysis_combined_plot.png",
+  "settings": {
+    "before_track_id": 11,
+    "after_track_ids": [
+      21,
+      22
+    ],
+    "extend_before_to_100": true,
+    "after_x_positions": {
+      "1 cycle": 100,
+      "1 cycle + 2h": 120
+    },
+    "reference_y_deg": 145,
+    "plot_x_min": -10,
+    "plot_x_max": 125
+  },
+  "overall_counts": {
+    "clean_source_rows": 120,
+    "combined_export_rows": 120,
+    "mean_sd_by_time_frame_rows": 205,
+    "before_rows": 54,
+    "after_rows": 66,
+    "n_repeat_i_total": 9
+  },
+  "tracks": {
+    "11": {
+      "phase": "before_division",
+      "n_independent_values_for_fit": 54,
+      "n_repeat_i": 9,
+      "n_plot_points": 201,
+      "linear_fit_independent_values": {
+        "status": "fitted",
+        "model": "y = slope * x + intercept",
+        "x_col": "x_for_fit",
+        "y_col": "junctionAngleAverageDegrees",
+        "slope_deg_per_x_unit": -0.20762806474240736,
+        "intercept_deg": 170.33048716056317,
+        "r_squared": 0.49437024358643755,
+        "pearson_r": -0.7031146731411869,
+        "residual_std_error_deg": 6.10141194987684,
+        "n_points": 54,
+        "n_unique_x": 22,
+        "x_min": 0.0,
+        "x_max": 87.5,
+        "y_mean_deg": 161.67931779629635,
+        "y_sd_deg": 8.49919460122653
+      },
+      "linear_fit_plotted_mean_curve": {
+        "status": "fitted",
+        "model": "y = slope * x + intercept",
+        "x_col": "x",
+        "y_col": "y_for_fit",
+        "slope_deg_per_x_unit": -0.19580470664790278,
+        "intercept_deg": 170.11764506289256,
+        "r_squared": 0.9657125286550562,
+        "pearson_r": -0.9827067358347849,
+        "residual_std_error_deg": 1.0757428724400508,
+        "n_points": 201,
+        "n_unique_x": 201,
+        "x_min": 0.0,
+        "x_max": 100.0,
+        "y_mean_deg": 160.32740973049752,
+        "y_sd_deg": 5.794984634979014
+      }
+    },
+    "21": {
+      "phase": "after_division",
+      "n_independent_values_for_fit": 24,
+      "n_repeat_i": 9,
+      "n_plot_points": 2,
+      "linear_fit_independent_values": {
+        "status": "fitted",
+        "model": "y = slope * x + intercept",
+        "x_col": "x",
+        "y_col": "junctionAngleAverageDegrees",
+        "slope_deg_per_x_unit": -0.048034983333332074,
+        "intercept_deg": 170.00461849999988,
+        "r_squared": 0.0056611882486092835,
+        "pearson_r": -0.07524086820744076,
+        "residual_std_error_deg": 6.649137626849153,
+        "n_points": 24,
+        "n_unique_x": 2,
+        "x_min": 100.0,
+        "x_max": 120.0,
+        "y_mean_deg": 164.72077033333335,
+        "y_sd_deg": 6.521470723275429
+      },
+      "linear_fit_plotted_mean_points": {
+        "status": "fitted",
+        "model": "y = slope * x + intercept",
+        "x_col": "x",
+        "y_col": "y_for_fit",
+        "slope_deg_per_x_unit": -0.0480349833333339,
+        "intercept_deg": 170.0046185000001,
+        "r_squared": 1.0,
+        "pearson_r": -0.9999999999999999,
+        "residual_std_error_deg": null,
+        "n_points": 2,
+        "n_unique_x": 2,
+        "x_min": 100.0,
+        "x_max": 120.0,
+        "y_mean_deg": 164.72077033333335,
+        "y_sd_deg": 0.6793172489836584
+      }
+    },
+    "22": {
+      "phase": "after_division",
+      "n_independent_values_for_fit": 42,
+      "n_repeat_i": 9,
+      "n_plot_points": 2,
+      "linear_fit_independent_values": {
+        "status": "fitted",
+        "model": "y = slope * x + intercept",
+        "x_col": "x",
+        "y_col": "junctionAngleAverageDegrees",
+        "slope_deg_per_x_unit": -0.054428076190476404,
+        "intercept_deg": 126.8921420952382,
+        "r_squared": 0.001350214666392846,
+        "pearson_r": -0.03674526726522567,
+        "residual_std_error_deg": 15.167808243602702,
+        "n_points": 42,
+        "n_unique_x": 2,
+        "x_min": 100.0,
+        "x_max": 120.0,
+        "y_mean_deg": 120.90505371428571,
+        "y_sd_deg": 14.991817623245499
+      },
+      "linear_fit_plotted_mean_points": {
+        "status": "fitted",
+        "model": "y = slope * x + intercept",
+        "x_col": "x",
+        "y_col": "y_for_fit",
+        "slope_deg_per_x_unit": -0.05442807619047647,
+        "intercept_deg": 126.89214209523819,
+        "r_squared": 1.0,
+        "pearson_r": -1.0,
+        "residual_std_error_deg": null,
+        "n_points": 2,
+        "n_unique_x": 2,
+        "x_min": 100.0,
+        "x_max": 120.0,
+        "y_mean_deg": 120.90505371428571,
+        "y_sd_deg": 0.7697292352244909
+      }
+    }
+  }
+}
