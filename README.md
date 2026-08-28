@@ -19,13 +19,3 @@ The archive includes image data, cell-wall outlines, polygonal-network files, li
 5. [`5_Software_Qt_FIJI/`](5_Software_Qt_FIJI/) — The Cell Division Inference FIJI/ImageJ plugin and Qt graphical user interface, including source code, compiled distributions, example data, and tutorials.
 
 Detailed data definitions, analysis instructions, and software requirements are provided in the README files within the corresponding numbered directories.
-
-## Reproducibility and versioning
-
-This deposit preserves the data, code, and software version associated with the manuscript. For reproduction of the reported analyses, use this archived version. The latest development version is available from the [project GitHub repository](https://github.com/Wang-Bio/cell-division-inference-from-cell-shape).
-
-## Citation
-
-Please cite both the associated article and this Zenodo record when using these materials:
-
-Wang Z, Zhao Y, Nakayama H, Horiguchi G, Inoue Y, Mochizuki A, and Tsukaya H. **Inferring recent cell division from cell shapes.** Manuscript under revision at *The Plant Cell*.
