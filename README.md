@@ -2,9 +2,9 @@
 
 ## Overview
 
-This Zenodo archive accompanies the manuscript **“Inferring recent cell division from cell shape.”** It contains the five Supplementary Data Sets used to develop, validate, and apply a shape-based framework for inferring recent daughter-cell pairs from static polygonal cell networks.
+This repository accompanies the manuscript **“Inferring recent cell division from cell shape.”** It contains the five Supplementary Data Sets used to develop, validate, and apply a shape-based framework for inferring recent daughter-cell pairs from static polygonal cell networks.
 
-The archive includes image data, cell-wall outlines, polygonal-network files, live-imaging-derived ground-truth daughter-pair annotations, geometric measurements, analysis scripts and outputs, and FIJI/ImageJ and Qt/C++ software.
+The repository includes image data, cell-wall outlines, polygonal-network files, live-imaging-derived ground-truth daughter-pair annotations, geometric measurements, analysis scripts and outputs, and FIJI/ImageJ and Qt/C++ software.
 
 ## Repository contents
 
