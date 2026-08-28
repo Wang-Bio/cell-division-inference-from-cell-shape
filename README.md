@@ -1,8 +1,8 @@
-# Data, analysis code, and software for “Inferring recent cell division from cell shapes”
+# Data, analysis code, and software for “Inferring recent cell division from cell shape”
 
 ## Overview
 
-This Zenodo archive accompanies the manuscript **“Inferring recent cell division from cell shapes.”** It contains the five Supplementary Data Sets used to develop, validate, and apply a shape-based framework for inferring recent daughter-cell pairs from static polygonal cell networks.
+This Zenodo archive accompanies the manuscript **“Inferring recent cell division from cell shape.”** It contains the five Supplementary Data Sets used to develop, validate, and apply a shape-based framework for inferring recent daughter-cell pairs from static polygonal cell networks.
 
 The archive includes image data, cell-wall outlines, polygonal-network files, live-imaging-derived ground-truth daughter-pair annotations, geometric measurements, analysis scripts and outputs, and FIJI/ImageJ and Qt/C++ software.
 
