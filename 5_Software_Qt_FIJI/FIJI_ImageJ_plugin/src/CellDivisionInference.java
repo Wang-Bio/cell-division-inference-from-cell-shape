@@ -343,6 +343,12 @@ public class CellDivisionInference implements PlugIn {
             */
             JMenu geometryMenu=new JMenu("Geometry");
 
+            geometryMenu.add(new JMenuItem(new AbstractAction("Single Cell Geometry Calculation") {
+                @Override public void actionPerformed(ActionEvent e){
+                    calculateAndExportSingleCellGeometries(frame);
+                }
+            }));
+
             geometryMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Geometry Calculation") {
                 @Override public void actionPerformed(ActionEvent e){
                     calculateAllNeighborPairGeometries(frame);
@@ -4431,6 +4437,171 @@ public class CellDivisionInference implements PlugIn {
     }
 
     // ---- Geometry helpers ----
+
+    static class SingleCellGeometryResult {
+        final double area;
+        final double circularity;
+        final double orientationDegrees;
+        final double aspectRatio;
+
+        SingleCellGeometryResult(double area, double circularity,
+                                 double orientationDegrees, double aspectRatio){
+            this.area = area;
+            this.circularity = circularity;
+            this.orientationDegrees = orientationDegrees;
+            this.aspectRatio = aspectRatio;
+        }
+    }
+
+    /** Dimensions and long-axis orientation of a minimum-area fitted rectangle. */
+    static class FittedRectangle {
+        final double longAxis;
+        final double shortAxis;
+        final double orientationDegrees;
+
+        FittedRectangle(double longAxis, double shortAxis, double orientationDegrees){
+            this.longAxis = longAxis;
+            this.shortAxis = shortAxis;
+            this.orientationDegrees = orientationDegrees;
+        }
+    }
+
+    private enum CellOrientationRange {
+        ZERO_TO_90("0–90° (horizontal 0°, vertical 90°)"),
+        ZERO_TO_180("0–180° (left horizontal 0°, vertical 90°, right horizontal 180°)");
+
+        final String label;
+        CellOrientationRange(String label){ this.label = label; }
+        @Override public String toString(){ return label; }
+    }
+
+    static FittedRectangle fitMinimumAreaRectangle(List<Point2D.Double> points){
+        if(points == null || points.size() < 3) return null;
+        List<Point2D.Double> hull = convexHull(points);
+        if(hull.size() < 3) return null;
+
+        double bestArea = Double.POSITIVE_INFINITY;
+        double bestLong = 0.0, bestShort = 0.0, bestAngle = 0.0;
+        for(int i=0; i<hull.size(); i++){
+            Point2D.Double a = hull.get(i);
+            Point2D.Double b = hull.get((i + 1) % hull.size());
+            double angle = Math.atan2(b.y - a.y, b.x - a.x);
+            double cos = Math.cos(angle), sin = Math.sin(angle);
+            double minU = Double.POSITIVE_INFINITY, maxU = Double.NEGATIVE_INFINITY;
+            double minV = Double.POSITIVE_INFINITY, maxV = Double.NEGATIVE_INFINITY;
+            for(Point2D.Double p : hull){
+                double u = p.x * cos + p.y * sin;
+                double v = -p.x * sin + p.y * cos;
+                minU = Math.min(minU, u); maxU = Math.max(maxU, u);
+                minV = Math.min(minV, v); maxV = Math.max(maxV, v);
+            }
+            double width = maxU - minU, height = maxV - minV;
+            double area = width * height;
+            if(area < bestArea - 1e-9){
+                bestArea = area;
+                if(width >= height){
+                    bestLong = width; bestShort = height; bestAngle = angle;
+                }else{
+                    bestLong = height; bestShort = width; bestAngle = angle + Math.PI / 2.0;
+                }
+            }
+        }
+        if(bestLong <= 0.0 || bestShort <= 0.0) return null;
+        double degrees = Math.toDegrees(bestAngle) % 180.0;
+        if(degrees < 0.0) degrees += 180.0;
+        if(Math.abs(degrees - 180.0) < 1e-9) degrees = 0.0;
+        return new FittedRectangle(bestLong, bestShort, degrees);
+    }
+
+    private SingleCellGeometryResult calculateSingleCellGeometry(List<Integer> ids, double micrometersPerPixel,
+                                                                 CellOrientationRange orientationRange){
+        if(ids == null || ids.size() < 3) return null;
+        ArrayList<Point2D.Double> points = new ArrayList<>(ids.size());
+        for(int id : ids){
+            Point2D.Double p = vertexGeometryPoint(id);
+            points.add(new Point2D.Double(p.x, p.y));
+        }
+        double areaPixels = polygonAreaAbs(ids);
+        double perimeter = polygonPerimeter(ids);
+        FittedRectangle rectangle = fitMinimumAreaRectangle(points);
+        if(areaPixels <= 0.0 || rectangle == null) return null;
+        double orientation = 180.0 - rectangle.orientationDegrees;
+        if(orientationRange == CellOrientationRange.ZERO_TO_90) orientation = Math.min(orientation, 180.0 - orientation);
+        double areaMicrometersSquared = areaPixels * micrometersPerPixel * micrometersPerPixel;
+        return new SingleCellGeometryResult(areaMicrometersSquared,
+                circularityForPolygon(areaPixels, perimeter), orientation,
+                rectangle.longAxis / rectangle.shortAxis);
+    }
+
+    private void calculateAndExportSingleCellGeometries(JFrame frame){
+        if(polygons == null || polygons.isEmpty()){
+            JOptionPane.showMessageDialog(frame, "No polygons available. Run Detect → Polygon Detection first.",
+                    "Single Cell Geometry Calculation", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JTextField scaleField = new JTextField("1.0", 10);
+        JComboBox<CellOrientationRange> orientationBox = new JComboBox<>(CellOrientationRange.values());
+        JPanel options = new JPanel(new GridLayout(0, 2, 8, 6));
+        options.add(new JLabel("Micrometers per pixel:"));
+        options.add(scaleField);
+        options.add(new JLabel("Orientation definition:"));
+        options.add(orientationBox);
+        if(JOptionPane.showConfirmDialog(frame, options, "Single Cell Geometry Options",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;
+
+        Double micrometersPerPixel = tryParseDouble(scaleField.getText());
+        if(micrometersPerPixel == null || !Double.isFinite(micrometersPerPixel) || micrometersPerPixel <= 0.0){
+            JOptionPane.showMessageDialog(frame, "Micrometers per pixel must be a number greater than zero.",
+                    "Single Cell Geometry Calculation", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        CellOrientationRange orientationRange = (CellOrientationRange)orientationBox.getSelectedItem();
+
+        ArrayList<SingleCellGeometryResult> results = new ArrayList<>(polygons.size());
+        for(List<Integer> polygon : polygons){
+            results.add(calculateSingleCellGeometry(polygon, micrometersPerPixel, orientationRange));
+        }
+
+        JFileChooser chooser = new JFileChooser(OpenDialog.getDefaultDirectory());
+        chooser.setDialogTitle("Choose directory for single-cell geometry CSV");
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setAcceptAllFileFilterUsed(false);
+        if(chooser.showSaveDialog(frame) != JFileChooser.APPROVE_OPTION) return;
+
+        File directory = chooser.getSelectedFile();
+        if(!directory.exists() && !directory.mkdirs()){
+            IJ.error("Export failed", "Cannot create directory: " + directory);
+            return;
+        }
+        String base = baseNameWithoutExtension(currentGeometrySourceFileName);
+        if(base == null || base.trim().isEmpty()) base = "geometry";
+        File output = new File(directory, base + "_single_cell_geometry.csv");
+        if(output.exists() && JOptionPane.showConfirmDialog(frame,
+                "Replace existing file?\n" + output.getAbsolutePath(), "Confirm overwrite",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
+
+        try(BufferedWriter writer = utf8Writer(output)){
+            writer.write("file_name,cell_id,micrometers_per_pixel,area_micrometer_squared,circularity,orientation_degrees,orientation_definition,aspect_ratio\n");
+            List<Integer> displayIds = imagePanel == null ? null : imagePanel.polygonDisplayIds;
+            for(int i=0; i<results.size(); i++){
+                SingleCellGeometryResult result = results.get(i);
+                if(result == null) continue;
+                int cellId = displayIds != null && displayIds.size() == polygons.size() ? displayIds.get(i) : i;
+                writer.write(escapeCsvField(currentGeometrySourceFileName) + "," + cellId + ","
+                        + formatQtCsvDouble(micrometersPerPixel) + "," + formatQtCsvDouble(result.area) + ","
+                        + formatQtCsvDouble(result.circularity) + "," + formatQtCsvDouble(result.orientationDegrees) + ","
+                        + escapeCsvField(orientationRange == CellOrientationRange.ZERO_TO_90 ? "0-90" : "0-180") + ","
+                        + formatQtCsvDouble(result.aspectRatio) + "\n");
+            }
+        }catch(IOException ex){
+            IJ.error("Export failed", ex.getMessage());
+            return;
+        }
+        IJ.showStatus("Single-cell geometries exported: " + output.getAbsolutePath());
+        JOptionPane.showMessageDialog(frame, "Exported " + results.size() + " cells to:\n" + output.getAbsolutePath(),
+                "Single Cell Geometry Calculation", JOptionPane.INFORMATION_MESSAGE);
+    }
 
     private Point2D.Double vertexGeometryPoint(int vid){
         if(vertexGeometryPoints != null && vid >= 0 && vid < vertexGeometryPoints.size()){
