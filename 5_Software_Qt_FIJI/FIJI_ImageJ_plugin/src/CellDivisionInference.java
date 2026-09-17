@@ -12,6 +12,9 @@ import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.border.TitledBorder;
+import javax.swing.plaf.FontUIResource;
+import javax.swing.plaf.basic.BasicSplitPaneDivider;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
 
 import java.awt.*;
 import java.awt.event.*;
@@ -39,6 +42,239 @@ import org.jgrapht.graph.SimpleWeightedGraph;
 import org.jgrapht.util.SupplierUtil;
 
 public class CellDivisionInference implements PlugIn {
+
+    // Dark Fusion-style palette used by the Qt desktop application.  Keeping
+    // the colours here also makes dialogs created later by JOptionPane and
+    // JFileChooser use the same theme as the main plugin window.
+    private static final Color DARK_WINDOW = new Color(53, 53, 53);
+    private static final Color DARK_PANEL = new Color(45, 45, 45);
+    private static final Color DARK_INPUT = new Color(25, 25, 25);
+    private static final Color DARK_BORDER = new Color(78, 78, 78);
+    private static final Color DARK_TEXT = new Color(230, 230, 230);
+    private static final Color DARK_DISABLED_TEXT = new Color(127, 127, 127);
+    private static final Color DARK_HIGHLIGHT = new Color(42, 130, 218);
+
+    /** Apply a dependency-free Qt Fusion inspired theme to all plugin Swing UI. */
+    private static void applyDarkTheme(){
+        // Ask Java2D to use antialiased, sub-pixel text where the platform
+        // supports it.  This is particularly noticeable on high-DPI screens.
+        System.setProperty("awt.useSystemAAFontSettings", "lcd");
+        System.setProperty("swing.aatext", "true");
+
+        // Use Metal rather than an operating-system look and feel so every
+        // supported FIJI platform honours the custom palette consistently.
+        try{
+            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+        }catch(ReflectiveOperationException | UnsupportedLookAndFeelException e){
+            IJ.log("[Cell Division Inference] Could not select the cross-platform look and feel: " + e.getMessage());
+        }
+
+        UIDefaults defaults = UIManager.getDefaults();
+        defaults.put("control", DARK_WINDOW);
+        defaults.put("info", DARK_PANEL);
+        defaults.put("nimbusBase", DARK_INPUT);
+        defaults.put("nimbusBlueGrey", DARK_WINDOW);
+        defaults.put("nimbusLightBackground", DARK_INPUT);
+        defaults.put("text", DARK_TEXT);
+        defaults.put("textText", DARK_TEXT);
+        defaults.put("controlText", DARK_TEXT);
+        defaults.put("menuText", DARK_TEXT);
+        defaults.put("windowText", DARK_TEXT);
+        defaults.put("inactiveControlText", DARK_DISABLED_TEXT);
+        defaults.put("textInactiveText", DARK_DISABLED_TEXT);
+        defaults.put("textHighlight", DARK_HIGHLIGHT);
+        defaults.put("textHighlightText", Color.WHITE);
+        defaults.put("controlHighlight", DARK_BORDER);
+        defaults.put("controlLtHighlight", new Color(92, 92, 92));
+        defaults.put("controlShadow", new Color(32, 32, 32));
+        defaults.put("controlDkShadow", new Color(18, 18, 18));
+
+        String[] panelBackgrounds = {
+            "Panel.background", "OptionPane.background", "FileChooser.background",
+            "ColorChooser.background", "Viewport.background", "SplitPane.background"
+        };
+        for(String key : panelBackgrounds) defaults.put(key, DARK_WINDOW);
+
+        String[] inputBackgrounds = {
+            "TextField.background", "FormattedTextField.background", "PasswordField.background",
+            "TextArea.background", "TextPane.background", "EditorPane.background",
+            "List.background", "Table.background", "Tree.background", "ComboBox.background"
+        };
+        for(String key : inputBackgrounds) defaults.put(key, DARK_INPUT);
+
+        String[] foregrounds = {
+            "Label.foreground", "Button.foreground", "ToggleButton.foreground",
+            "CheckBox.foreground", "RadioButton.foreground", "ComboBox.foreground",
+            "List.foreground", "Table.foreground", "TableHeader.foreground", "Tree.foreground",
+            "TextField.foreground", "FormattedTextField.foreground", "PasswordField.foreground",
+            "TextArea.foreground", "TextPane.foreground", "EditorPane.foreground",
+            "Menu.foreground", "MenuItem.foreground", "CheckBoxMenuItem.foreground",
+            "RadioButtonMenuItem.foreground", "OptionPane.messageForeground",
+            "TitledBorder.titleColor"
+        };
+        for(String key : foregrounds) defaults.put(key, DARK_TEXT);
+
+        String[] controlBackgrounds = {
+            "Button.background", "ToggleButton.background", "CheckBox.background",
+            "RadioButton.background", "MenuBar.background", "Menu.background",
+            "MenuItem.background", "CheckBoxMenuItem.background", "RadioButtonMenuItem.background",
+            "PopupMenu.background", "ToolBar.background", "TableHeader.background",
+            "TabbedPane.background", "TabbedPane.selected", "ScrollPane.background"
+        };
+        for(String key : controlBackgrounds) defaults.put(key, DARK_PANEL);
+
+        defaults.put("List.selectionBackground", DARK_HIGHLIGHT);
+        defaults.put("List.selectionForeground", Color.WHITE);
+        defaults.put("Table.selectionBackground", DARK_HIGHLIGHT);
+        defaults.put("Table.selectionForeground", Color.WHITE);
+        defaults.put("Tree.selectionBackground", DARK_HIGHLIGHT);
+        defaults.put("Tree.selectionForeground", Color.WHITE);
+        defaults.put("ComboBox.selectionBackground", DARK_HIGHLIGHT);
+        defaults.put("ComboBox.selectionForeground", Color.WHITE);
+        defaults.put("Table.gridColor", DARK_BORDER);
+        defaults.put("Separator.foreground", DARK_BORDER);
+        defaults.put("Separator.background", DARK_WINDOW);
+        defaults.put("ProgressBar.foreground", DARK_HIGHLIGHT);
+        defaults.put("ProgressBar.background", DARK_INPUT);
+        defaults.put("ScrollBar.background", DARK_WINDOW);
+        defaults.put("ScrollBar.foreground", DARK_BORDER);
+        defaults.put("ScrollBar.thumb", DARK_BORDER);
+        defaults.put("ScrollBar.thumbHighlight", new Color(96, 96, 96));
+        defaults.put("ScrollBar.thumbShadow", new Color(35, 35, 35));
+        defaults.put("ScrollBar.thumbDarkShadow", new Color(20, 20, 20));
+        defaults.put("ScrollBar.track", DARK_INPUT);
+        defaults.put("ScrollBar.trackHighlight", DARK_PANEL);
+        defaults.put("ScrollBar.width", Integer.valueOf(14));
+        defaults.put("Slider.background", DARK_WINDOW);
+        defaults.put("Slider.foreground", DARK_HIGHLIGHT);
+        defaults.put("Slider.highlight", new Color(96, 96, 96));
+        defaults.put("Slider.shadow", new Color(28, 28, 28));
+        defaults.put("Slider.focus", DARK_HIGHLIGHT);
+        defaults.put("Slider.tickColor", DARK_TEXT);
+
+        // Use a logical font so Java selects the best scalable platform face,
+        // while preserving bold styles and making small legacy defaults legible.
+        for(Object key : new ArrayList<Object>(defaults.keySet())){
+            Object value = defaults.get(key);
+            if(value instanceof Font){
+                Font oldFont = (Font)value;
+                int size = Math.max(13, oldFont.getSize());
+                defaults.put(key, new FontUIResource(Font.SANS_SERIF, oldFont.getStyle(), size));
+            }
+        }
+
+        // The main window supplies its own simple dark title bar.  Keeping the
+        // Metal window decorations disabled avoids their patterned caption and
+        // dated black-and-white control icons.
+        JFrame.setDefaultLookAndFeelDecorated(false);
+        JDialog.setDefaultLookAndFeelDecorated(false);
+    }
+
+    private static JPanel createTitleBar(final JFrame frame){
+        JPanel titleBar = new JPanel(new BorderLayout());
+        titleBar.setBackground(DARK_PANEL);
+        titleBar.setPreferredSize(new Dimension(1, 34));
+        titleBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, DARK_BORDER));
+
+        JLabel title = new JLabel("Cell Division Inference");
+        title.setForeground(DARK_TEXT);
+        title.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 8));
+        titleBar.add(title, BorderLayout.CENTER);
+
+        JPanel controls = new JPanel(new GridLayout(1, 3, 0, 0));
+        controls.setOpaque(false);
+        JButton minimize = new WindowControlButton(WindowControlButton.MINIMIZE);
+        JButton maximize = new WindowControlButton(WindowControlButton.MAXIMIZE);
+        JButton close = new WindowControlButton(WindowControlButton.CLOSE);
+        minimize.setToolTipText("Minimize");
+        maximize.setToolTipText("Maximize / Restore");
+        close.setToolTipText("Close");
+        minimize.addActionListener(e -> frame.setState(Frame.ICONIFIED));
+        maximize.addActionListener(e -> toggleMaximized(frame));
+        close.addActionListener(e -> frame.dispatchEvent(
+                new WindowEvent(frame, WindowEvent.WINDOW_CLOSING)));
+        controls.add(minimize);
+        controls.add(maximize);
+        controls.add(close);
+        titleBar.add(controls, BorderLayout.EAST);
+
+        MouseAdapter moveWindow = new MouseAdapter(){
+            private Point pressedOnScreen;
+            private Point frameAtPress;
+
+            @Override public void mousePressed(MouseEvent e){
+                if(SwingUtilities.isLeftMouseButton(e)){
+                    pressedOnScreen = e.getLocationOnScreen();
+                    frameAtPress = frame.getLocation();
+                }
+            }
+
+            @Override public void mouseDragged(MouseEvent e){
+                if(pressedOnScreen == null || (frame.getExtendedState() & Frame.MAXIMIZED_BOTH) != 0) return;
+                Point now = e.getLocationOnScreen();
+                frame.setLocation(frameAtPress.x + now.x - pressedOnScreen.x,
+                        frameAtPress.y + now.y - pressedOnScreen.y);
+            }
+
+            @Override public void mouseReleased(MouseEvent e){
+                pressedOnScreen = null;
+                frameAtPress = null;
+            }
+
+            @Override public void mouseClicked(MouseEvent e){
+                if(SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 2) toggleMaximized(frame);
+            }
+        };
+        titleBar.addMouseListener(moveWindow);
+        titleBar.addMouseMotionListener(moveWindow);
+        title.addMouseListener(moveWindow);
+        title.addMouseMotionListener(moveWindow);
+        return titleBar;
+    }
+
+    private static void toggleMaximized(JFrame frame){
+        int state = frame.getExtendedState();
+        frame.setExtendedState((state & Frame.MAXIMIZED_BOTH) == 0
+                ? state | Frame.MAXIMIZED_BOTH
+                : state & ~Frame.MAXIMIZED_BOTH);
+    }
+
+    /** Crisp vector window controls; no font glyphs or Metal bitmap icons. */
+    private static class WindowControlButton extends JButton {
+        static final int MINIMIZE = 0, MAXIMIZE = 1, CLOSE = 2;
+        private final int control;
+
+        WindowControlButton(int control){
+            this.control = control;
+            setPreferredSize(new Dimension(46, 34));
+            setFocusable(false);
+            setBorderPainted(false);
+            setContentAreaFilled(false);
+            setOpaque(false);
+        }
+
+        @Override protected void paintComponent(Graphics graphics){
+            Graphics2D g = (Graphics2D)graphics.create();
+            if(getModel().isRollover() || getModel().isPressed()){
+                g.setColor(control == CLOSE ? new Color(196, 43, 28)
+                        : (getModel().isPressed() ? new Color(65, 65, 65) : new Color(75, 75, 75)));
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(DARK_TEXT);
+            g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER));
+            int cx = getWidth() / 2, cy = getHeight() / 2;
+            if(control == MINIMIZE){
+                g.drawLine(cx - 6, cy + 4, cx + 6, cy + 4);
+            }else if(control == MAXIMIZE){
+                g.drawRect(cx - 6, cy - 6, 12, 11);
+            }else{
+                g.drawLine(cx - 5, cy - 5, cx + 5, cy + 5);
+                g.drawLine(cx + 5, cy - 5, cx - 5, cy + 5);
+            }
+            g.dispose();
+        }
+    }
 
     private static class CenteredViewPanel extends JPanel {
         private final JComponent content;
@@ -251,9 +487,14 @@ public class CellDivisionInference implements PlugIn {
 
         SwingUtilities.invokeLater(() -> {
 
+            applyDarkTheme();
+
             JFrame frame=new JFrame("Cell Division Inference");
             mainFrame = frame;
             frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+            frame.setUndecorated(true);
+            frame.getRootPane().setBorder(BorderFactory.createLineBorder(DARK_BORDER));
+            frame.add(createTitleBar(frame), BorderLayout.NORTH);
 
             imagePanel=new ImagePanel();
             centeredImageContainer = new CenteredViewPanel(imagePanel);
@@ -266,9 +507,19 @@ public class CellDivisionInference implements PlugIn {
 
             JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, infoPanel, scrollPane);
             splitPane.setResizeWeight(0.0);
-            splitPane.setDividerSize(8);
+            splitPane.setDividerSize(6);
             splitPane.setContinuousLayout(true);
             splitPane.setBorder(BorderFactory.createEmptyBorder());
+            splitPane.setBackground(DARK_BORDER);
+
+            // Metal'\''s divider keeps a light bevel even when SplitPane.background
+            // is dark.  Style the concrete divider so no white seam remains
+            // between the information panel and image viewport.
+            BasicSplitPaneUI splitPaneUI = new BasicSplitPaneUI();
+            splitPane.setUI(splitPaneUI);
+            BasicSplitPaneDivider divider = splitPaneUI.getDivider();
+            divider.setBackground(DARK_BORDER);
+            divider.setBorder(BorderFactory.createEmptyBorder());
             frame.add(splitPane, BorderLayout.CENTER);
 
             JMenuBar bar=new JMenuBar();
