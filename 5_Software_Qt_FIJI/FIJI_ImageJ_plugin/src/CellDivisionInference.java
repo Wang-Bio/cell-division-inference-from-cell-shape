@@ -70,6 +70,7 @@ public class CellDivisionInference implements PlugIn {
         }
 
         UIDefaults defaults = UIManager.getDefaults();
+        applyEnglishDialogLabels(defaults);
         defaults.put("control", DARK_WINDOW);
         defaults.put("info", DARK_PANEL);
         defaults.put("nimbusBase", DARK_INPUT);
@@ -168,6 +169,91 @@ public class CellDivisionInference implements PlugIn {
         // dated black-and-white control icons.
         JFrame.setDefaultLookAndFeelDecorated(false);
         JDialog.setDefaultLookAndFeelDecorated(false);
+    }
+
+    /**
+     * Keep Swing'\''s standard dialog controls in English regardless of the
+     * language selected for FIJI, Java, or the operating system.  The plugin'\''s
+     * own messages are English, so localized stock buttons would otherwise
+     * produce mixed-language dialogs (for example, Chinese OK/Cancel buttons).
+     * Setting individual UI defaults avoids changing the locale of FIJI or of
+     * other plugins in the same Java process.
+     */
+    private static void applyEnglishDialogLabels(UIDefaults defaults){
+        String[][] labels = {
+            {"OptionPane.okButtonText", "OK"},
+            {"OptionPane.cancelButtonText", "Cancel"},
+            {"OptionPane.yesButtonText", "Yes"},
+            {"OptionPane.noButtonText", "No"},
+            {"OptionPane.inputDialogTitle", "Input"},
+            {"OptionPane.messageDialogTitle", "Message"},
+            {"OptionPane.titleText", "Select an Option"},
+
+            {"FileChooser.openButtonText", "Open"},
+            {"FileChooser.openButtonToolTipText", "Open selected file"},
+            {"FileChooser.saveButtonText", "Save"},
+            {"FileChooser.saveButtonToolTipText", "Save selected file"},
+            {"FileChooser.directoryOpenButtonText", "Open"},
+            {"FileChooser.directoryOpenButtonToolTipText", "Open selected directory"},
+            {"FileChooser.cancelButtonText", "Cancel"},
+            {"FileChooser.cancelButtonToolTipText", "Close the dialog"},
+            {"FileChooser.updateButtonText", "Update"},
+            {"FileChooser.updateButtonToolTipText", "Update directory listing"},
+            {"FileChooser.helpButtonText", "Help"},
+            {"FileChooser.helpButtonToolTipText", "File chooser help"},
+            {"FileChooser.openDialogTitleText", "Open"},
+            {"FileChooser.saveDialogTitleText", "Save"},
+            {"FileChooser.lookInLabelText", "Look in:"},
+            {"FileChooser.saveInLabelText", "Save in:"},
+            {"FileChooser.fileNameLabelText", "File name:"},
+            {"FileChooser.filesOfTypeLabelText", "Files of type:"},
+            {"FileChooser.acceptAllFileFilterText", "All Files"},
+            {"FileChooser.upFolderToolTipText", "Up One Level"},
+            {"FileChooser.homeFolderToolTipText", "Home"},
+            {"FileChooser.newFolderToolTipText", "Create New Folder"},
+            {"FileChooser.listViewButtonToolTipText", "List"},
+            {"FileChooser.listViewButtonAccessibleName", "List"},
+            {"FileChooser.detailsViewButtonToolTipText", "Details"},
+            {"FileChooser.detailsViewButtonAccessibleName", "Details"},
+            {"FileChooser.upFolderAccessibleName", "Up One Level"},
+            {"FileChooser.homeFolderAccessibleName", "Home"},
+            {"FileChooser.newFolderAccessibleName", "Create New Folder"},
+            {"FileChooser.viewMenuButtonToolTipText", "View Menu"},
+            {"FileChooser.viewMenuButtonAccessibleName", "View Menu"},
+            {"FileChooser.listViewActionLabelText", "List"},
+            {"FileChooser.detailsViewActionLabelText", "Details"},
+            {"FileChooser.refreshActionLabelText", "Refresh"},
+            {"FileChooser.newFolderActionLabelText", "New Folder"},
+
+            {"ColorChooser.okText", "OK"},
+            {"ColorChooser.cancelText", "Cancel"},
+            {"ColorChooser.resetText", "Reset"},
+            {"ColorChooser.previewText", "Preview"},
+            {"ColorChooser.swatchesNameText", "Swatches"},
+            {"ColorChooser.swatchesRecentText", "Recent:"},
+            {"ColorChooser.hsvNameText", "HSV"},
+            {"ColorChooser.hsvHueText", "Hue"},
+            {"ColorChooser.hsvSaturationText", "Saturation"},
+            {"ColorChooser.hsvValueText", "Value"},
+            {"ColorChooser.hsvTransparencyText", "Transparency"},
+            {"ColorChooser.hslNameText", "HSL"},
+            {"ColorChooser.hslHueText", "Hue"},
+            {"ColorChooser.hslSaturationText", "Saturation"},
+            {"ColorChooser.hslLightnessText", "Lightness"},
+            {"ColorChooser.hslTransparencyText", "Transparency"},
+            {"ColorChooser.rgbNameText", "RGB"},
+            {"ColorChooser.rgbRedText", "Red"},
+            {"ColorChooser.rgbGreenText", "Green"},
+            {"ColorChooser.rgbBlueText", "Blue"},
+            {"ColorChooser.rgbAlphaText", "Alpha"},
+            {"ColorChooser.cmykNameText", "CMYK"},
+            {"ColorChooser.cmykCyanText", "Cyan"},
+            {"ColorChooser.cmykMagentaText", "Magenta"},
+            {"ColorChooser.cmykYellowText", "Yellow"},
+            {"ColorChooser.cmykBlackText", "Black"},
+            {"ColorChooser.cmykAlphaText", "Alpha"}
+        };
+        for(String[] label : labels) defaults.put(label[0], label[1]);
     }
 
     private static JPanel createTitleBar(final JFrame frame){
