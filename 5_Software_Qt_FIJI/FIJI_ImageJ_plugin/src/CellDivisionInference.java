@@ -580,7 +580,6 @@ public class CellDivisionInference implements PlugIn {
             frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             frame.setUndecorated(true);
             frame.getRootPane().setBorder(BorderFactory.createLineBorder(DARK_BORDER));
-            frame.add(createTitleBar(frame), BorderLayout.NORTH);
 
             imagePanel=new ImagePanel();
             centeredImageContainer = new CenteredViewPanel(imagePanel);
@@ -618,11 +617,7 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
-            fileMenu.add(new JMenuItem(new AbstractAction("Create Canvas"){
-                public void actionPerformed(ActionEvent e){
-                    createCanvas(frame);
-                }
-            }));
+
 
             fileMenu.add(new JMenuItem(new AbstractAction("Open Background"){
                 public void actionPerformed(ActionEvent e){
@@ -638,6 +633,12 @@ public class CellDivisionInference implements PlugIn {
             });
             showSourceImageMenuItem.setEnabled(false);
             fileMenu.add(showSourceImageMenuItem);
+
+            fileMenu.add(new JMenuItem(new AbstractAction("Create Canvas"){
+                public void actionPerformed(ActionEvent e){
+                    createCanvas(frame);
+                }
+            }));
 
             JMenu processMenu=new JMenu("Detect");
 
@@ -680,16 +681,16 @@ public class CellDivisionInference implements PlugIn {
             */
             JMenu geometryMenu=new JMenu("Geometry");
 
-            geometryMenu.add(new JMenuItem(new AbstractAction("Single Cell Geometry Calculation") {
-                @Override public void actionPerformed(ActionEvent e){
-                    calculateAndExportSingleCellGeometries(frame);
-                }
-            }));
-
             geometryMenu.add(new JMenuItem(new AbstractAction("Neighbor Pair Geometry Calculation") {
                 @Override public void actionPerformed(ActionEvent e){
                     calculateAllNeighborPairGeometries(frame);
                 }                
+            }));
+
+            geometryMenu.add(new JMenuItem(new AbstractAction("Single Cell Geometry Calculation") {
+                @Override public void actionPerformed(ActionEvent e){
+                    calculateAndExportSingleCellGeometries(frame);
+                }
             }));
 
             JMenu estimateMenu=new JMenu("Estimate");
@@ -860,7 +861,10 @@ public class CellDivisionInference implements PlugIn {
             bar.add(findMenu);
             bar.add(ioMenu);
 
-            frame.setJMenuBar(bar);
+            JPanel windowHeader = new JPanel(new BorderLayout());
+            windowHeader.add(createTitleBar(frame), BorderLayout.NORTH);
+            windowHeader.add(bar, BorderLayout.SOUTH);
+            frame.add(windowHeader, BorderLayout.NORTH);
             updateInfoPanel();
             frame.setSize(1200, 800);
             frame.setLocationRelativeTo(null);
