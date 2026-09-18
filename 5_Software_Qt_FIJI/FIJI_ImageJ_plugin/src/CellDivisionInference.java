@@ -422,14 +422,96 @@ public class CellDivisionInference implements PlugIn {
         for(String[] label : labels) defaults.put(label[0], label[1]);
     }
 
+    /**
+     * Draw the application icon directly in Java. The geometry is based on the
+     * two neighboring daughter-cell polygons in the reference figure, using the
+     * original 425 x 527 design coordinate system so every requested icon size
+     * preserves the same proportions.
+     */
+    private static BufferedImage createDivisionPairIcon(int size){
+        BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = image.createGraphics();
+
+        try{
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+
+            final double designWidth = 425.0;
+            final double designHeight = 527.0;
+
+            // Keep a small transparent margin around the cell pair.
+            double padding = Math.max(1.0, size * 0.045);
+            double scale = (size - 2.0 * padding) / designHeight;
+            double drawingWidth = designWidth * scale;
+            double offsetX = (size - drawingWidth) / 2.0;
+            double offsetY = padding;
+
+            g.translate(offsetX, offsetY);
+            g.scale(scale, scale);
+
+            // Upper daughter cell.
+            Path2D.Double upper = new Path2D.Double();
+            upper.moveTo(204, 5);
+            upper.lineTo(100, 72);
+            upper.lineTo(91, 219);      // shared junction
+            upper.lineTo(354, 359);     // shared junction
+            upper.lineTo(420, 269);
+            upper.lineTo(334, 99);
+            upper.closePath();
+
+            // Lower daughter cell.
+            Path2D.Double lower = new Path2D.Double();
+            lower.moveTo(91, 219);      // shared junction
+            lower.lineTo(5, 373);
+            lower.lineTo(89, 498);
+            lower.lineTo(229, 522);
+            lower.lineTo(354, 359);     // shared junction
+            lower.closePath();
+
+            // Colors sampled/approximated from the reference figure.
+            Color fillColor = new Color(226, 239, 216, 210);
+            Color borderColor = new Color(59, 125, 35);
+
+            g.setColor(fillColor);
+            g.fill(upper);
+            g.fill(lower);
+
+            // Keep the green wall visible even for 16-24 px taskbar icons.
+            double designStroke = Math.max(9.0, 1.35 / scale);
+            g.setStroke(new BasicStroke(
+                    (float)designStroke,
+                    BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND));
+
+            g.setColor(borderColor);
+            g.draw(upper);
+            g.draw(lower);
+        } finally {
+            g.dispose();
+        }
+
+        return image;
+    }
+
+    /** Multiple resolutions let the operating system choose the sharpest icon. */
+    private static List<Image> createDivisionPairIcons(){
+        List<Image> icons = new ArrayList<>();
+        int[] sizes = {16, 20, 24, 32, 48, 64, 128, 256};
+        for(int size : sizes) icons.add(createDivisionPairIcon(size));
+        return icons;
+    }
+
     private static JPanel createTitleBar(final JFrame frame){
         JPanel titleBar = new JPanel(new BorderLayout());
         titleBar.setBackground(DARK_PANEL);
         titleBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, DARK_BORDER));
 
         JLabel title = new JLabel("Cell Division Inference");
+        int titleIconSize = Math.max(22, title.getFontMetrics(title.getFont()).getHeight() + 2);
+        title.setIcon(new ImageIcon(createDivisionPairIcon(titleIconSize)));
+        title.setIconTextGap(7);
         title.setForeground(DARK_TEXT);
-        title.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 8));
+        title.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 8));
         int titleHeight = Math.max(34, title.getFontMetrics(title.getFont()).getHeight() + 14);
         titleBar.setPreferredSize(new Dimension(1, titleHeight));
         titleBar.add(title, BorderLayout.CENTER);
@@ -753,6 +835,7 @@ public class CellDivisionInference implements PlugIn {
             writeInterfaceFontDefaults(resolvedInterfaceFontSize);
 
             JFrame frame=new JFrame("Cell Division Inference");
+            frame.setIconImages(createDivisionPairIcons());
             mainFrame = frame;
             frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             frame.setUndecorated(true);
