@@ -32,6 +32,7 @@ import java.awt.geom.Rectangle2D;
 import java.awt.geom.PathIterator;
 import java.awt.geom.FlatteningPathIterator;
 import java.text.DecimalFormat;
+import java.util.prefs.Preferences;
 
 import com.google.gson.*;
 import org.jgrapht.Graph;
@@ -42,6 +43,22 @@ import org.jgrapht.graph.SimpleWeightedGraph;
 import org.jgrapht.util.SupplierUtil;
 
 public class CellDivisionInference implements PlugIn {
+
+    private static final int BASE_INTERFACE_FONT_SIZE = 13;
+    private static final int MIN_INTERFACE_FONT_SIZE = 10;
+    private static final int MAX_INTERFACE_FONT_SIZE = 32;
+    private static final String PREF_INTERFACE_FONT_MODE = "interfaceFontMode";
+    private static final String PREF_INTERFACE_FONT_SIZE = "interfaceFontSize";
+    private static final String FONT_MODE_AUTOMATIC = "automatic";
+    private static final String FONT_MODE_MANUAL = "manual";
+    private static final Preferences PLUGIN_PREFERENCES =
+            Preferences.userNodeForPackage(CellDivisionInference.class);
+    private static final Map<Object, Font> ORIGINAL_UI_FONTS = new LinkedHashMap<>();
+    private static boolean originalFontsCaptured;
+
+    private String interfaceFontMode = FONT_MODE_AUTOMATIC;
+    private int manualInterfaceFontSize = BASE_INTERFACE_FONT_SIZE;
+    private int resolvedInterfaceFontSize = BASE_INTERFACE_FONT_SIZE;
 
     // Dark Fusion-style palette used by the Qt desktop application.  Keeping
     // the colours here also makes dialogs created later by JOptionPane and
@@ -153,22 +170,171 @@ public class CellDivisionInference implements PlugIn {
         defaults.put("Slider.focus", DARK_HIGHLIGHT);
         defaults.put("Slider.tickColor", DARK_TEXT);
 
-        // Use a logical font so Java selects the best scalable platform face,
-        // while preserving bold styles and making small legacy defaults legible.
-        for(Object key : new ArrayList<Object>(defaults.keySet())){
-            Object value = defaults.get(key);
-            if(value instanceof Font){
-                Font oldFont = (Font)value;
-                int size = Math.max(13, oldFont.getSize());
-                defaults.put(key, new FontUIResource(Font.SANS_SERIF, oldFont.getStyle(), size));
-            }
-        }
-
         // The main window supplies its own simple dark title bar.  Keeping the
         // Metal window decorations disabled avoids their patterned caption and
         // dated black-and-white control icons.
         JFrame.setDefaultLookAndFeelDecorated(false);
         JDialog.setDefaultLookAndFeelDecorated(false);
+    }
+
+    private static synchronized void captureOriginalFontDefaults(){
+        if(originalFontsCaptured) return;
+        UIDefaults defaults = UIManager.getDefaults();
+        for(Object key : new ArrayList<Object>(defaults.keySet())){
+            Object value = defaults.get(key);
+            if(value instanceof Font) ORIGINAL_UI_FONTS.put(key, (Font)value);
+        }
+        originalFontsCaptured = true;
+    }
+
+    /** Writes an absolute size, always deriving style from the unscaled defaults. */
+    private static void writeInterfaceFontDefaults(int pointSize){
+        captureOriginalFontDefaults();
+        UIDefaults defaults = UIManager.getDefaults();
+        for(Map.Entry<Object, Font> entry : ORIGINAL_UI_FONTS.entrySet()){
+            Font original = entry.getValue();
+            defaults.put(entry.getKey(), new FontUIResource(
+                    original.getName(), original.getStyle(), pointSize));
+        }
+    }
+
+    private static void restoreOriginalFontDefaults(){
+        if(!originalFontsCaptured) return;
+        UIDefaults defaults = UIManager.getDefaults();
+        for(Map.Entry<Object, Font> entry : ORIGINAL_UI_FONTS.entrySet())
+            defaults.put(entry.getKey(), entry.getValue());
+    }
+
+    private static int clampInterfaceFontSize(int size){
+        return Math.max(MIN_INTERFACE_FONT_SIZE, Math.min(MAX_INTERFACE_FONT_SIZE, size));
+    }
+
+    private static int automaticInterfaceFontSize(GraphicsConfiguration configuration){
+        if(configuration == null) return BASE_INTERFACE_FONT_SIZE;
+        AffineTransform transform = configuration.getDefaultTransform();
+        if(transform == null) return BASE_INTERFACE_FONT_SIZE;
+        double scale = Math.max(transform.getScaleX(), transform.getScaleY());
+        if(!Double.isFinite(scale) || scale <= 0.0 || Math.abs(scale - 1.0) < 0.05)
+            return BASE_INTERFACE_FONT_SIZE;
+        return clampInterfaceFontSize((int)Math.round(BASE_INTERFACE_FONT_SIZE * scale));
+    }
+
+    private int resolveInterfaceFontSize(GraphicsConfiguration configuration){
+        return FONT_MODE_MANUAL.equals(interfaceFontMode)
+                ? clampInterfaceFontSize(manualInterfaceFontSize)
+                : automaticInterfaceFontSize(configuration);
+    }
+
+    private static void applyFontRecursively(Component component, int pointSize){
+        Set<Component> visited = Collections.newSetFromMap(new IdentityHashMap<Component, Boolean>());
+        applyFontRecursively(component, pointSize, visited);
+    }
+
+    /**
+     * Apply the selected interface size to the complete Swing subtree. JMenu
+     * stores its submenu entries in a JPopupMenu rather than in the ordinary
+     * Container child list, so menu popup trees must be traversed explicitly.
+     */
+    private static void applyFontRecursively(Component component, int pointSize, Set<Component> visited){
+        if(component == null || !visited.add(component)) return;
+
+        Font font = component.getFont();
+        if(font != null && font.getSize() != pointSize)
+            component.setFont(font.deriveFont((float)pointSize));
+
+        if(component instanceof JComponent){
+            JComponent jc = (JComponent)component;
+            applyFontToBorder(jc.getBorder(), jc.getFont(), pointSize);
+            JPopupMenu attachedPopup = jc.getComponentPopupMenu();
+            if(attachedPopup != null) applyFontRecursively(attachedPopup, pointSize, visited);
+        }
+
+        if(component instanceof JMenu){
+            // JMenu#getComponents() does not reliably expose the popup menu
+            // hierarchy used for submenu items on every Swing implementation.
+            applyFontRecursively(((JMenu)component).getPopupMenu(), pointSize, visited);
+        }
+
+        if(component instanceof JTable){
+            JTable table = (JTable)component;
+            int minimumRowHeight = table.getFontMetrics(table.getFont()).getHeight() + 6;
+            if(table.getRowHeight() < minimumRowHeight) table.setRowHeight(minimumRowHeight);
+        }
+
+        if(component instanceof Container){
+            for(Component child : ((Container)component).getComponents())
+                applyFontRecursively(child, pointSize, visited);
+        }
+    }
+
+    private static void applyFontToBorder(javax.swing.border.Border border, Font fallback, int pointSize){
+        if(border == null) return;
+        if(border instanceof TitledBorder){
+            TitledBorder titled = (TitledBorder)border;
+            Font titleFont = titled.getTitleFont();
+            if(titleFont == null) titleFont = fallback;
+            if(titleFont != null) titled.setTitleFont(titleFont.deriveFont((float)pointSize));
+        }
+        if(border instanceof javax.swing.border.CompoundBorder){
+            javax.swing.border.CompoundBorder compound = (javax.swing.border.CompoundBorder)border;
+            applyFontToBorder(compound.getOutsideBorder(), fallback, pointSize);
+            applyFontToBorder(compound.getInsideBorder(), fallback, pointSize);
+        }
+    }
+
+    private void applyFontToDetachedPluginPopups(){
+        // ImagePanel uses a manually shown popup, so it is not part of the main
+        // frame's normal component hierarchy. Keep it synchronized explicitly.
+        if(imagePanel != null && imagePanel.popup != null)
+            applyFontRecursively(imagePanel.popup, resolvedInterfaceFontSize);
+    }
+
+    private void updatePluginWindow(Window window, boolean repack){
+        if(window == null) return;
+        Rectangle oldBounds = window.getBounds();
+        applyFontRecursively(window, resolvedInterfaceFontSize);
+        SwingUtilities.updateComponentTreeUI(window);
+        applyFontRecursively(window, resolvedInterfaceFontSize);
+        if(window == mainFrame) applyFontToDetachedPluginPopups();
+        window.invalidate();
+        if(repack) window.pack(); else window.validate();
+        if(window == mainFrame && oldBounds.width > 0 && oldBounds.height > 0)
+            window.setBounds(oldBounds);
+        clampWindowToScreen(window);
+        window.repaint();
+    }
+
+    private static void clampWindowToScreen(Window window){
+        GraphicsConfiguration gc = window.getGraphicsConfiguration();
+        if(gc == null) gc = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getDefaultScreenDevice().getDefaultConfiguration();
+        Rectangle screen = gc == null
+                ? GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds()
+                : gc.getBounds();
+        Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(gc);
+        Rectangle usable = new Rectangle(screen.x + insets.left, screen.y + insets.top,
+                screen.width - insets.left - insets.right, screen.height - insets.top - insets.bottom);
+        Dimension size = window.getSize();
+        window.setSize(Math.min(size.width, usable.width), Math.min(size.height, usable.height));
+        int x = Math.max(usable.x, Math.min(window.getX(), usable.x + usable.width - window.getWidth()));
+        int y = Math.max(usable.y, Math.min(window.getY(), usable.y + usable.height - window.getHeight()));
+        window.setLocation(x, y);
+    }
+
+    private void packDialog(JDialog dialog, int minimumWidth, int minimumHeight){
+        applyFontRecursively(dialog, resolvedInterfaceFontSize);
+        dialog.setMinimumSize(new Dimension(minimumWidth, minimumHeight));
+        dialog.pack();
+        Dimension packed = dialog.getSize();
+        Dimension minimum = dialog.getMinimumSize();
+        dialog.setSize(Math.max(packed.width, minimum.width), Math.max(packed.height, minimum.height));
+        clampWindowToScreen(dialog);
+    }
+
+    private static int fontMetric(Component component, int basePixels){
+        Font font = component.getFont();
+        int size = font == null ? BASE_INTERFACE_FONT_SIZE : font.getSize();
+        return Math.max(basePixels, (int)Math.ceil(basePixels * size / (double)BASE_INTERFACE_FONT_SIZE));
     }
 
     /**
@@ -259,12 +425,13 @@ public class CellDivisionInference implements PlugIn {
     private static JPanel createTitleBar(final JFrame frame){
         JPanel titleBar = new JPanel(new BorderLayout());
         titleBar.setBackground(DARK_PANEL);
-        titleBar.setPreferredSize(new Dimension(1, 34));
         titleBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, DARK_BORDER));
 
         JLabel title = new JLabel("Cell Division Inference");
         title.setForeground(DARK_TEXT);
         title.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 8));
+        int titleHeight = Math.max(34, title.getFontMetrics(title.getFont()).getHeight() + 14);
+        titleBar.setPreferredSize(new Dimension(1, titleHeight));
         titleBar.add(title, BorderLayout.CENTER);
 
         JPanel controls = new JPanel(new GridLayout(1, 3, 0, 0));
@@ -332,7 +499,8 @@ public class CellDivisionInference implements PlugIn {
 
         WindowControlButton(int control){
             this.control = control;
-            setPreferredSize(new Dimension(46, 34));
+            int height = Math.max(34, getFontMetrics(getFont()).getHeight() + 14);
+            setPreferredSize(new Dimension(fontMetric(this, 46), height));
             setFocusable(false);
             setBorderPainted(false);
             setContentAreaFilled(false);
@@ -350,13 +518,14 @@ public class CellDivisionInference implements PlugIn {
             g.setColor(DARK_TEXT);
             g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER));
             int cx = getWidth() / 2, cy = getHeight() / 2;
+            int icon = Math.max(6, getFontMetrics(getFont()).getHeight() / 3);
             if(control == MINIMIZE){
-                g.drawLine(cx - 6, cy + 4, cx + 6, cy + 4);
+                g.drawLine(cx - icon, cy + icon / 2, cx + icon, cy + icon / 2);
             }else if(control == MAXIMIZE){
-                g.drawRect(cx - 6, cy - 6, 12, 11);
+                g.drawRect(cx - icon, cy - icon, icon * 2, icon * 2 - 1);
             }else{
-                g.drawLine(cx - 5, cy - 5, cx + 5, cy + 5);
-                g.drawLine(cx + 5, cy - 5, cx - 5, cy + 5);
+                g.drawLine(cx - icon, cy - icon, cx + icon, cy + icon);
+                g.drawLine(cx + icon, cy - icon, cx - icon, cy + icon);
             }
             g.dispose();
         }
@@ -574,6 +743,14 @@ public class CellDivisionInference implements PlugIn {
         SwingUtilities.invokeLater(() -> {
 
             applyDarkTheme();
+            interfaceFontMode = PLUGIN_PREFERENCES.get(PREF_INTERFACE_FONT_MODE, FONT_MODE_AUTOMATIC);
+            if(!FONT_MODE_MANUAL.equals(interfaceFontMode)) interfaceFontMode = FONT_MODE_AUTOMATIC;
+            manualInterfaceFontSize = clampInterfaceFontSize(PLUGIN_PREFERENCES.getInt(
+                    PREF_INTERFACE_FONT_SIZE, BASE_INTERFACE_FONT_SIZE));
+            GraphicsConfiguration initialConfiguration = GraphicsEnvironment
+                    .getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+            resolvedInterfaceFontSize = resolveInterfaceFontSize(initialConfiguration);
+            writeInterfaceFontDefaults(resolvedInterfaceFontSize);
 
             JFrame frame=new JFrame("Cell Division Inference");
             mainFrame = frame;
@@ -852,6 +1029,13 @@ public class CellDivisionInference implements PlugIn {
                 }
             }));
 
+            JMenu settingMenu = new JMenu("Setting");
+            settingMenu.add(new JMenuItem(new AbstractAction("Interface Font Size…"){
+                @Override public void actionPerformed(ActionEvent e){
+                    showInterfaceFontSizeDialog(frame);
+                }
+            }));
+
             bar.add(fileMenu);
             bar.add(processMenu);
             bar.add(geometryMenu);
@@ -860,6 +1044,7 @@ public class CellDivisionInference implements PlugIn {
             bar.add(editMenu);
             bar.add(findMenu);
             bar.add(ioMenu);
+            bar.add(settingMenu);
 
             JPanel windowHeader = new JPanel(new BorderLayout());
             windowHeader.add(createTitleBar(frame), BorderLayout.NORTH);
@@ -869,8 +1054,140 @@ public class CellDivisionInference implements PlugIn {
             frame.setSize(1200, 800);
             frame.setLocationRelativeTo(null);
             adjustWindowToContent();
+            int deviceSize = resolveInterfaceFontSize(frame.getGraphicsConfiguration());
+            if(deviceSize != resolvedInterfaceFontSize){
+                resolvedInterfaceFontSize = deviceSize;
+                updatePluginWindow(frame, false);
+            }else{
+                applyFontRecursively(frame, resolvedInterfaceFontSize);
+                applyFontToDetachedPluginPopups();
+            }
+            frame.addPropertyChangeListener("graphicsConfiguration", e -> {
+                if(!FONT_MODE_AUTOMATIC.equals(interfaceFontMode)) return;
+                int newSize = resolveInterfaceFontSize(frame.getGraphicsConfiguration());
+                if(newSize != resolvedInterfaceFontSize){
+                    resolvedInterfaceFontSize = newSize;
+                    updatePluginWindow(frame, false);
+                }
+            });
+            AWTEventListener pluginWindowListener = event -> {
+                if(event instanceof WindowEvent && event.getID() == WindowEvent.WINDOW_OPENED){
+                    Window opened = ((WindowEvent)event).getWindow();
+                    if(isPluginOwnedWindow(opened)) updatePluginWindow(opened, opened != mainFrame);
+                    return;
+                }
+                if(event instanceof ContainerEvent && event.getID() == ContainerEvent.COMPONENT_ADDED){
+                    ContainerEvent containerEvent = (ContainerEvent)event;
+                    if(isPluginComponent(containerEvent.getContainer()))
+                        applyFontRecursively(containerEvent.getChild(), resolvedInterfaceFontSize);
+                }
+            };
+            Toolkit.getDefaultToolkit().addAWTEventListener(pluginWindowListener,
+                    AWTEvent.WINDOW_EVENT_MASK | AWTEvent.CONTAINER_EVENT_MASK);
+            frame.addWindowListener(new WindowAdapter(){
+                @Override public void windowClosed(WindowEvent e){
+                    Toolkit.getDefaultToolkit().removeAWTEventListener(pluginWindowListener);
+                }
+            });
             frame.setVisible(true);
+            // UIManager is shared by FIJI. Components above have their own font;
+            // restore the defaults so unrelated dialogs do not inherit it.
+            restoreOriginalFontDefaults();
         });
+    }
+
+    private boolean isPluginOwnedWindow(Window window){
+        for(Window candidate = window; candidate != null; candidate = candidate.getOwner())
+            if(candidate == mainFrame) return true;
+        return false;
+    }
+
+    private boolean isPluginComponent(Component component){
+        if(component == null) return false;
+        Component candidate = component;
+        while(candidate != null){
+            if(candidate == mainFrame) return true;
+            if(candidate instanceof JPopupMenu){
+                Component invoker = ((JPopupMenu)candidate).getInvoker();
+                if(invoker != null && invoker != candidate && isPluginComponent(invoker)) return true;
+            }
+            candidate = candidate.getParent();
+        }
+        Window owner = SwingUtilities.getWindowAncestor(component);
+        return owner != null && (owner == mainFrame || isPluginOwnedWindow(owner));
+    }
+
+    private void showInterfaceFontSizeDialog(JFrame owner){
+        JDialog dialog = new JDialog(owner, "Interface Font Size", true);
+        JPanel content = new JPanel(new GridBagLayout());
+        content.setBorder(BorderFactory.createEmptyBorder(12, 12, 6, 12));
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.anchor = GridBagConstraints.WEST;
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.insets = new Insets(4, 4, 4, 4);
+        gc.gridx = 0; gc.gridy = 0; gc.gridwidth = 2; gc.weightx = 1;
+
+        int automaticSize = automaticInterfaceFontSize(owner.getGraphicsConfiguration());
+        JRadioButton automatic = new JRadioButton(
+                "Automatic (recommended) — " + automaticSize + " pt",
+                FONT_MODE_AUTOMATIC.equals(interfaceFontMode));
+        JRadioButton manual = new JRadioButton("Manual", FONT_MODE_MANUAL.equals(interfaceFontMode));
+        ButtonGroup modes = new ButtonGroup();
+        modes.add(automatic); modes.add(manual);
+        content.add(automatic, gc);
+        gc.gridy++; gc.gridwidth = 1;
+        content.add(manual, gc);
+        JSpinner size = new JSpinner(new SpinnerNumberModel(manualInterfaceFontSize,
+                MIN_INTERFACE_FONT_SIZE, MAX_INTERFACE_FONT_SIZE, 1));
+        gc.gridx = 1; content.add(size, gc);
+        gc.gridx = 0; gc.gridy++; gc.gridwidth = 2;
+        JLabel note = new JLabel("Java 8/platform DPI reporting can vary; use Manual when needed.");
+        content.add(note, gc);
+        gc.gridy++;
+        JLabel preview = new JLabel("Live preview: Cell Division Inference  Aa 123");
+        preview.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(DARK_BORDER), BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+        content.add(preview, gc);
+        Runnable updatePreview = () -> {
+            int selected = automatic.isSelected() ? automaticSize : ((Number)size.getValue()).intValue();
+            preview.setFont(preview.getFont().deriveFont((float)selected));
+            size.setEnabled(manual.isSelected());
+            dialog.pack();
+            clampWindowToScreen(dialog);
+        };
+        automatic.addActionListener(e -> updatePreview.run());
+        manual.addActionListener(e -> updatePreview.run());
+        size.addChangeListener(e -> updatePreview.run());
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton restore = new JButton("Restore Default");
+        JButton ok = new JButton("OK");
+        JButton cancel = new JButton("Cancel");
+        buttons.add(restore); buttons.add(ok); buttons.add(cancel);
+        restore.addActionListener(e -> {
+            automatic.setSelected(true);
+            size.setValue(BASE_INTERFACE_FONT_SIZE);
+            updatePreview.run();
+        });
+        cancel.addActionListener(e -> dialog.dispose());
+        ok.addActionListener(e -> {
+            interfaceFontMode = manual.isSelected() ? FONT_MODE_MANUAL : FONT_MODE_AUTOMATIC;
+            manualInterfaceFontSize = clampInterfaceFontSize(((Number)size.getValue()).intValue());
+            PLUGIN_PREFERENCES.put(PREF_INTERFACE_FONT_MODE, interfaceFontMode);
+            PLUGIN_PREFERENCES.putInt(PREF_INTERFACE_FONT_SIZE, manualInterfaceFontSize);
+            int newSize = resolveInterfaceFontSize(owner.getGraphicsConfiguration());
+            dialog.dispose();
+            resolvedInterfaceFontSize = newSize;
+            for(Window window : Window.getWindows())
+                if(window == mainFrame || isPluginOwnedWindow(window)) updatePluginWindow(window, window != mainFrame);
+            applyFontToDetachedPluginPopups();
+        });
+        dialog.add(content, BorderLayout.CENTER);
+        dialog.add(buttons, BorderLayout.SOUTH);
+        applyFontRecursively(dialog, resolvedInterfaceFontSize);
+        updatePreview.run();
+        dialog.setLocationRelativeTo(owner);
+        dialog.setVisible(true);
     }
 
     /** Shared defaults are intentionally identical to NetworkDebugTolerances in Qt. */
@@ -905,7 +1222,7 @@ public class CellDivisionInference implements PlugIn {
         r.sort(Comparator.comparing((DebugIssue x)->x.severity).thenComparing(x->x.code).thenComparing(DebugIssue::objects));return r;
     }
     private void showNetworkDebugger(JFrame owner){
-        final JDialog d=new JDialog(owner,"Debug All — Network Issues",false);d.setLayout(new BorderLayout(6,6));final JLabel summary=new JLabel();final String[] cols={"Severity","Code","Objects","Location","Description","Suggested correction"};final AbstractTableModel model=new AbstractTableModel(){List<DebugIssue> issues=inspectNetwork();public int getRowCount(){return issues.size();}public int getColumnCount(){return cols.length;}public String getColumnName(int c){return cols[c];}public Object getValueAt(int r,int c){DebugIssue i=issues.get(r);return new Object[]{i.severity,i.code,i.objects(),String.format(Locale.ROOT,"%.1f, %.1f",i.location.x,i.location.y),i.description,i.correction}[c];}};JTable table=new JTable(model);Runnable counts=()->{int e=0,w=0;for(DebugIssue i:((AbstractTableModel)model instanceof AbstractTableModel?inspectNetwork():Collections.<DebugIssue>emptyList())){if(i.severity==DebugSeverity.ERROR)e++;if(i.severity==DebugSeverity.WARNING)w++;}summary.setText(e==0&&w==0?"No errors or warnings detected.":e+" Errors, "+w+" Warnings");};counts.run();table.getSelectionModel().addListSelectionListener(e->{int row=table.getSelectedRow();List<DebugIssue> now=inspectNetwork();if(row>=0&&row<now.size()){DebugIssue i=now.get(row);imagePanel.setDebugHighlights(i.vertices,i.lines);}});d.add(summary,BorderLayout.NORTH);d.add(new JScrollPane(table),BorderLayout.CENTER);JPanel buttons=new JPanel();JButton previous=new JButton("Previous"),next=new JButton("Next"),rerun=new JButton("Re-run"),clear=new JButton("Clear Highlights"),close=new JButton("Close");previous.addActionListener(e->{if(table.getRowCount()>0)table.setRowSelectionInterval((table.getSelectedRow()-1+table.getRowCount())%table.getRowCount(),(table.getSelectedRow()-1+table.getRowCount())%table.getRowCount());});next.addActionListener(e->{if(table.getRowCount()>0){int x=(table.getSelectedRow()+1)%table.getRowCount();table.setRowSelectionInterval(x,x);}});rerun.addActionListener(e->{d.dispose();showNetworkDebugger(owner);});clear.addActionListener(e->{imagePanel.clearDebugHighlights();imagePanel.repaint();});close.addActionListener(e->d.dispose());for(JButton b:Arrays.asList(previous,next,rerun,clear,close))buttons.add(b);d.add(buttons,BorderLayout.SOUTH);d.setSize(1200,500);d.setLocationRelativeTo(owner);d.setVisible(true);
+        final JDialog d=new JDialog(owner,"Debug All — Network Issues",false);d.setLayout(new BorderLayout(6,6));final JLabel summary=new JLabel();final String[] cols={"Severity","Code","Objects","Location","Description","Suggested correction"};final AbstractTableModel model=new AbstractTableModel(){List<DebugIssue> issues=inspectNetwork();public int getRowCount(){return issues.size();}public int getColumnCount(){return cols.length;}public String getColumnName(int c){return cols[c];}public Object getValueAt(int r,int c){DebugIssue i=issues.get(r);return new Object[]{i.severity,i.code,i.objects(),String.format(Locale.ROOT,"%.1f, %.1f",i.location.x,i.location.y),i.description,i.correction}[c];}};JTable table=new JTable(model);Runnable counts=()->{int e=0,w=0;for(DebugIssue i:((AbstractTableModel)model instanceof AbstractTableModel?inspectNetwork():Collections.<DebugIssue>emptyList())){if(i.severity==DebugSeverity.ERROR)e++;if(i.severity==DebugSeverity.WARNING)w++;}summary.setText(e==0&&w==0?"No errors or warnings detected.":e+" Errors, "+w+" Warnings");};counts.run();table.getSelectionModel().addListSelectionListener(e->{int row=table.getSelectedRow();List<DebugIssue> now=inspectNetwork();if(row>=0&&row<now.size()){DebugIssue i=now.get(row);imagePanel.setDebugHighlights(i.vertices,i.lines);}});d.add(summary,BorderLayout.NORTH);d.add(new JScrollPane(table),BorderLayout.CENTER);JPanel buttons=new JPanel();JButton previous=new JButton("Previous"),next=new JButton("Next"),rerun=new JButton("Re-run"),clear=new JButton("Clear Highlights"),close=new JButton("Close");previous.addActionListener(e->{if(table.getRowCount()>0)table.setRowSelectionInterval((table.getSelectedRow()-1+table.getRowCount())%table.getRowCount(),(table.getSelectedRow()-1+table.getRowCount())%table.getRowCount());});next.addActionListener(e->{if(table.getRowCount()>0){int x=(table.getSelectedRow()+1)%table.getRowCount();table.setRowSelectionInterval(x,x);}});rerun.addActionListener(e->{d.dispose();showNetworkDebugger(owner);});clear.addActionListener(e->{imagePanel.clearDebugHighlights();imagePanel.repaint();});close.addActionListener(e->d.dispose());for(JButton b:Arrays.asList(previous,next,rerun,clear,close))buttons.add(b);d.add(buttons,BorderLayout.SOUTH);packDialog(d, 900, 420);d.setLocationRelativeTo(owner);d.setVisible(true);
     }
 
     private void checkUnconnectedVerticesAndLines(JFrame frame){
@@ -1051,8 +1368,10 @@ public class CellDivisionInference implements PlugIn {
         gbc.weighty = 1.0;
         panel.add(Box.createVerticalGlue(), gbc);
 
-        panel.setPreferredSize(new Dimension(300, 620));
-        panel.setMinimumSize(new Dimension(250, 200));
+        int em = panel.getFontMetrics(panel.getFont()).charWidth('M');
+        int line = panel.getFontMetrics(panel.getFont()).getHeight();
+        panel.setPreferredSize(new Dimension(Math.max(300, 34 * em), Math.max(620, (row + 3) * (line + 6))));
+        panel.setMinimumSize(new Dimension(Math.max(250, 28 * em), Math.max(200, 8 * line)));
         return panel;
     }
 
@@ -4662,7 +4981,7 @@ public class CellDivisionInference implements PlugIn {
         bottom.add(clearCache);
         dialog.add(bottom, BorderLayout.SOUTH);
 
-        dialog.setSize(900, 600);
+        packDialog(dialog, 760, 520);
         dialog.setLocationRelativeTo(frame);
         dialog.setVisible(true);
     }
@@ -6295,7 +6614,7 @@ public class CellDivisionInference implements PlugIn {
         cancelBtn.addActionListener(e -> worker.cancel(true));
         worker.execute();
 
-        prog.setSize(420, 120);
+        packDialog(prog, 420, 120);
         prog.setLocationRelativeTo(frame);
         prog.setVisible(true);
     }
@@ -6409,7 +6728,7 @@ public class CellDivisionInference implements PlugIn {
         });
         cancel.addActionListener(e -> dialog.dispose());
 
-        dialog.setSize(520, 240);
+        packDialog(dialog, 520, 240);
         dialog.setLocationRelativeTo(frame);
         dialog.setVisible(true);
     }
@@ -7956,7 +8275,7 @@ public class CellDivisionInference implements PlugIn {
 
         cancel.addActionListener(e -> dialog.dispose());
 
-        dialog.setSize(580, 680);
+        packDialog(dialog, 580, 680);
         dialog.setLocationRelativeTo(frame);
         dialog.setVisible(true);
     }
